@@ -4,7 +4,9 @@
 
 ## Текущее состояние
 
-Подготовлены полный игровой дизайн, архитектура, roadmap, OpenSpec и минимальная основа Godot. Десять статических десктопных макетов опубликованы в [Figma](https://www.figma.com/design/OejURNEY5ZRhWWOBicFNYP?node-id=0-1), initial commit опубликован в GitHub. Это не интерактивный прототип и не библиотека production-компонентов. Игровая гонка, сетевые сервисы, аккаунты и реальные платежи ещё не реализованы. Новые сюжетные названия остаются заглушками.
+Подготовлены полный игровой дизайн, архитектура, roadmap и OpenSpec. Начата реализация технического прототипа: Godot Web, тестовая трасса, дрифт с ускорением, серверная физика, браузерная оболочка и local/test вход без Google. Десять принятых статических макетов доступны в [Figma](https://www.figma.com/design/OejURNEY5ZRhWWOBicFNYP?node-id=0-1).
+
+Это ещё не первый полный игровой тест: нет предметов, ботов, рейтинга, кампании, Google-входа и платежей. Модели машины и трассы являются тестовой геометрией, не готовым 3D-контентом по концепт-арту. Сюжетные названия остаются заглушками. Проверенные возможности и ограничения фиксируются в [статусе поставки](docs/delivery.md).
 
 | Артефакт | Назначение |
 | --- | --- |
@@ -14,33 +16,44 @@
 | [OpenSpec proposal](openspec/changes/design-gnom-fiji-racing/proposal.md) | Что и зачем создаётся |
 | [OpenSpec design](openspec/changes/design-gnom-fiji-racing/design.md) | Решения и компромиссы реализации |
 | [Задачи](openspec/changes/design-gnom-fiji-racing/tasks.md) | Проверяемый список будущей реализации |
-| [Godot foundation](game/README.md) | Запуск, Web export и результаты проверки |
+| [Godot](game/README.md) | Запуск, управление и границы прототипа |
+| [Toolchain](docs/toolchain.md) | Версии, контрольные суммы templates и воспроизводимый export |
+| [Сетевой прототип](docs/network-prototype.md) | Сервер, билеты, prediction и проверки протокола |
+| [Backend](backend/README.md) | Dev-вход, PostgreSQL, защита сессий и тесты |
 | [Макеты](design/README.md) | Редактируемые экраны, иллюстрации и статус Figma |
 
-## Запуск основы
+## Локальный запуск
 
-Открыть `game/project.godot` в Godot **4.7.2** и запустить проект. Проверенный бинарный build: `4.7.2.stable.official.ed1daf0bf`.
+Нужны Node.js **24 LTS** и Godot **4.7.2** (`4.7.2.stable.official.ed1daf0bf`). `GODOT_BIN` можно задать абсолютным путём к бинарнику; по умолчанию используется `godot` из PATH. Установка export templates загружает официальный архив размером около 1.28 GB с проверкой SHA-256.
 
 ```sh
-godot --editor --path game
-godot --headless --editor --path game --import
-godot --headless --path game --quit-after 2
+node scripts/setup-godot.mjs
+npm --prefix backend ci
+npm --prefix backend run build
+node scripts/export-web.mjs
+node scripts/dev.mjs --detach
 ```
 
-Для Web export установить соответствующие export templates; текущая проверка headless не подтверждает браузерную производительность. Настроен Compatibility, GDScript и single-thread Web preset.
+Последняя команда печатает адрес игры, обычно `http://127.0.0.1:8787`. При занятом порте выбирается следующий. Запускаются loopback-only API, portable PostgreSQL и headless race worker. Google-конфигурация не требуется. Локальные данные и журналы находятся в игнорируемых `.local/` и `backend/.local/`.
+
+```sh
+node scripts/dev.mjs --stop
+```
+
+Для одиночной проверки физики достаточно открыть `game/project.godot` в Godot и запустить главную сцену. Этот native-режим не использует аккаунты и сетевую гонку.
 
 ## Разработка
 
 Первый игровой тест: **одна трасса, три машины, шесть предметов и онлайн**. Полная цель: 10+ персонажей, 30+ машин, 10 трасс, 25+ предметов, 15+ модификаций.
 
-В архитектуре предусмотрены Google-вход и отдельный local/test вход без Google OAuth. Оба создают обычную игровую сессию, но dev-профили недоступны в публичном окружении. Реализация авторизации ещё впереди; сейчас Google configuration для запуска основы не нужна. PostgreSQL хранит постоянные данные, физика работает в памяти Godot. Linux ARM64 на 4/8 ядрах является целью испытаний, не подтверждённым бюджетом одновременных игроков.
+Dev-профили используют настоящие серверные сессии, CSRF и отдельную локальную БД; публичное окружение не должно включать этот провайдер. Google-вход остаётся отдельной задачей. PostgreSQL хранит постоянные данные, физика работает в памяти Godot. Транспорт WS используется только на loopback: выбор production WebRTC/WSS ещё не завершён. Linux ARM64 на 4/8 ядрах является целью испытаний, не подтверждённым бюджетом одновременных игроков.
 
 ```sh
 openspec status --change design-gnom-fiji-racing
 openspec validate design-gnom-fiji-racing --strict
 ```
 
-Для реализации использовать `/opsx:apply` с change `design-gnom-fiji-racing`. Готовые документы не означают готовый продукт.
+Продолжение реализации: `/opsx:apply design-gnom-fiji-racing`. Готовые документы и успешный cross-export не означают готовый продукт или проверенную серверную ёмкость.
 
 ## Источники и публикация
 

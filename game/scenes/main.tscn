@@ -1,49 +1,6 @@
-[gd_scene format=3]
+[gd_scene load_steps=2 format=3]
 
-[node name="Foundation" type="Control"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+[ext_resource type="Script" path="res://app/prototype.gd" id="1_prototype"]
 
-[node name="Margin" type="MarginContainer" parent="."]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 24
-
-[node name="Content" type="VBoxContainer" parent="Margin"]
-layout_mode = 2
-theme_override_constants/separation = 20
-alignment = 1
-
-[node name="Title" type="Label" parent="Margin/Content"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.96, 0.28, 1)
-theme_override_font_sizes/font_size = 32
-text = "GNOM FIJI PIVO RAUL RACING"
-horizontal_alignment = 1
-autowrap_mode = 2
-
-[node name="Status" type="Label" parent="Margin/Content"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "ПРОТОТИП · ПОДГОТОВКА ПРОЕКТА"
-horizontal_alignment = 1
-autowrap_mode = 2
-
-[node name="Milestone" type="Label" parent="Margin/Content"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.7, 0.74, 0.73, 1)
-theme_override_font_sizes/font_size = 16
-text = "Первый игровой тест: 1 трасса · 3 машины · 6 предметов"
-horizontal_alignment = 1
-autowrap_mode = 2
+[node name="Prototype" type="Node3D"]
+script = ExtResource("1_prototype")

@@ -1,0 +1,5 @@
+**
+!build/
+!build/server/
+!build/server/gnom-racing.arm64
+!build/server/gnom-racing.pck

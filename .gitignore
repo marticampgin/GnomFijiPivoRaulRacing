@@ -1,6 +1,11 @@
 # Godot editor cache and generated exports.
 .godot/
 /build/
+/.tools/
+/.local/
+node_modules/
+/backend/dist/
+/backend/.local/
 /game/export_credentials.cfg
 
 # Local tools and operating-system files.

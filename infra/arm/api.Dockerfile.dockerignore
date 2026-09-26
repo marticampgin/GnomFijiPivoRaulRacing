@@ -1,0 +1,16 @@
+**
+!backend/
+!backend/package.json
+!backend/package-lock.json
+!backend/src/
+!backend/src/**
+!backend/migrations/
+!backend/migrations/**
+!web/
+!web/**
+!build/
+!build/web/
+!build/web/**
+!infra/
+!infra/arm/
+!infra/arm/api-entry.ts
