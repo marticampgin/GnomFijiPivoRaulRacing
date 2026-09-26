@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "width": 1600,
+  "height": 900,
+  "locale": "ru",
+  "figmaPublished": false,
+  "frames": [
+    {
+      "id": "01-hub",
+      "title": "Главный экран"
+    },
+    {
+      "id": "02-garage",
+      "title": "Гараж и сборка"
+    },
+    {
+      "id": "03-ranked-lobby",
+      "title": "Рейтинговое лобби"
+    },
+    {
+      "id": "04-race-hud",
+      "title": "Гонка: основной HUD"
+    },
+    {
+      "id": "05-results",
+      "title": "Результаты гонки"
+    },
+    {
+      "id": "06-campaign",
+      "title": "Кампания и сюжетная карта"
+    },
+    {
+      "id": "07-shop",
+      "title": "Магазин и кристаллы"
+    },
+    {
+      "id": "08-friend-room",
+      "title": "Комната друзей"
+    },
+    {
+      "id": "09-architecture",
+      "title": "Архитектура: браузер, сервисы, гонка"
+    },
+    {
+      "id": "10-interface-states",
+      "title": "Ключевые состояния интерфейса"
+    }
+  ]
+}

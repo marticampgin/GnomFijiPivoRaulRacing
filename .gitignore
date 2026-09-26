@@ -1,0 +1,10 @@
+# Godot editor cache and generated exports.
+.godot/
+/build/
+/game/export_credentials.cfg
+
+# Local tools and operating-system files.
+.DS_Store
+.env
+.env.*
+!.env.example

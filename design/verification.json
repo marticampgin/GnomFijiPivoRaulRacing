@@ -1,0 +1,57 @@
+{
+  "frames": [
+    {
+      "id": "01-hub",
+      "textCount": 31,
+      "overflow": []
+    },
+    {
+      "id": "02-garage",
+      "textCount": 51,
+      "overflow": []
+    },
+    {
+      "id": "03-ranked-lobby",
+      "textCount": 62,
+      "overflow": []
+    },
+    {
+      "id": "04-race-hud",
+      "textCount": 31,
+      "overflow": []
+    },
+    {
+      "id": "05-results",
+      "textCount": 76,
+      "overflow": []
+    },
+    {
+      "id": "06-campaign",
+      "textCount": 45,
+      "overflow": []
+    },
+    {
+      "id": "07-shop",
+      "textCount": 47,
+      "overflow": []
+    },
+    {
+      "id": "08-friend-room",
+      "textCount": 66,
+      "overflow": []
+    },
+    {
+      "id": "09-architecture",
+      "textCount": 52,
+      "overflow": []
+    },
+    {
+      "id": "10-interface-states",
+      "textCount": 46,
+      "overflow": []
+    }
+  ],
+  "galleryImagesLoaded": true,
+  "mobileGalleryOverflow": false,
+  "note": "Mobile gallery only; gameplay mockups are desktop designs."
+}
