@@ -3,7 +3,8 @@
   "width": 1600,
   "height": 900,
   "locale": "ru",
-  "figmaPublished": false,
+  "figmaPublished": true,
+  "figmaPublication": "figma-publication.json",
   "frames": [
     {
       "id": "01-hub",

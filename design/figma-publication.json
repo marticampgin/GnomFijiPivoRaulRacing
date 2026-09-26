@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "publishedOn": "2026-09-26",
+  "acceptedByUserOn": "2026-09-26",
+  "fileKey": "OejURNEY5ZRhWWOBicFNYP",
+  "fileUrl": "https://www.figma.com/design/OejURNEY5ZRhWWOBicFNYP?node-id=0-1",
+  "sourcePresentationUnchanged": true,
+  "staticDesktopMockups": true,
+  "interactivePrototype": false,
+  "productionComponentLibrary": false,
+  "fontSubstitution": {
+    "source": "Arial",
+    "figma": "Arimo",
+    "styles": [
+      "Regular",
+      "Bold"
+    ]
+  },
+  "iconSubstitution": {
+    "source": "Three up-right arrow characters",
+    "figma": "Lucide ArrowUpRight vector icons"
+  },
+  "verification": {
+    "allFrameScreenshotsRendered": true,
+    "contactSheetReviewed": true,
+    "hudReviewedAtFullSize": true,
+    "hubAndShopReviewedAfterIconFix": true
+  },
+  "pageId": "0:1",
+  "boardCount": 10,
+  "totalNativeText": 505,
+  "totalImages": 8,
+  "frames": [
+    {
+      "id": "01-hub",
+      "nodeId": "3:2",
+      "width": 1600,
+      "height": 900,
+      "textCount": 29,
+      "imageCount": 1,
+      "vectorIcons": 2,
+      "wrongFont": [],
+      "missingText": [],
+      "outOfBounds": []
+    },
+    {
+      "id": "02-garage",
+      "nodeId": "3:22",
+      "width": 1600,
+      "height": 900,
+      "textCount": 51,
+      "imageCount": 1,
+      "vectorIcons": 0,
+      "wrongFont": [],
+      "missingText": [],
+      "outOfBounds": []
+    },
+    {
+      "id": "03-ranked-lobby",
+      "nodeId": "3:60",
+      "width": 1600,
+      "height": 900,
+      "textCount": 62,
+      "imageCount": 1,
+      "vectorIcons": 0,
+      "wrongFont": [],
+      "missingText": [],
+      "outOfBounds": []
+    },
+    {
+      "id": "04-race-hud",
+      "nodeId": "3:101",
+      "width": 1600,
+      "height": 900,
+      "textCount": 31,
+      "imageCount": 1,
+      "vectorIcons": 0,
+      "wrongFont": [],
+      "missingText": [],
+      "outOfBounds": []
+    },
+    {
+      "id": "05-results",
+      "nodeId": "3:130",
+      "width": 1600,
+      "height": 900,
+      "textCount": 76,
+      "imageCount": 1,
+      "vectorIcons": 0,
+      "wrongFont": [],
+      "missingText": [],
+      "outOfBounds": []
+    },
+    {
+      "id": "06-campaign",
+      "nodeId": "3:166",
+      "width": 1600,
+      "height": 900,
+      "textCount": 45,
+      "imageCount": 1,
+      "vectorIcons": 0,
+      "wrongFont": [],
+      "missingText": [],
+      "outOfBounds": []
+    },
+    {
+      "id": "07-shop",
+      "nodeId": "3:198",
+      "width": 1600,
+      "height": 900,
+      "textCount": 47,
+      "imageCount": 1,
+      "vectorIcons": 1,
+      "wrongFont": [],
+      "missingText": [],
+      "outOfBounds": []
+    },
+    {
+      "id": "08-friend-room",
+      "nodeId": "3:239",
+      "width": 1600,
+      "height": 900,
+      "textCount": 66,
+      "imageCount": 1,
+      "vectorIcons": 0,
+      "wrongFont": [],
+      "missingText": [],
+      "outOfBounds": []
+    },
+    {
+      "id": "09-architecture",
+      "nodeId": "3:269",
+      "width": 1600,
+      "height": 900,
+      "textCount": 52,
+      "imageCount": 0,
+      "vectorIcons": 0,
+      "wrongFont": [],
+      "missingText": [],
+      "outOfBounds": []
+    },
+    {
+      "id": "10-interface-states",
+      "nodeId": "3:294",
+      "width": 1600,
+      "height": 900,
+      "textCount": 46,
+      "imageCount": 0,
+      "vectorIcons": 0,
+      "wrongFont": [],
+      "missingText": [],
+      "outOfBounds": []
+    }
+  ]
+}
