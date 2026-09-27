@@ -144,6 +144,8 @@ func _process(delta: float) -> void:
 	if is_instance_valid(_local) and is_instance_valid(_local_visual):
 		_local_visual.update_visual(delta, _local.speed_mps, _local.steering_amount, _local.is_drifting, minf(1.0, _local.boost_remaining))
 		_local_visual.visible = _combat_visible(_client_combat)
+		if _local_visual.has_method("set_combat_visual"):
+			_local_visual.set_combat_visual(_client_combat)
 	if _joined and Time.get_ticks_msec() - _last_ping_ms >= 1000:
 		_last_ping_ms = Time.get_ticks_msec()
 		_send({"type": "ping", "sent": _last_ping_ms})
@@ -670,6 +672,7 @@ func _apply_snapshot(packet: Dictionary) -> void:
 			_remotes[id]["node"].queue_free()
 			_remotes.erase(id)
 	_hud["players"] = public_players
+	_hud["attack_warning"] = _attack_warning(item_world, _player_id, _local) if _can_drive() else ""
 
 
 func _can_drive() -> bool:
@@ -745,6 +748,8 @@ func _interpolate_remotes(delta: float) -> void:
 				remote.erase("near_lead")
 		remote["node"].global_transform = result
 		remote["node"].visible = _combat_visible(remote.get("combat", {}))
+		if remote["node"].has_method("set_combat_visual"):
+			remote["node"].set_combat_visual(remote.get("combat", {}))
 		remote["node"].update_visual(delta, motion["speed"], motion["steering"], motion["drifting"], minf(1.0, motion["boost"]))
 
 
@@ -820,6 +825,7 @@ func _publish_hud() -> void:
 		"items": _client_combat.get("slots", ["", ""]), "health": _client_combat.get("health", 100.0), "maxHealth": _client_combat.get("max_health", 100.0),
 		"shards": _client_combat.get("shards", 0), "shardCap": _items.Catalog.SHARD_CAP,
 		"driving": _hud.get("driving", {}),
+		"attackWarning": _hud.get("attack_warning", "") if _can_drive() else "",
 		"effects": _client_combat.get("effects", {}), "itemAck": _client_combat.get("item_ack", 0),
 		"destroyedRemaining": _client_combat.get("destroyed_remaining", 0.0), "invulnerableRemaining": _client_combat.get("invulnerable_remaining", 0.0),
 		"canUseItems": _joined and _can_drive() and _focused and _input_enabled,
@@ -858,6 +864,25 @@ func _drift_segments(charge: float) -> Array:
 	return segments
 
 
+func _attack_warning(world: Dictionary, player_id: String, vehicle: Node3D) -> String:
+	if not is_instance_valid(vehicle):
+		return ""
+	var closest: float = INF
+	var direction: String = ""
+	for projectile: Dictionary in world.get("projectiles", []):
+		if projectile.get("kind") != "seeker" or projectile.get("target", "") != player_id:
+			continue
+		var point: Array = projectile.position
+		var offset: Vector3 = Vector3(point[0], point[1], point[2]) - vehicle.global_position
+		if offset.length_squared() >= closest:
+			continue
+		closest = offset.length_squared()
+		var forward: float = offset.dot(-vehicle.global_basis.z)
+		var right: float = offset.dot(vehicle.global_basis.x)
+		direction = ("front" if forward >= 0.0 else "rear") if absf(forward) >= absf(right) else ("right" if right >= 0.0 else "left")
+	return direction
+
+
 func _local_devices() -> Array:
 	var devices: Array = [{"id": -1, "name": "Keyboard"}]
 	for device: int in Input.get_connected_joypads():
@@ -882,6 +907,7 @@ func _local_hud_state() -> Dictionary:
 		var combat: Dictionary = entry.combat
 		var seat: Dictionary = row.duplicate()
 		seat.merge({"device": snapshot.devices[entry.slot], "styleId": entry.style_id,
+			"attackWarning": _attack_warning(snapshot.items_world, entry.id, vehicle) if not entry.finished and float(combat.destroyed_remaining) <= 0.0 else "",
 			"shards": combat.shards, "shardCap": _items.Catalog.SHARD_CAP, "driving": entry.driving,
 			"speed": vehicle.speed_mps * 3.6, "lap": entry.lap, "laps": RACE_LAPS,
 			"reverse": vehicle.velocity.dot(-vehicle.global_basis.z) < -0.1,

@@ -17,7 +17,7 @@
     onExit() { leave(); },
     onGraphics(value) { graphics = value; saveGraphics(); },
   });
-  const itemLabels = {fanta:'Fanta', mermaid_rum:'Mermaid Rum', ice_rum:'Ice Rum', stroh80:'Stroh 80', lays_crab:'Lay’s Crab', bfg10k:'BFG 10K'};
+  const itemLabels = {fanta:'Fanta', mermaid_rum:'Mermaid Rum', ice_rum:'Ice Rum', stroh80:'Stroh 80', lays_crab:'Lay’s Crab', bfg10k:'BFG 10K', crystal_shield:'Кристальный щит', seeker:'Кристальная ракета', rear_trap:'Рунная ловушка'};
   function renderItems(state) {
     for (let slot = 0; slot < 2; slot++) {
       const button = $(`item-slot-${slot}`), id = state.items?.[slot], label = itemLabels[id];
@@ -41,11 +41,14 @@
     $('destroyed-status').textContent = remaining > 0 ? `ВОССТАНОВЛЕНИЕ · ${Math.ceil(remaining)}` : '';
     const effects = {...state.effects};
     if (state.invulnerableRemaining > 0) effects.invulnerable = {remaining:state.invulnerableRemaining};
-    const labels = {...itemLabels, burn:'Горение', invulnerable:'Защита'};
+    const labels = {...itemLabels, burn:'Горение', invulnerable:'Защита', weapon_guard:'Защита от удара'};
+    const warnings = {rear:'РАКЕТА СЗАДИ',front:'РАКЕТА ВПЕРЕДИ',left:'РАКЕТА СЛЕВА',right:'РАКЕТА СПРАВА'};
+    $('attack-warning').hidden = !Object.hasOwn(warnings,state.attackWarning);
+    $('attack-warning').textContent = $('attack-warning').hidden ? '' : `! ${warnings[state.attackWarning]}`;
     $('item-effects').replaceChildren(...Object.entries(effects).filter(([id, effect]) => labels[id] && Number(effect?.remaining ?? effect) > 0).map(([id, effect]) => {
       const badge = document.createElement('span'), icon = document.createElement('img'), timer = document.createElement('b');
       badge.className = `item-effect ${id}`; badge.title = labels[id]; badge.setAttribute('aria-label', `${labels[id]}: ${Math.ceil(Number(effect?.remaining ?? effect))} с`);
-      icon.src = `/assets/items/${id === 'burn' ? 'stroh80' : id === 'invulnerable' ? 'ice_rum' : id}.png`; icon.alt = '';
+      icon.src = `/assets/items/${id === 'burn' ? 'stroh80' : ['invulnerable','weapon_guard'].includes(id) ? 'crystal_shield' : id}.png`; icon.alt = '';
       timer.textContent = `${Math.ceil(Number(effect?.remaining ?? effect))}с`; badge.append(icon,timer); return badge;
     }));
     const blur = Math.max(0, Math.min(1, Number(state.blurIntensity) || 0));

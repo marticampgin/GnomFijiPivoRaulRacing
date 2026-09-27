@@ -1,9 +1,11 @@
 class_name ItemCatalog
 extends RefCounted
 
-const IDS: Array[String] = ["fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k"]
+const IDS: Array[String] = ["fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k", "crystal_shield", "seeker", "rear_trap"]
 # Versioned MVP balance baseline, not a guaranteed comeback for trailing racers.
-const LOOT_VERSION: int = 1
+const LOOT_VERSION: int = 2
+const COMBAT_VERSION: int = 1
+const WEAPON_GUARD_SECONDS: float = 0.75
 const SHARD_VERSION: int = 1
 const SHARD_CAP: int = 20
 const SHARD_TOP_SPEED_BONUS: float = 0.10
@@ -17,6 +19,7 @@ const LOOT_GAP_METERS: float = 150.0
 const TRAILING_WEIGHTS: Dictionary = {
 	"fanta": 1.40, "mermaid_rum": 1.05, "ice_rum": 1.20,
 	"stroh80": 1.15, "lays_crab": 0.90, "bfg10k": 1.25,
+	"crystal_shield": 1.10, "seeker": 1.20, "rear_trap": 0.90,
 }
 const DEFINITIONS: Dictionary = {
 	"fanta": {"duration": 4.0, "speed": 1.30},
@@ -25,6 +28,9 @@ const DEFINITIONS: Dictionary = {
 	"stroh80": {"radius": 5.0, "damage": 25.0, "burn_damage": 5.0, "burn_duration": 4.0, "speed": 25.0, "gravity": 12.0},
 	"lays_crab": {"duration": 8.0, "damage_multiplier": 1.15},
 	"bfg10k": {"radius": 9.0, "damage": 55.0, "speed": 42.0, "gravity": 0.0},
+	"crystal_shield": {"duration": 5.0},
+	"seeker": {"radius": 2.2, "damage": 30.0, "speed": 30.0, "gravity": 0.0, "lifetime": 4.0, "arm": 0.65, "turn_rate": 1.2, "range": 60.0},
+	"rear_trap": {"radius": 1.8, "damage": 25.0, "speed": 0.0, "gravity": 0.0, "lifetime": 12.0, "arm": 0.65, "rear_distance": 3.0},
 }
 
 

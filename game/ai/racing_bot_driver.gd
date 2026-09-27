@@ -100,7 +100,7 @@ func item_slots(player: Dictionary, players: Dictionary, tick: int) -> Array[int
 		if difficulty == "hard":
 			if player.combat.effects.has(item):
 				continue
-			if item in ["stroh80", "bfg10k"] and not _target_ahead(player, players, 25.0 if item == "stroh80" else 50.0):
+			if item in ["stroh80", "bfg10k", "seeker"] and not _target_ahead(player, players, 25.0 if item == "stroh80" else 50.0):
 				continue
 			if item == "fanta" and absf(float(_held_command.get("steering", 0.0))) > 0.4:
 				continue

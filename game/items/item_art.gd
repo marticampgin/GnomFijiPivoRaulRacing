@@ -41,6 +41,12 @@ static func crystal(root: Node3D, position: Vector3, color: Color, size: float =
 static func create_item(id: String) -> Node3D:
 	if id == "engine_shard":
 		return create_shard()
+	if id == "crystal_shield":
+		return create_shield()
+	if id == "seeker":
+		return create_seeker()
+	if id == "rear_trap":
+		return create_trap()
 	var root := Node3D.new()
 	root.name = id
 	var dark := Color("193737")
@@ -83,6 +89,72 @@ static func create_item(id: String) -> Node3D:
 			box(root, Vector3(0.2, 0.1, 0.12), Vector3(0.08, 0.74, 0), dark).rotation.z = -0.4
 	return root
 
+
+static func create_shield() -> Node3D:
+	var root := Node3D.new()
+	root.name = "crystal_shield"
+	var rim := cylinder(root, 0.66, 0.66, 0.13, Vector3.ZERO, Color("e6bb64"))
+	(rim.mesh as CylinderMesh).radial_segments = 6
+	rim.rotation.x = PI / 2.0
+	var face := cylinder(root, 0.54, 0.54, 0.16, Vector3(0, 0, -0.05), Color("176e89"))
+	(face.mesh as CylinderMesh).radial_segments = 6
+	face.rotation.x = PI / 2.0
+	crystal(root, Vector3(0, 0, -0.22), Color("83ffff"), 0.35)
+	for side in [-1.0, 1.0]:
+		box(root, Vector3(0.10, 0.35, 0.08), Vector3(side * 0.31, 0, -0.18), Color("72ece6"), 0.3).rotation.z = side * 0.35
+	return root
+
+static func create_seeker() -> Node3D:
+	var root := Node3D.new()
+	root.name = "seeker"
+	cylinder(root, 0.18, 0.18, 0.7, Vector3.ZERO, Color("944269")).rotation.x = PI / 2.0
+	cylinder(root, 0.19, 0, 0.43, Vector3(0, 0, -0.54), Color("ff768b")).rotation.x = -PI / 2.0
+	cylinder(root, 0.23, 0.23, 0.12, Vector3(0, 0, 0.28), Color("e6bb64")).rotation.x = PI / 2.0
+	for side in [-1.0, 1.0]:
+		var fin := PrismMesh.new()
+		fin.size = Vector3(0.4, 0.13, 0.43)
+		part(root, fin, Vector3(side * 0.25, 0, 0.18), Color("e6bb64"))
+	box(root, Vector3(0.1, 0.36, 0.28), Vector3(0, 0.16, 0.2), Color("d99c58"))
+	crystal(root, Vector3(0, 0.23, -0.13), Color("ffb2c1"), 0.14)
+	cylinder(root, 0.09, 0, 0.32, Vector3(0, 0, 0.47), Color("6af6e8")).rotation.x = PI / 2.0
+	return root
+
+static func create_trap() -> Node3D:
+	var root := Node3D.new()
+	root.name = "rear_trap"
+	cylinder(root, 0.55, 0.46, 0.17, Vector3(0, 0.09, 0), Color("493b57"))
+	cylinder(root, 0.40, 0.34, 0.1, Vector3(0, 0.22, 0), Color("e6bb64"))
+	crystal(root, Vector3(0, 0.39, 0), Color("ff6982"), 0.32)
+	for index in range(6):
+		var angle := TAU * index / 6.0
+		var spike := cylinder(root, 0.14, 0, 0.43, Vector3(sin(angle) * 0.40, 0.32, cos(angle) * 0.40), Color("edbd73"))
+		spike.rotation = Vector3(cos(angle) * 0.45, 0, -sin(angle) * 0.45)
+	return root
+
+static func create_shield_aura() -> Node3D:
+	var root := Node3D.new()
+	root.name = "CrystalShieldAura"
+	var dome := SphereMesh.new()
+	dome.radius = 1.6
+	dome.height = 3.2
+	dome.radial_segments = 12
+	dome.rings = 6
+	var shell := part(root, dome, Vector3(0, 0.65, 0), Color(0.25, 0.9, 0.94, 0.10), 0.15)
+	shell.scale = Vector3(1, 0.75, 1.2)
+	var skin := shell.material_override as StandardMaterial3D
+	skin.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	skin.cull_mode = BaseMaterial3D.CULL_DISABLED
+	shell.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	for height in [0.05, 1.2]:
+		var ring := TorusMesh.new()
+		ring.inner_radius = 1.42
+		ring.outer_radius = 1.46
+		ring.rings = 12
+		ring.ring_segments = 6
+		var band := part(root, ring, Vector3(0, height, 0), Color("72ece6"), 0.35)
+		band.scale.z = 1.2
+		band.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return root
 
 static func create_shard() -> Node3D:
 	var root := Node3D.new()
@@ -132,6 +204,8 @@ static func create_pickup() -> Node3D:
 static func create_explosion(kind: String) -> Node3D:
 	var root := Node3D.new()
 	var color := Color("a9ef63") if kind.contains("bfg") else Color("ffac48")
+	if kind.contains("seeker") or kind.contains("rear_trap"):
+		color = Color("ff7895")
 	var mesh := SphereMesh.new()
 	mesh.radius = 0.5
 	mesh.height = 1.0

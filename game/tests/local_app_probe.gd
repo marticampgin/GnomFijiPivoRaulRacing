@@ -50,6 +50,30 @@ func _run() -> void:
 	_check(hud.seats[0].shards == 7 and hud.seats[0].shardCap == 20, "race-only shard reserve reaches owning HUD")
 	_check(hud.seats[0].driftLevel == 2 and hud.seats[0].driftSegments == [1.0, 1.0, 0.0], "HUD derives three drift segments from simulation thresholds")
 	_check(hud.seats[0].driving.slipstream_charge == 0.5, "authoritative technique state reaches owning HUD")
+	var projectile_position: Vector3 = player.vehicle.global_position + player.vehicle.global_basis.z * 8.0
+	var warning_world: Dictionary = {"projectiles": [{"kind": "seeker", "target": player.id, "position": [projectile_position.x, projectile_position.y, projectile_position.z]}]}
+	_check(app._attack_warning(warning_world, player.id, player.vehicle) == "rear", "incoming marker uses actual rear direction")
+	_check(app._attack_warning(warning_world, "another-seat", player.vehicle) == "", "warning never leaks to another seat")
+	projectile_position = player.vehicle.global_position + player.vehicle.global_basis.x * 8.0
+	warning_world.projectiles[0].position = [projectile_position.x, projectile_position.y, projectile_position.z]
+	_check(app._attack_warning(warning_world, player.id, player.vehicle) == "right", "warning follows actual side instead of hardcoded rear")
+	player.combat.slots = ["crystal_shield", "rear_trap"]
+	player.combat.effects.burn = {"remaining": 3.0, "damage": 4.0}
+	app._on_local_message({"type": "local_use_item", "seat": 0, "slot": 0})
+	await _step(app)
+	hud = app._local_hud_state()
+	_check(hud.seats[0].items == ["", "rear_trap"] and hud.seats[0].effects.has("crystal_shield") and hud.seats[0].effects.has("burn"), "shield activation uses own slot without clearing burn")
+	var visual: Node3D = app._local_view._visuals[player.vehicle.get_instance_id()]
+	_check(is_instance_valid(visual._shield_aura) and visual._shield_aura.visible, "shared view renders shield on the owning kart")
+	app._on_local_message({"type": "local_use_item", "seat": 0, "slot": 1})
+	await _step(app)
+	_check(session._items.world_state().projectiles.any(func(projectile: Dictionary) -> bool: return projectile.kind == "rear_trap"), "local item command deploys a real shared trap")
+	var shield_time: float = float(player.combat.effects.crystal_shield.remaining)
+	app._on_local_message({"type": "local_pause"})
+	await _step(app)
+	_check(float(player.combat.effects.crystal_shield.remaining) == shield_time, "local pause freezes shield duration")
+	app._on_local_message({"type": "local_resume"})
+	player.combat.effects.clear()
 	player.vehicle.velocity = player.vehicle.global_basis.z * 2.0
 	_check(app._local_hud_state().seats[0].reverse, "reverse indicator follows actual signed motion")
 	player.vehicle.velocity = -player.vehicle.global_basis.z * 2.0
@@ -77,6 +101,7 @@ func _run() -> void:
 	_check(app._local_hud_state().botDifficulty == "hard", "rematch keeps chosen difficulty")
 	_check(app._local_hud_state().seats[0].items == ["", ""], "rematch clears projected inventory")
 	_check(app._local_hud_state().seats[0].shards == 0 and app._local_hud_state().seats[0].driving.slipstream_charge == 0.0, "rematch clears shards and technique HUD")
+	_check(not visual._shield_aura.visible and session._items.world_state().projectiles.is_empty() and app._local_hud_state().seats[0].attackWarning == "", "rematch clears shield visuals, traps and attack warning")
 	app._on_local_message({"type": "local_leave"})
 	_check(not is_instance_valid(app._local_race) and not is_instance_valid(app._local_view), "leave removes local authority and views")
 	_check(not root.disable_3d and app._camera.current, "leave restores network/practice rendering")

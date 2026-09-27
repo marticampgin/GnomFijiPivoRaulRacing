@@ -4,12 +4,12 @@ extends RefCounted
 const Vehicle = preload("res://vehicle/racing_vehicle.gd")
 const Styles = preload("res://vehicle/driving_styles.gd")
 const Catalog = preload("res://items/item_catalog.gd")
-const WIRE_VERSION: int = 6
+const WIRE_VERSION: int = 7
 const TICKET_VERSION: int = 3
 const VEHICLE_STATE_VERSION: int = Vehicle.STATE_VERSION
 const TRACK_SCHEMA_VERSION: int = 1
 const MATCH_ID: String = "prototype-1"
-const LOADOUT_HASH: String = "prototype-v9"
+const LOADOUT_HASH: String = "prototype-v10"
 const NEUTRAL: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 0.0, "drift": false}
 # Simulation-only parking command; never serialized as a player input packet.
 const BLOCKED: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false, "drive_blocked": true}
@@ -59,18 +59,19 @@ static func validate_combat(data: Variant) -> Dictionary:
 	if not slots is Array or slots.size() != 2:
 		return {}
 	for slot: Variant in slots:
-		if not slot is String or not slot in ["", "fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k"]:
+		if not slot is String or not slot in ["", "fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k", "crystal_shield", "seeker", "rear_trap"]:
 			return {}
 	var effects: Variant = data.get("effects")
-	if not effects is Dictionary or effects.size() > 5:
+	if not effects is Dictionary or effects.size() > 7:
 		return {}
 	for key: Variant in effects:
-		if not key is String or not key in ["fanta", "mermaid_rum", "ice_rum", "lays_crab", "burn"]:
+		if not key is String or not key in ["fanta", "mermaid_rum", "ice_rum", "lays_crab", "burn", "crystal_shield", "weapon_guard"]:
 			return {}
 		var effect: Variant = effects[key]
 		if not effect is Dictionary or effect.size() != (2 if key == "burn" else 1):
 			return {}
-		if not _bounded(effect.get("remaining"), 0.0, 4.0 if key == "burn" else 8.0):
+		var maximum: float = {"burn": 4.0, "crystal_shield": 5.0, "weapon_guard": 0.75}.get(key, 8.0)
+		if not _bounded(effect.get("remaining"), 0.0, maximum):
 			return {}
 		if key == "burn" and not _bounded(effect.get("damage"), 0.0, 5.75):
 			return {}
@@ -115,12 +116,16 @@ static func validate_items_world(data: Variant) -> Dictionary:
 				if category == "shards" and not entry.get("scattered") is bool:
 					return {}
 			elif category == "projectiles":
-				if entry.size() != 3 or not entry.get("kind") in ["stroh80", "bfg10k"]:
+				if entry.size() != 4 or not entry.get("kind") in ["stroh80", "bfg10k", "seeker", "rear_trap"]:
+					return {}
+				if not entry.get("target") is String or entry.target.length() > 128:
+					return {}
+				if entry.kind != "seeker" and not entry.target.is_empty():
 					return {}
 			else:
 				if entry.size() != 4 or not entry.get("kind") is String or not _bounded(entry.get("radius"), 0.0, 20.0):
 					return {}
-				if not entry.kind in ["pickup", "destroyed", "blast_stroh80", "blast_bfg10k", "use_fanta", "use_mermaid_rum", "use_ice_rum", "use_stroh80", "use_lays_crab", "use_bfg10k"]:
+				if not entry.kind in ["pickup", "destroyed", "blast_stroh80", "blast_bfg10k", "blast_seeker", "blast_rear_trap", "use_fanta", "use_mermaid_rum", "use_ice_rum", "use_stroh80", "use_lays_crab", "use_bfg10k", "use_crystal_shield", "use_seeker", "use_rear_trap"]:
 					return {}
 	return data.duplicate(true)
 

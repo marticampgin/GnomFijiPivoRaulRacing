@@ -82,9 +82,11 @@ func _run() -> void:
 	_check(a.combat.shards == count, "blocked hit causes no shard loss")
 	a.combat.invulnerable_remaining = 0.0
 	a.combat.shards = 1
+	a.combat.effects.erase("weapon_guard")
 	items.apply_damage(a, 1.0)
-	_check(a.combat.shards == 0 and a.combat.destroyed_remaining == 0.0 and a.combat.effects.is_empty(), "zero shards causes no additional stun or destruction")
+	_check(a.combat.shards == 0 and a.combat.destroyed_remaining == 0.0 and a.combat.effects.size() == 1 and a.combat.effects.has("weapon_guard"), "zero shards causes no additional stun or destruction")
 	a.combat.shards = 20
+	a.combat.effects.erase("weapon_guard")
 	items.apply_damage(a, 1000.0)
 	_check(a.combat.shards == 0 and a.combat.health == 0.0, "destruction always zeroes stock")
 	a.vehicle.position = Vector3(100, 0, 0)

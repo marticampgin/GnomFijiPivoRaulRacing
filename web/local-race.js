@@ -1,7 +1,8 @@
 (function (root) {
   'use strict';
   const styles = {handling:'Управляемость', acceleration:'Ускорение', speed:'Скорость', drift:'Дрифт'};
-  const items = {fanta:'Fanta', mermaid_rum:'Mermaid Rum', ice_rum:'Ice Rum', stroh80:'Stroh 80', lays_crab:'Lay’s Crab', bfg10k:'BFG 10K'};
+  const items = {fanta:'Fanta', mermaid_rum:'Mermaid Rum', ice_rum:'Ice Rum', stroh80:'Stroh 80', lays_crab:'Lay’s Crab', bfg10k:'BFG 10K', crystal_shield:'Кристальный щит', seeker:'Кристальная ракета', rear_trap:'Рунная ловушка'};
+  const warnings = {rear:'РАКЕТА СЗАДИ',front:'РАКЕТА ВПЕРЕДИ',left:'РАКЕТА СЛЕВА',right:'РАКЕТА СПРАВА'};
   const colors = ['#64e3db','#ffd36b','#ff877b','#a9cfff'];
   const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
   const time = value => { const ms = Math.max(0, Math.floor((Number(value) || 0) * 1000)); return `${String(Math.floor(ms/60000)).padStart(2,'0')}:${String(Math.floor(ms/1000)%60).padStart(2,'0')}.${String(ms%1000).padStart(3,'0')}`; };
@@ -85,10 +86,11 @@
       const driftBars=[0,1,2].map(level=>{const bar=element('progress');bar.max=1;bar.setAttribute('aria-label',`Дрифт P${index+1}, уровень ${level+1}`);driftTrack.append(bar);return bar;});drift.append(driftLabel,driftTrack);
       const speed = element('div','local-speed'), speedValue=element('strong'), reverse=element('b','local-reverse','R'); reverse.hidden=true;reverse.setAttribute('aria-label','Задний ход');speed.append(reverse,speedValue,element('span','','км/ч'));
       const effects=element('div','local-effects'), map=element('canvas','local-map'); map.width=160;map.height=160;map.setAttribute('aria-label',`Карта P${index+1}`);
+      const warning=element('div','local-attack-warning');warning.hidden=true;warning.setAttribute('role','status');
       const countdown=element('div','local-countdown'), finish=element('div','local-finish'), finishTitle=element('strong'),finishTime=element('span');
       const ready=button('Ещё заезд',()=>send({type:'local_ready',seat:index}),'rotate-ccw'); finish.append(finishTitle,finishTime,ready); finish.hidden=true;
-      pane.append(blur,identity,inventory,crystals,lap,rank,health,drift,speed,effects,map,countdown,finish);
-      return {pane,blur,identity,slots,crystals,crystalValue,lapValue,clock,rankValue,total,healthValue,healthBar,driftLabel,driftBars,speedValue,reverse,effects,map,countdown,finish,finishTitle,finishTime,ready};
+      pane.append(blur,identity,inventory,crystals,lap,rank,health,drift,speed,effects,map,warning,countdown,finish);
+      return {pane,blur,identity,slots,crystals,crystalValue,lapValue,clock,rankValue,total,healthValue,healthBar,driftLabel,driftBars,speedValue,reverse,effects,map,warning,countdown,finish,finishTitle,finishTime,ready};
     }
     function drawMap(canvas, descriptor, players, id) {
       const ctx=canvas.getContext('2d'); if(!ctx)return; ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -135,7 +137,8 @@
         p.crystalValue.textContent=clamp(seat.shards,0,seat.shardCap||20);p.crystals.title=`Осколки: ${p.crystalValue.textContent} / ${seat.shardCap||20}`;
         p.driftBars.forEach((bar,level)=>bar.value=clamp(seat.driftSegments?.[level],0,1));p.driftLabel.textContent=`ДРИФТ ${['','I','II','III'][clamp(seat.driftLevel,0,3)]}`;
         p.slots.forEach(({node,img,key,empty},slot)=> { const item=seat.items?.[slot];const valid=Object.hasOwn(items,item);img.hidden=!valid;empty.hidden=valid;if(valid && img.dataset.item!==item){img.src=`/assets/items/${item}.png`;img.dataset.item=item;}key.textContent=seat.device===-1?['Q','E'][slot]:['LB','RB'][slot];node.disabled=!valid||!seat.canUseItems||next.paused;node.title=valid?items[item]:'Пусто';node.setAttribute('aria-label',`P${index+1}, предмет ${slot+1}: ${valid?items[item]:'пусто'}`); });
-        const labels={...items,burn:'Горение',invulnerable:'Защита',recovery:'Восстановление'};
+        const labels={...items,crystal_shield:'Щит',weapon_guard:'Защита от удара',burn:'Горение',invulnerable:'Защита',recovery:'Восстановление'};
+        p.warning.hidden=!Object.hasOwn(warnings,seat.attackWarning);p.warning.textContent=p.warning.hidden?'':`! ${warnings[seat.attackWarning]}`;
         const effects={...seat.effects};if(seat.invulnerableRemaining>0)effects.invulnerable=seat.invulnerableRemaining;if(seat.destroyedRemaining>0)effects.recovery=seat.destroyedRemaining;
         p.effects.replaceChildren(...Object.entries(effects).filter(([key,value])=>labels[key]&&Number(value?.remaining ?? value)>0).map(([key,value])=>element('span',`local-effect ${key}`,`${labels[key]} ${Math.ceil(Number(value?.remaining ?? value))} с`)));
         const driving=seat.driving||{};

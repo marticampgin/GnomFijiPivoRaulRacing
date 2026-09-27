@@ -34,7 +34,7 @@ func _run() -> void:
 		_check(Protocol.validate_item_command(broken).is_empty(), "reject missing item field %s" % key)
 	var combat: Dictionary = {"health": 100.0, "max_health": 100.0, "slots": ["", "fanta"], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0, "shards": 0}
 	_check(not Protocol.validate_combat(combat).is_empty(), "valid combat state")
-	for item_id: String in ["fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k"]:
+	for item_id: String in ["fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k", "crystal_shield", "seeker", "rear_trap"]:
 		var equipped: Dictionary = combat.duplicate(true)
 		equipped["slots"] = [item_id, item_id]
 		_check(not Protocol.validate_combat(equipped).is_empty(), "valid inventory item %s" % item_id)
@@ -42,6 +42,8 @@ func _run() -> void:
 	for effect_id: String in ["fanta", "mermaid_rum", "ice_rum", "lays_crab"]:
 		active_combat["effects"][effect_id] = {"remaining": 8.0}
 	active_combat["effects"]["burn"] = {"remaining": 4.0, "damage": 5.75}
+	active_combat["effects"]["crystal_shield"] = {"remaining": 5.0}
+	active_combat["effects"]["weapon_guard"] = {"remaining": 0.75}
 	_check(not Protocol.validate_combat(active_combat).is_empty(), "bounded simultaneous effects accepted")
 	for key: String in ["health", "max_health", "destroyed_remaining", "invulnerable_remaining", "item_ack"]:
 		for invalid: Variant in [NAN, INF, -INF, true, "1", null, -1, 2147483648]:

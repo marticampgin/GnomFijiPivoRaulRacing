@@ -2,6 +2,7 @@ extends Node3D
 
 const MODEL_PATH: String = "res://art/vehicles/hero-blockout.glb"
 const EXHAUST_SHADER = preload("res://vehicle/crystal_exhaust.gdshader")
+const ItemArt = preload("res://items/item_art.gd")
 const WHEEL_NAMES: Array[String] = ["FrontLeftRoll", "FrontRightRoll", "RearLeftRoll", "RearRightRoll"]
 const STEER_NAMES: Array[String] = ["FrontLeftSteer", "FrontRightSteer"]
 const WHEEL_RADII: Array[float] = [0.40, 0.40, 0.43, 0.43]
@@ -24,6 +25,7 @@ var _jet_material: ShaderMaterial
 var _reduced_effects: bool = false
 var _elapsed: float = 0.0
 var _lean: float = 0.0
+var _shield_aura: Node3D
 
 
 static func warm() -> void:
@@ -45,6 +47,15 @@ func set_reduced_effects(enabled: bool) -> void:
 	if _jet_material != null:
 		_jet_material.set_shader_parameter("pulse_strength", 0.0 if enabled else 1.0)
 		_jet_material.set_shader_parameter("effect_opacity", 0.5 if enabled else 1.0)
+
+
+func set_combat_visual(combat: Dictionary) -> void:
+	var shielded: bool = float(combat.get("effects", {}).get("crystal_shield", {}).get("remaining", 0.0)) > 0.0 and float(combat.get("destroyed_remaining", 0.0)) <= 0.0
+	if shielded and not is_instance_valid(_shield_aura):
+		_shield_aura = ItemArt.create_shield_aura()
+		add_child(_shield_aura)
+	if is_instance_valid(_shield_aura):
+		_shield_aura.visible = shielded
 
 
 func update_visual(delta: float, speed_mps: float, steering: float, drifting: bool, boost_amount: float) -> void:

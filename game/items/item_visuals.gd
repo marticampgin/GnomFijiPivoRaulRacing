@@ -37,7 +37,7 @@ func apply_world(world: Dictionary) -> void:
 			continue
 		_seen_events[id] = _clock
 		var kind := str(event.get("kind", ""))
-		if kind not in ["blast_stroh80", "blast_bfg10k", "destroyed"]:
+		if kind not in ["blast_stroh80", "blast_bfg10k", "blast_seeker", "blast_rear_trap", "destroyed"]:
 			continue
 		var node: Node3D = Art.create_explosion(kind)
 		add_child(node)
@@ -79,8 +79,13 @@ func _sync(values: Array, existing: Dictionary, pickup: bool) -> void:
 		var visual: Node3D = existing[id]
 		visual.visible = bool(entry.get("available", true)) if pickup else true
 		var target := _position(entry.get("position", []))
+		visual.set_meta("kind", str(entry.get("kind", "")))
+		if str(entry.get("kind", "")) == "seeker":
+			var direction: Vector3 = target - visual.get_meta("base_position", visual.position)
+			if direction.length_squared() > 0.0001 and direction.normalized().cross(Vector3.UP).length_squared() > 0.001:
+				visual.look_at(visual.global_position + direction, Vector3.UP)
 		visual.set_meta("base_position", target)
-		if pickup:
+		if pickup or str(entry.get("kind", "")) == "rear_trap":
 			visual.position = target
 	for id in existing.keys():
 		if not alive.has(id):
@@ -97,7 +102,8 @@ func _process(delta: float) -> void:
 		node.position.y = node.get_meta("base_position").y + (0.0 if _reduced else sin(_clock * 2.0 + node.position.x) * 0.12)
 	for node in _projectiles.values():
 		node.position = node.position.lerp(node.get_meta("base_position"), 1.0 - exp(-delta / 0.045))
-		node.rotation.z += delta * (0.4 if _reduced else 2.0)
+		if node.get_meta("kind", "") not in ["seeker", "rear_trap"]:
+			node.rotation.z += delta * (0.4 if _reduced else 2.0)
 	for id in _events.keys():
 		var effect: Dictionary = _events[id]
 		effect.age += delta

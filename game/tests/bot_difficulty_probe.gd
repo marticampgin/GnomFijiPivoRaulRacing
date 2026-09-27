@@ -56,7 +56,7 @@ func _run() -> void:
 				if bot.vehicle.speed_mps > 1.0:
 					moving += 1
 				_check(bot.epoch == epochs[bot.id], "short mixed grid no teleport " + level)
-				_check(bot.vehicle.stats == Session.Styles.stats_for(bot.style_id), "live shared stats " + level)
+				_check(bot.vehicle.stats == session._items.effects_stats(bot, Session.Styles.stats_for(bot.style_id)), "live shared stats include ordinary race effects " + level)
 		_check(moving == 8, "all bots drive under shared simulation " + level)
 	var player: Dictionary = session._players["bot:2"]
 	var opponent: Dictionary = session._players["local:0"]
@@ -76,6 +76,12 @@ func _run() -> void:
 	_check(hard.item_slots(player, isolated, 180) == [0, 1], "hard heals and fires at target ahead")
 	opponent.vehicle.global_position = player.vehicle.global_position + player.vehicle.global_basis.z * 15.0
 	_check(hard.item_slots(player, isolated, 180) == [0], "hard does not shoot backwards")
+	player.combat.slots = ["seeker", "crystal_shield"]
+	_check(hard.item_slots(player, isolated, 180) == [1], "hard saves seeker without a forward target")
+	opponent.vehicle.global_position = player.vehicle.global_position - player.vehicle.global_basis.z * 15.0
+	_check(hard.item_slots(player, isolated, 180) == [0, 1], "hard uses seeker and shield through ordinary slots")
+	player.combat.effects.crystal_shield = {"remaining": 3.0}
+	_check(hard.item_slots(player, isolated, 180) == [0], "hard does not waste an already active shield")
 	player.combat.slots = ["fanta", ""]
 	player.combat.effects = {"fanta": {"remaining": 2.0}}
 	_check(hard.item_slots(player, isolated, 180).is_empty(), "hard avoids redundant active effect")

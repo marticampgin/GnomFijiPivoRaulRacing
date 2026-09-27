@@ -66,6 +66,8 @@ func _run() -> void:
 	_check(is_equal_approx(b.combat.health, 77.0), "chips increases damage15percent")
 	items.apply_damage(b, -10.0)
 	_check(is_equal_approx(b.combat.health, 77.0), "negative damage cannot repair")
+	# Independent lethal-hit fixture, outside the preceding hit's protection window.
+	b.combat.effects.erase("weapon_guard")
 	items.apply_damage(b, 1000.0)
 	_check(b.combat.health == 0.0 and b.combat.destroyed_remaining == 2.0, "lethal damage clamps and schedules destruction")
 	_check(items.step(players, 1.0).is_empty(), "no early restoration")
@@ -129,6 +131,7 @@ func _run() -> void:
 	await physics_frame
 	await physics_frame
 	b.combat.health = 100.0
+	b.combat.effects.erase("weapon_guard")
 	items._explode(explosion, players)
 	_check(b.combat.health == 100.0, "wall blocks explosion damage")
 	_check(not items._line_of_sight(Vector3.ZERO, Vector3(3, 0, 0)), "static geometry LOS enforced")

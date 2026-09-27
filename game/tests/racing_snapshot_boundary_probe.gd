@@ -34,7 +34,7 @@ func _run() -> void:
 	extra_driving.drift_level = 3
 	_check(Protocol.validate_driving(extra_driving).is_empty(), "drift level is derived not network field")
 	var world: Dictionary = {"pickups": [{"id": 0, "position": [0, 1, 2], "available": true}],
-		"projectiles": [{"id": 1, "position": [0, 1, 2], "kind": "bfg10k"}],
+		"projectiles": [{"id": 1, "position": [0, 1, 2], "kind": "bfg10k", "target": ""}],
 		"events": [{"id": 2, "position": [0, 1, 2], "kind": "blast_bfg10k", "radius": 9}],
 		"shards": [{"id": 3, "position": [0, 1, 2], "available": false, "scattered": true}]}
 	var decoded: Dictionary = JSON.parse_string(JSON.stringify(world))
@@ -76,6 +76,26 @@ func _run() -> void:
 	broken = world.duplicate(true)
 	broken.projectiles[0].kind = "cheat"
 	_check(Protocol.validate_items_world(broken).is_empty(), "known projectile")
+	for kind: String in ["stroh80", "bfg10k", "seeker", "rear_trap"]:
+		broken = world.duplicate(true)
+		broken.projectiles[0].kind = kind
+		broken.projectiles[0].target = "local:1" if kind == "seeker" else ""
+		_check(not Protocol.validate_items_world(broken).is_empty(), "known targeted projectile " + kind)
+	for invalid: Variant in [null, true, 1, [], "x".repeat(129)]:
+		broken = world.duplicate(true)
+		broken.projectiles[0].kind = "seeker"
+		broken.projectiles[0].target = invalid
+		_check(Protocol.validate_items_world(broken).is_empty(), "bounded string projectile target")
+	broken = world.duplicate(true)
+	broken.projectiles[0].erase("target")
+	_check(Protocol.validate_items_world(broken).is_empty(), "legacy projectile without target rejected")
+	broken = world.duplicate(true)
+	broken.projectiles[0].target = "local:1"
+	_check(Protocol.validate_items_world(broken).is_empty(), "untargeted weapon cannot spoof warning")
+	for kind: String in ["use_crystal_shield", "use_seeker", "use_rear_trap", "blast_seeker", "blast_rear_trap"]:
+		broken = world.duplicate(true)
+		broken.events[0].kind = kind
+		_check(not Protocol.validate_items_world(broken).is_empty(), "counterplay event " + kind)
 	broken = world.duplicate(true)
 	broken.events[0].radius = NAN
 	_check(Protocol.validate_items_world(broken).is_empty(), "finite event radius")
@@ -91,6 +111,17 @@ func _run() -> void:
 	for amount: Variant in [-1, 21, 1.5, NAN, INF, true, "1", null]:
 		player.combat.shards = amount
 		_check(Protocol.validate_combat(player.combat).is_empty(), "strict shard count")
+	player.combat.shards = 0
+	for item: String in ["crystal_shield", "seeker", "rear_trap"]:
+		player.combat.slots = [item, item]
+		_check(not Protocol.validate_combat(player.combat).is_empty(), "counterplay inventory " + item)
+	for effect: String in ["crystal_shield", "weapon_guard"]:
+		var maximum: float = 5.0 if effect == "crystal_shield" else 0.75
+		player.combat.effects = {effect: {"remaining": maximum}}
+		_check(not Protocol.validate_combat(player.combat).is_empty(), "counterplay effect " + effect)
+		for invalid: Variant in [maximum + 0.01, -0.01, NAN, INF, true, "1", null]:
+			player.combat.effects[effect].remaining = invalid
+			_check(Protocol.validate_combat(player.combat).is_empty(), "bounded counterplay effect " + effect)
 	var track := Track.new()
 	root.add_child(track)
 	track.build(false)

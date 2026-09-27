@@ -19,6 +19,8 @@ godot --headless --path game --script res://tests/shards_probe.gd
 godot --headless --path game --script res://tests/race_techniques_probe.gd
 godot --headless --path game --script res://tests/racing_snapshot_boundary_probe.gd
 godot --headless --path game --script res://tests/local_view_probe.gd
+godot --headless --path game --script res://tests/combat_items_probe.gd
+godot --headless --path game --script res://tests/combat_assets_probe.gd
 ```
 
 Local browser flow: choose easy/normal/hard in local setup, start, hold brake
@@ -36,6 +38,14 @@ rules. Separate HUD-only fixtures may supply rare combinations of these states t
 check layout/icon loading at 1600x900 and 390x844; label them as presentation tests,
 not evidence of gameplay awards. Four-camera checks share one pickup world and
 verify pause freezes pickup timers. No full-lap or hardware performance claim.
+
+Combat probes cover shield during burn, post-hit guard, inventory preservation,
+target lifecycle, limited steering/evade, launch from a moving owner, wall blocking,
+one-shot trap arbitration and slope placement. `local_app_probe` exercises real
+item commands, shield visuals, owning-seat warning projection, pause and reset.
+Browser fixtures exercise the three PNG icons, warning isolation/direction/clearing,
+slot dispatch without speculative consumption, and shield plus burn layout. A
+controlled native screenshot is evidence of rendering, not a normal Web playthrough.
 
 - Node.js with `playwright` and `sharp` resolvable by `require()`.
 - Playwright's Chromium already available and a graphical desktop session.

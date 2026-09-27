@@ -1,6 +1,6 @@
 # MVP Item Assets
 
-Six original low-poly props share the fantasy kart's teal, gold and crystal vocabulary. They are generated from native Godot meshes, with no downloads, external textures or licensed brand artwork. Product names are gameplay placeholders approved for this prototype; this does not grant trademark or production distribution rights. Packaging, silhouettes and symbols are original approximations, not reproductions of commercial packaging.
+Nine original low-poly props share the fantasy kart's teal, gold and crystal vocabulary. They are generated from native Godot meshes, with no downloads, external textures or licensed brand artwork. Product names are gameplay placeholders approved for this prototype; this does not grant trademark or production distribution rights. Packaging, silhouettes and symbols are original approximations, not reproductions of commercial packaging.
 
 | ID | Prop | Visual cue |
 | --- | --- | --- |
@@ -10,11 +10,16 @@ Six original low-poly props share the fantasy kart's teal, gold and crystal voca
 | `stroh80` | Amber bottle | Red diamond, dark fuse |
 | `lays_crab` | Red packet | Gold seals, crab motif |
 | `bfg10k` | Original green energy weapon | Twin luminous emitters, top crystal |
+| `crystal_shield` | Hexagonal shield | Gold rim, teal face, bright central crystal |
+| `seeker` | Crystal rocket | Rose nose, gold fins, turquoise exhaust |
+| `rear_trap` | Low rune mine | Dark base, gold spikes, rose crystal |
 
 ## Source And Reproduction
 
 - Race-only `engine_shard`: native Godot faceted turquoise crystal from `create_shard()`, shared road/scatter visuals with authoritative IDs. It is not an inventory item or shop currency.
 - Crystal HUD icon: `web/assets/icons/crystal-shard.svg`, exported from the accepted Figma HUD file `OejURNEY5ZRhWWOBicFNYP`, screen `18:4`. Unlike the procedural 3D props, this is a downloaded project design asset, kept at its intrinsic dimensions.
+- Active shield: `create_shield_aura()` on the authored kart, one transparent faceted shell and two steady emissive rings. No flashing; hidden on expiry/destruction/reset. Shared local world shows the same aura in all cameras.
+- New missile points along its observed movement; the trap does not spin. Rose explosions distinguish both new attacks from the existing orange/green effects.
 
 - Geometry/material source: `game/items/item_art.gd`.
 - Pickup crate: teal cube, gold bands, floating crystal. No collision or authority is encoded in the asset.
@@ -22,6 +27,7 @@ Six original low-poly props share the fantasy kart's teal, gold and crystal voca
 - Snapshot presentation/lifecycle: `game/items/item_visuals.gd`. Pickup/projectile IDs reconcile each snapshot; recent event IDs deduplicate effects. `clear()` resets race-local IDs. No damage is applied by presentation.
 - HUD images: `web/assets/items/*.png`, transparent 256 x 256 native Godot renders of those exact meshes.
 - Regenerate: `GODOT_BIN --path game --script res://items/render_icons.gd` with a graphical renderer. Replace `GODOT_BIN` with the installed Godot executable. No Python or image editing step.
+- Render only new icons: append `-- crystal_shield seeker rear_trap`. Transparent PNGs are 256 x 256, generated from the actual meshes rather than illustrative replacements.
 - Verify lifecycle: `GODOT_BIN --headless --path game --script res://tests/item_visuals_probe.gd`.
 
 ## HUD Contract

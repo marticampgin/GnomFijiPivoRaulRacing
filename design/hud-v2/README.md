@@ -98,7 +98,11 @@ for existing items, health, rank, lap, drift charge and effects. The prior HUD r
 in the network prototype. Reverse now has a live R indicator in both HUDs;
 the local setup includes three bot difficulties. Shards, three drift segments and
 start/slipstream statuses now use live simulation state in both HUDs. Attack warnings
-remain pending their mechanics, without illustrative mockup values. The original
+now follow accepted state screen `18:800`: separate red marker above the action,
+only for the targeted seat. The direction label follows the actual missile position
+(rear/front/left/right), rather than always claiming it is behind. Shield and burn
+can appear together without occupying inventory. The new item icons are renders
+of the same Godot props used in the race. The original
 crystal icon from accepted Figma screen `18:4` (component `17:40`) is stored at
 `web/assets/icons/crystal-shard.svg`, preserving its intrinsic 28 x 34.1694 size.
 Physical-controller and four-camera performance acceptance remain open.

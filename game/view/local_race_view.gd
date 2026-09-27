@@ -182,6 +182,7 @@ func _sync_visuals(delta: float) -> void:
 			_visuals[key] = visual
 		var visual: Node3D = _visuals[key]
 		var combat: Dictionary = player.combat
+		visual.set_combat_visual(combat)
 		visual.visible = float(combat.get("destroyed_remaining", 0.0)) <= 0.0 and (_reduced or float(combat.get("invulnerable_remaining", 0.0)) <= 0.0 or fmod(_clock, 0.4) < 0.28)
 		visual.update_visual(delta, vehicle.speed_mps, vehicle.steering_amount, vehicle.is_drifting, minf(1.0, vehicle.boost_remaining))
 	for key: int in _visuals.keys():

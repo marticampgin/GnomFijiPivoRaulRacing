@@ -1,5 +1,6 @@
 .local-race{position:fixed;inset:0;z-index:15;pointer-events:none;font-family:Arial, sans-serif;font-weight:700;color:#f5f7f4;letter-spacing:0;text-shadow:0 2px 4px #000b}
 .local-race[hidden],.local-race [hidden]{display:none!important}
+.local-attack-warning{position:absolute;top:76px;left:50%;transform:translateX(-50%);box-sizing:border-box;max-width:calc(100% - 24px);padding:8px 12px;border:1px solid #ff877b;border-radius:4px;background:#131715;color:#ff877b;font-size:18px;line-height:1.1;text-align:center;white-space:nowrap}
 .local-grid{position:absolute;inset:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
 .local-grid.players-2{grid-template-columns:repeat(2,minmax(0,1fr))}.local-grid.players-2.stacked{grid-template-columns:minmax(0,1fr);grid-template-rows:repeat(2,minmax(0,1fr))}.local-grid.players-3,.local-grid.players-4{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr))}
 .local-pane{position:relative;min-width:0;min-height:0;overflow:hidden;container-type:size;--inset:28px;background:linear-gradient(#050a088f,transparent 20%,transparent 78%,#050a088f)}
@@ -34,3 +35,5 @@
 .local-crystals{position:absolute;top:126px;left:var(--inset);height:36px;display:flex;align-items:center;gap:8px}.local-crystals img{flex:none}.local-crystals strong{font-size:32px;line-height:1.1}.local-drift-segments{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.local-race .local-effects{top:176px}.local-effect.drift-boost,.local-effect.start-boost{color:#e5ff58;border-color:#e5ff58}
 @container (max-width:600px){.local-crystals{top:112px;height:35px}.local-crystals strong{font-size:24px}.local-race .local-effects{top:155px}}
 @container (max-width:350px){.local-crystals{top:90px;left:8px}.local-crystals strong{font-size:18px}.local-race .local-effects{top:130px}.local-drift-segments{gap:3px}}
+@container (max-width:600px){.local-attack-warning{top:112px;left:auto;right:var(--inset);transform:none;font-size:12px;padding:8px;max-width:calc(100% - 100px)}}
+@container (max-width:350px){.local-attack-warning{top:94px;right:8px;font-size:10px;padding:6px;max-width:calc(100% - 75px)}}

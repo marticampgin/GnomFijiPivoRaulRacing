@@ -1,7 +1,7 @@
 extends SceneTree
 
 const Art = preload("res://items/item_art.gd")
-const IDS = ["fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k"]
+const IDS = ["fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k", "crystal_shield", "seeker", "rear_trap"]
 
 func _initialize() -> void:
 	call_deferred("_render")
@@ -34,7 +34,12 @@ func _render() -> void:
 	var output := ProjectSettings.globalize_path("res://../web/assets/items")
 	DirAccess.make_dir_recursive_absolute(output)
 	for id in IDS:
+		if not OS.get_cmdline_user_args().is_empty() and id not in OS.get_cmdline_user_args():
+			continue
 		var model: Node3D = Art.create_item(id)
+		if id == "seeker":
+			model.rotation.y = 0.6
+			model.scale = Vector3.ONE * 1.15
 		viewport.add_child(model)
 		await process_frame
 		await process_frame

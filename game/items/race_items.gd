@@ -51,27 +51,40 @@ func restore(player: Dictionary) -> void:
 	player.combat.invulnerable_remaining = 2.0
 
 
-func use(player: Dictionary, slot: int, _players: Dictionary) -> bool:
+func use(player: Dictionary, slot: int, players: Dictionary) -> bool:
 	if not _active(player) or slot < 0 or slot > 1:
 		return false
 	var state: Dictionary = player.combat
 	var id: String = state.slots[slot]
 	if not Catalog.IDS.has(id):
 		return false
+	var trap_position: Vector3 = Vector3.ZERO
+	if id == "rear_trap":
+		var body: Node3D = player.vehicle
+		var behind: Vector3 = body.global_position + Vector3.UP * 0.15 + body.global_basis.z * float(Catalog.definition(id).rear_distance)
+		var ground: Dictionary = _trap_ground(behind, body.global_position)
+		if ground.is_empty() or not _line_of_sight(body.global_position + Vector3.UP * 0.5, ground.position + Vector3.UP * 0.1):
+			ground = _trap_ground(body.global_position + Vector3.UP * 0.15, body.global_position)
+		if ground.is_empty():
+			return false
+		trap_position = ground.position
 	state.slots[slot] = ""
 	var definition: Dictionary = Catalog.definition(id)
 	if definition.has("repair"):
 		state.health = minf(float(state.max_health), float(state.health) + float(definition.repair))
 	if definition.has("duration"):
 		state.effects[id] = {"remaining": float(definition.duration)}
-	if id == "stroh80" or id == "bfg10k":
+	if id in ["stroh80", "bfg10k", "seeker", "rear_trap"]:
 		var body: Node3D = player.vehicle
 		var forward: Vector3 = -body.global_basis.z
 		# Start inside the kart's front envelope so a bumper against a wall cannot fire through it.
 		var position: Vector3 = body.global_position + Vector3.UP * (0.8 if id == "stroh80" else 0.1) + forward * 0.8
+		if id == "rear_trap":
+			position = trap_position
 		_projectiles.append({"id": _serial(), "kind": id, "owner": str(player.id), "position": position,
 			"velocity": forward * float(definition.speed) + (Vector3.UP * 7.0 if id == "stroh80" else Vector3.ZERO),
-			"remaining": 2.5, "age": 0.0, "damage_multiplier": _damage_multiplier(player)})
+			"remaining": float(definition.get("lifetime", 2.5)), "age": 0.0, "damage_multiplier": _damage_multiplier(player),
+			"target": _seeker_target(player, players) if id == "seeker" else "", "launch_age": 0.0, "owner_cleared": false})
 	_event("use_" + id, player.vehicle.global_position, 1.0)
 	return true
 
@@ -148,17 +161,21 @@ func world_state(_player_id: String = "") -> Dictionary:
 		var available: bool = float(_cooldowns.get(str(pickup.id), 0.0)) <= 0.0
 		pickups.append({"id": pickup.id, "position": _array(pickup.position), "available": available})
 	for projectile: Dictionary in _projectiles:
-		projectiles.append({"id": projectile.id, "kind": projectile.kind, "position": _array(projectile.position)})
+		projectiles.append({"id": projectile.id, "kind": projectile.kind, "position": _array(projectile.position), "target": str(projectile.get("target", ""))})
 	for event: Dictionary in _events:
 		events.append({"id": event.id, "kind": event.kind, "position": _array(event.position), "radius": event.radius})
 	return {"pickups": pickups, "projectiles": projectiles, "events": events, "shards": shards}
 
 
-func apply_damage(player: Dictionary, amount: float, source: Dictionary = {}, impact_kind: String = "weapon") -> void:
+func apply_damage(player: Dictionary, amount: float, source: Dictionary = {}, impact_kind: String = "weapon") -> bool:
 	if not _active(player) or float(player.combat.invulnerable_remaining) > 0.0:
-		return
+		return false
+	if impact_kind == "weapon" and _weapon_blocked(player):
+		return false
 	var multiplier: float = _damage_multiplier(source) if not source.is_empty() else 1.0
 	var actual: float = maxf(0.0, amount) * multiplier
+	if actual <= 0.0:
+		return false
 	player.combat.health = maxf(0.0, float(player.combat.health) - actual)
 	if actual > 0.0 and (impact_kind == "weapon" or (impact_kind == "contact" and actual >= Catalog.SHARD_STRONG_CONTACT_DAMAGE)):
 		_lose_shards(player, player.combat.health == 0.0)
@@ -167,6 +184,16 @@ func apply_damage(player: Dictionary, amount: float, source: Dictionary = {}, im
 		player.combat.destroyed_remaining = 2.0
 		player.combat.effects.clear()
 		_event("destroyed", player.vehicle.global_position, 2.0)
+	elif impact_kind == "weapon":
+		player.combat.effects.weapon_guard = {"remaining": Catalog.WEAPON_GUARD_SECONDS}
+	return true
+
+
+func _weapon_blocked(player: Dictionary) -> bool:
+	for id: String in ["crystal_shield", "weapon_guard"]:
+		if float(player.combat.effects.get(id, {}).get("remaining", 0.0)) > 0.0:
+			return true
+	return false
 
 
 func _lose_shards(player: Dictionary, destroyed: bool) -> void:
@@ -212,7 +239,7 @@ func _step_shards(players: Dictionary, delta: float) -> void:
 
 
 func _active(player: Dictionary) -> bool:
-	return player.has("combat") and not player.get("finished", false) and not player.get("spectator", false) and float(player.combat.health) > 0.0
+	return player.has("combat") and not player.get("finished", false) and not player.get("spectator", false) and not player.get("expired", false) and player.get("connected", true) and float(player.combat.health) > 0.0
 
 
 func _damage_multiplier(player: Dictionary) -> float:
@@ -281,21 +308,132 @@ func _draw_item(weights: Dictionary) -> String:
 	return Catalog.IDS.back()
 
 
+func _trap_ground(position: Vector3, owner_position: Vector3) -> Dictionary:
+	if not is_instance_valid(_track) or not _track.is_inside_tree():
+		return {}
+	# Bound the search to the current road deck, never dropping through a bridge gap.
+	var query := PhysicsRayQueryParameters3D.create(position + Vector3.UP * 2.0, position + Vector3.DOWN * 3.0, 1)
+	var hit: Dictionary = _track.get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty() or hit.normal.dot(Vector3.UP) < 0.55 or absf(float(hit.position.y) - owner_position.y) > 2.0:
+		return {}
+	return {"position": hit.position + Vector3.UP * 0.15}
+
+
+func _windup_seeker(projectile: Dictionary, players: Dictionary) -> bool:
+	var owner: Dictionary = players.get(str(projectile.owner), {})
+	if owner.is_empty() or not _active(owner):
+		return false
+	var body: Node3D = owner.vehicle
+	var center: Vector3 = body.global_position + Vector3.UP * 0.1
+	var position: Vector3 = center - body.global_basis.z * 0.8
+	if not _line_of_sight(projectile.position, position) or not _line_of_sight(center, position):
+		return false
+	projectile.position = position
+	return true
+
+
+func _seeker_target(owner: Dictionary, players: Dictionary) -> String:
+	var chosen: String = ""
+	var best: float = float(Catalog.definition("seeker").range)
+	var origin: Vector3 = owner.vehicle.global_position
+	var forward: Vector3 = -owner.vehicle.global_basis.z
+	for player: Dictionary in players.values():
+		if str(player.id) == str(owner.id) or not _active(player):
+			continue
+		var offset: Vector3 = player.vehicle.global_position - origin
+		var distance: float = offset.length()
+		if distance < 0.1 or distance > best or forward.dot(offset.normalized()) < 0.5:
+			continue
+		if not _line_of_sight(origin + Vector3.UP * 0.35, player.vehicle.global_position + Vector3.UP * 0.35):
+			continue
+		if distance < best or chosen.is_empty() or str(player.id) < chosen:
+			chosen = str(player.id)
+			best = distance
+	return chosen
+
+
+func _steer_seeker(projectile: Dictionary, players: Dictionary, delta: float) -> void:
+	var target: Dictionary = players.get(str(projectile.get("target", "")), {})
+	if target.is_empty() or not _active(target):
+		projectile.target = ""
+		return
+	var offset: Vector3 = target.vehicle.global_position + Vector3.UP * 0.35 - projectile.position
+	if offset.length_squared() < 0.001:
+		return
+	var direction: Vector3 = projectile.velocity.normalized()
+	var desired: Vector3 = offset.normalized()
+	var angle: float = direction.angle_to(desired)
+	var maximum: float = float(Catalog.definition("seeker").turn_rate) * delta
+	if angle > 0.001:
+		var axis: Vector3 = direction.cross(desired)
+		if axis.length_squared() < 0.001:
+			axis = direction.cross(Vector3.UP)
+		if axis.length_squared() < 0.001:
+			axis = Vector3.RIGHT
+		direction = direction.rotated(axis.normalized(), minf(angle, maximum))
+	projectile.velocity = direction * float(Catalog.definition("seeker").speed)
+
+
+func _step_trap(projectile: Dictionary, players: Dictionary) -> bool:
+	var definition: Dictionary = Catalog.definition("rear_trap")
+	if float(projectile.remaining) <= 0.0:
+		return false
+	if float(projectile.age) < float(definition.arm):
+		return true
+	var winner: Dictionary = {}
+	var best: float = float(definition.radius)
+	for player: Dictionary in players.values():
+		if not _active(player):
+			continue
+		var target: Vector3 = player.vehicle.global_position + Vector3.UP * 0.35
+		var distance: float = target.distance_to(projectile.position)
+		if distance > best or not _line_of_sight(projectile.position, target):
+			continue
+		if distance < best or winner.is_empty() or str(player.id) < str(winner.id):
+			winner = player
+			best = distance
+	if winner.is_empty():
+		return true
+	apply_damage(winner, float(definition.damage) * float(projectile.damage_multiplier))
+	_event("blast_rear_trap", projectile.position, float(definition.radius))
+	return false
+
+
 func _step_projectiles(players: Dictionary, delta: float) -> void:
 	var retained: Array = []
 	for projectile: Dictionary in _projectiles:
 		var definition: Dictionary = Catalog.definition(projectile.kind)
-		var previous: Vector3 = projectile.position
-		projectile.velocity += Vector3.DOWN * float(definition.gravity) * delta
-		var next: Vector3 = previous + projectile.velocity * delta
+		var was_winding: bool = projectile.kind == "seeker" and float(projectile.age) < float(definition.get("arm", 0.0))
+		var motion_delta: float = delta
 		projectile.age += delta
 		projectile.remaining -= delta
+		if projectile.kind == "rear_trap":
+			if _step_trap(projectile, players):
+				retained.append(projectile)
+			continue
+		if projectile.kind == "seeker":
+			if was_winding and not _windup_seeker(projectile, players):
+				continue
+			_steer_seeker(projectile, players, delta)
+			if float(projectile.age) < float(definition.arm):
+				retained.append(projectile)
+				continue
+			if was_winding:
+				motion_delta = maxf(0.0, float(projectile.age) - float(definition.arm))
+			projectile.launch_age = float(projectile.get("launch_age", 0.0)) + motion_delta
+			var owner: Dictionary = players.get(str(projectile.owner), {})
+			if owner.is_empty() or (float(projectile.launch_age) >= 0.1 and projectile.position.distance_to(owner.vehicle.global_position) > 2.8):
+				projectile.owner_cleared = true
+		var previous: Vector3 = projectile.position
+		projectile.velocity += Vector3.DOWN * float(definition.gravity) * motion_delta
+		var next: Vector3 = previous + projectile.velocity * motion_delta
 		var impact: bool = false
 		if is_instance_valid(_track) and _track.is_inside_tree():
 			var query := PhysicsRayQueryParameters3D.create(previous, next, 3)
 			var excluded: Array[RID] = []
 			for player: Dictionary in players.values():
-				if not _active(player) or (str(player.id) == str(projectile.owner) and float(projectile.age) < 0.2):
+				var owner_grace: bool = not bool(projectile.get("owner_cleared", false)) if projectile.kind == "seeker" else float(projectile.age) < 0.2
+				if not _active(player) or (str(player.id) == str(projectile.owner) and owner_grace):
 					excluded.append(player.vehicle.get_rid())
 			query.exclude = excluded
 			var hit: Dictionary = _track.get_world_3d().direct_space_state.intersect_ray(query)
@@ -304,7 +442,8 @@ func _step_projectiles(players: Dictionary, delta: float) -> void:
 				impact = true
 		projectile.position = next
 		if impact or float(projectile.remaining) <= 0.0:
-			_explode(projectile, players)
+			if projectile.kind != "seeker" or (float(projectile.age) >= float(definition.arm) and impact):
+				_explode(projectile, players)
 		else:
 			retained.append(projectile)
 	_projectiles = retained
@@ -317,11 +456,13 @@ func _explode(projectile: Dictionary, players: Dictionary) -> void:
 	for player: Dictionary in players.values():
 		if not _active(player) or float(player.combat.invulnerable_remaining) > 0.0:
 			continue
+		if projectile.kind == "seeker" and str(player.id) == str(projectile.get("owner", "")) and not bool(projectile.get("owner_cleared", false)):
+			continue
 		var target: Vector3 = player.vehicle.global_position + Vector3.UP * 0.35
 		if center.distance_to(target) > float(definition.radius) or not _line_of_sight(center, target):
 			continue
-		apply_damage(player, float(definition.damage) * float(projectile.damage_multiplier))
-		if projectile.kind == "stroh80" and _active(player):
+		var damaged: bool = apply_damage(player, float(definition.damage) * float(projectile.damage_multiplier))
+		if damaged and projectile.kind == "stroh80" and _active(player):
 			player.combat.effects.burn = {"remaining": float(definition.burn_duration), "damage": float(definition.burn_damage) * float(projectile.damage_multiplier)}
 
 
