@@ -109,6 +109,15 @@ browsers. See [MDN's Gamepad API guide](https://developer.mozilla.org/en-US/docs
 
 ## Audit of the previous implementation
 
+This section records the pre-v13 behavior, not the current lobby. Input fixes
+in 3.26 did not establish visual acceptance: the user subsequently rejected the
+large dark setup form. Task 3.29 separately replaces that screen with the
+[full-screen lobby](../design/lobby-v1/README.md). The official CrossWorlds
+customization images support a large vehicle preview, visible selection groups,
+and a persistent action strip; the CTR online guide supports separating lobby
+concerns, not any exact local join/focus implementation. Our four styles and
+explicit Add seats remain project-specific decisions.
+
 - P1 is initialized to keyboard in `web/local-race.js`; detecting a pad only
   refreshes options. The previous live test manually selected a controller, so
   its pass did not establish automatic assignment.

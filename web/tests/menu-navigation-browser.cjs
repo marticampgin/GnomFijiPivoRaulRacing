@@ -6,8 +6,10 @@ const {chromium} = require('playwright');
 (async () => {
   const browser = await chromium.launch({headless:true});
   let checks = 0;
+  const errors = [];
   try {
     const page = await browser.newPage({viewport:{width:1280,height:800}});
+    page.on('pageerror', error => errors.push(error.message));
     await page.setContent(`<main id="hub"><button id="play" data-menu-default>Play</button><button disabled>Unavailable</button><button id="next">Next</button></main><dialog id="dialog"><button id="close">Close</button><select id="select"><option value="a">A</option><option value="b">B</option></select><input id="range" type="range" min="0" max="10" value="5"><details><summary id="details">Controls</summary><button id="inside">Reset</button></details><button id="ready" data-menu-device="1">P2 Ready</button></dialog><canvas id="canvas" tabindex="0"></canvas>`);
     await page.addStyleTag({content:'#hub{display:grid;width:300px;gap:12px}#dialog[open]{display:grid;width:320px;gap:12px}#dialog details{display:block}#dialog details>button{display:block;margin-top:12px}button,select,input,summary{min-height:32px}'});
     await page.addScriptTag({path:path.resolve(__dirname,'../menu-navigation.js')});
@@ -67,23 +69,47 @@ const {chromium} = require('playwright');
       assert.equal(await page.locator('.control-bindings').isVisible(),true);checks++;
     }
     await page.evaluate(()=>window.navigation.destroy());
-    await page.evaluate(()=>{const base=document.createElement('base');base.href='http://127.0.0.1:8788/';document.head.append(base);});
+    await page.evaluate(()=>{const base=document.createElement('base');base.href='http://127.0.0.1:8787/';document.head.append(base);});
     await page.addStyleTag({path:path.resolve(__dirname,'../app.css')});
     await page.addStyleTag({path:path.resolve(__dirname,'../local-race.css')});
+    await page.addStyleTag({path:path.resolve(__dirname,'../race-lobby.css')});
+    await page.addScriptTag({path:path.resolve(__dirname,'../race-lobby.js')});
     await page.addScriptTag({path:path.resolve(__dirname,'../local-race.js')});
     await page.evaluate(()=>{
       document.querySelector('#hub').hidden=true;
       window.fixture=GnomLocalUI.create({send(){}});fixture.showSetup();
-      document.querySelector('#local-setup details').open=true;
+      window.navigation=GnomMenuNavigation.create({scope:()=>Array.from(document.querySelectorAll('dialog[open]')).at(-1)});
     });
+    await page.getByRole('spinbutton',{name:'Игроки',exact:true}).focus();
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await page.getByRole('spinbutton',{name:'Игроки',exact:true}).getAttribute('aria-valuetext'),'2');checks++;
+    assert.equal(await page.getByRole('spinbutton',{name:'Экран',exact:true}).isVisible(),true,'Two players expose split-screen orientation');checks++;
+    await page.keyboard.press('Enter');
+    assert.equal(await page.getByRole('spinbutton',{name:'Игроки',exact:true}).getAttribute('aria-valuetext'),'2','Enter must not unexpectedly cycle a choice');checks++;
+    assert.match(await page.locator('#local-setup .menu-hints').innerText(),/← →.*Изменить/s);checks++;
+    await page.getByRole('spinbutton',{name:'Игроки',exact:true}).evaluate(node=>node.dispatchEvent(new CustomEvent('menu-adjust',{bubbles:true,detail:{amount:-1}})));
+    assert.equal(await page.getByRole('spinbutton',{name:'Игроки',exact:true}).getAttribute('aria-valuetext'),'1');checks++;
+    assert.equal(await page.locator('#local-setup select').count(),0,'Lobby choices must not reopen native select popups');checks++;
     for (const viewport of [{width:1280,height:800},{width:390,height:844}]) {
       await page.setViewportSize(viewport);
       const bounds=await page.locator('#local-setup').evaluate(node=>({width:node.clientWidth,scrollWidth:node.scrollWidth,right:node.getBoundingClientRect().right,left:node.getBoundingClientRect().left}));
       assert.ok(bounds.scrollWidth<=bounds.width+1&&bounds.left>=0&&bounds.right<=viewport.width,`Dialog overflows at ${viewport.width}`);checks++;
-      assert.ok(await page.locator('[aria-label="Стиль P1"]').evaluate(node=>node.getBoundingClientRect().width)>150,'Driving style must remain readable');checks++;
+      assert.equal(await page.getByRole('group',{name:'Стиль P1'}).getByRole('button').count(),4,'All four styles remain directly available');checks++;
       await page.waitForFunction(()=>Array.from(document.querySelectorAll('#local-setup img')).every(image=>image.complete&&image.naturalWidth>0));
+      await page.screenshot({path:`/tmp/gnom-controller-lobby-${viewport.width}.png`});
+      await page.getByRole('button',{name:'Управление P1',exact:true}).click();
+      await page.waitForFunction(()=>document.querySelector('#local-player-controls').open);
+      const controlsBounds=await page.locator('#local-player-controls').evaluate(node=>({width:node.clientWidth,scrollWidth:node.scrollWidth,right:node.getBoundingClientRect().right,left:node.getBoundingClientRect().left}));
+      assert.ok(controlsBounds.scrollWidth<=controlsBounds.width+1&&controlsBounds.left>=0&&controlsBounds.right<=viewport.width,`Controls dialog overflows at ${viewport.width}`);checks++;
+      assert.equal(await page.locator('#local-player-controls .control-bindings').isVisible(),true);checks++;
       await page.screenshot({path:`/tmp/gnom-controller-settings-${viewport.width}.png`});
+      await page.keyboard.press('Escape');
+      await page.waitForFunction(()=>!document.querySelector('#local-player-controls').open);
+      assert.equal(await page.locator('#local-setup').evaluate(node=>node.open),true,'Closing player controls returns to the lobby');checks++;
+      assert.equal(await page.evaluate(()=>document.activeElement.dataset.focusKey),'lobby-controls');checks++;
     }
+    await page.evaluate(()=>{navigation.destroy();fixture.destroy();});
+    assert.deepEqual(errors,[]);checks++;
     console.log(`menu DOM navigation: ${checks}/${checks} passed`);
   } finally { await browser.close(); }
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -61,7 +61,7 @@
       const style = root.getComputedStyle(node);
       return style.visibility !== 'hidden' && style.display !== 'none';
     }
-    function choices(container) { return Array.from(container.querySelectorAll(selector)).filter(visible); }
+    function choices(container) { return Array.from(container.querySelectorAll(selector)).filter(node => node.tabIndex >= 0 && visible(node)); }
     function focus(node) {
       node?.focus({preventScroll:true});
       node?.scrollIntoView({block:'nearest', inline:'nearest'});
@@ -70,8 +70,9 @@
     function showHints(container) {
       if (!container) { hints.remove(); return; }
       const results = container.dataset.phase === 'results';
-      const adjusting = ['SELECT','INPUT'].includes(doc.activeElement?.tagName);
-      const entries = [[source === 'gamepad' ? 'A' : 'Enter', results ? 'Готов' : adjusting ? 'Изменить' : 'Выбрать']];
+      const active = doc.activeElement;
+      const adjusting = active?.hasAttribute('data-menu-adjust') || active?.tagName === 'SELECT' || active?.type === 'range';
+      const entries = adjusting ? [['← →', 'Изменить']] : [[source === 'gamepad' ? 'A' : 'Enter', results ? 'Готов' : 'Выбрать']];
       if (container.id !== 'hub') entries.push([source === 'gamepad' ? 'B' : 'Esc', results ? 'В меню · P1' : 'Назад']);
       hints.replaceChildren(...entries.map(([key, label]) => {
         const span = doc.createElement('span'), glyph = doc.createElement('kbd');
@@ -109,6 +110,10 @@
       return candidates[0]?.node || active;
     }
     function adjust(node, amount) {
+      if (node?.hasAttribute('data-menu-adjust')) {
+        node.dispatchEvent(new root.CustomEvent('menu-adjust', {bubbles:true, detail:{amount}}));
+        return true;
+      }
       if (node?.tagName === 'SELECT') {
         const options = Array.from(node.options).filter(option => !option.disabled && !option.hidden);
         const index = options.findIndex(option => option.selected);
@@ -148,6 +153,7 @@
       if (value === 'back' || value === 'menu') { back(container, source, device); return; }
       if (value === 'confirm') {
         if (active?.hasAttribute('data-menu-device') && Number(active.dataset.menuDevice) !== device) return;
+        if (active?.hasAttribute('data-menu-adjust')) return;
         // Native select popups do not receive Gamepad API input. Cycle without opening one.
         if (active?.tagName === 'SELECT') adjust(active, 1);
         else active?.click();
@@ -155,7 +161,9 @@
       }
       if (!nodes.length) return;
       if (['left','right'].includes(value) && adjust(active, value === 'left' ? -1 : 1)) return;
-      focus(neighbor(active, nodes, value));
+      const target = active?.getAttribute(`data-menu-${value}`);
+      const directed = target && nodes.find(node => node.dataset.focusKey === target);
+      focus(directed || neighbor(active, nodes, value));
       showHints(container);
     }
     function keydown(event) {
@@ -172,7 +180,10 @@
       if (!event.repeat || !['confirm','back'].includes(value)) action(value, 'keyboard');
     }
     function pointer() { source = 'keyboard'; device = -1; delete doc.documentElement.dataset.navigation; onDevice?.(source, device); showHints(scope()); }
-    function remember(event) { const container = scope(); if (container===lastScope&&container?.contains(event.target)) remembered.set(container, event.target); }
+    function remember(event) {
+      const container = scope();
+      if (container===lastScope&&container?.contains(event.target)) { remembered.set(container, event.target); showHints(container); }
+    }
     function tick(now) {
       let pads = [];
       try { pads = root.navigator.getGamepads?.() || []; } catch { /* Gamepad access is optional. */ }

@@ -28,9 +28,10 @@
     return '';
   }
   function create({send, onStart, onExit, onGraphics, onResume}) {
-    let state = null, pads = [], panes = [], setupSeats = [{device:-1,style_id:'drift',name:'P1'}], chosenLayout = 'side-by-side';
+    let state = null, pads = [], panes = [], setupSeats = [{device:-1,style_id:'drift',name:'P1'}], chosenLayout = 'side-by-side', chosenDifficulty = 'normal';
     const manualDevices = new Set();
-    let tutorialSetup = false;
+    let tutorialSetup = false, tutorialSeat = null, tutorialManualDevice = false;
+    const activeSetupSeats = () => tutorialSetup ? [tutorialSeat] : setupSeats;
     const controls = root.GnomControlSettings;
     let savedProfiles = Array.from({length:4},()=>controls.defaultProfile());
     try {const saved=JSON.parse(localStorage.getItem('gnom.local-controls.v1'));if(saved?.version===1&&Array.isArray(saved.profiles))savedProfiles=savedProfiles.map((profile,i)=>controls.normalize(saved.profiles[i])||profile);} catch { /* Storage is optional. */ }
@@ -52,25 +53,70 @@
     const layer = element('section','local-race'); layer.hidden = true; layer.id = 'local-race';
     const grid = element('div','local-grid'); layer.append(grid); document.body.append(layer);
     const trackStatus=element('div','local-track-status');trackStatus.hidden=true;trackStatus.setAttribute('role','status');layer.append(trackStatus);
-    const setup = element('dialog','local-dialog'); setup.id = 'local-setup';
-    const setupHeading = element('h2','','Локальная гонка');
-    setup.setAttribute('aria-label','Локальная гонка');
-    const count = select([1,2,3,4].map(n => [n,`${n} ${n===1?'игрок':'игрока'}`]),1,'Количество игроков');
-    const layout = select([['side-by-side','Рядом'],['stacked','Друг над другом']],'side-by-side','Разделение экрана');
-    const difficulty = select([['easy','Лёгкие боты'],['normal','Обычные боты'],['hard','Сложные боты']],'normal','Сложность ботов');
-    const setupRows = element('div','local-setup-rows'), setupError = element('p','local-error'); setupError.setAttribute('role','alert');
-    const start = button('На старт', () => {
-      const error = validateSeats(tutorialSetup?setupSeats.slice(0,1):setupSeats,pads); setupError.textContent = error;
+    const lobby = root.GnomRaceLobby.create({
+      onStart:startSetup,
+      onBack:()=>lobby.close(),
+      onCount:changeSeatCount,
+      onStyle(index,id) {
+        const seats=activeSetupSeats();
+        if(!seats[index]||!Object.hasOwn(styles,id))return;
+        seats[index].style_id=id;renderSetup();
+      },
+      onDevice(index,device) {
+        const seats=activeSetupSeats();
+        if(!seats[index]||!Number.isInteger(device))return;
+        const occupied=seats.some((seat,other)=>other!==index&&seat.device===device);
+        if(device < -1 || (device>=0&&!pads.some(pad=>pad.id===device)) || occupied) {
+          setupError.textContent=occupied?'Этот контроллер уже назначен другому игроку.':'Выберите подключённый контроллер.';
+          renderSetup();return;
+        }
+        seats[index].device=device;
+        if(tutorialSetup)tutorialManualDevice=true;else manualDevices.add(index);
+        setupError.textContent='';renderSetup();
+      },
+      onControls:openSetupControls,
+      onDifficulty(value) {if(['easy','normal','hard'].includes(value)){chosenDifficulty=value;renderSetup();}},
+      onLayout(value) {if(['side-by-side','stacked'].includes(value)){chosenLayout=value;renderSetup();}},
+    });
+    const {node:setup,start,error:setupError}=lobby;
+    document.body.append(setup);
+    function startSetup() {
+      if(start.disabled)return;
+      const seats=activeSetupSeats();
+      const error = validateSeats(seats,pads); setupError.textContent = error;
       if (error) return;
       start.disabled = true;
-      const seats=tutorialSetup?setupSeats.slice(0,1):setupSeats;
-      const payload = {type:'local_start',seats:seats.map((seat,index) => ({...seat,controls:savedProfiles[index]})),layout:tutorialSetup?'side-by-side':chosenLayout,botDifficulty:tutorialSetup?'easy':difficulty.value,...(tutorialSetup?{tutorial:true}:{})};
+      const payload = {type:'local_start',seats:seats.map((seat,index) => ({...seat,controls:savedProfiles[index]})),layout:tutorialSetup?'side-by-side':chosenLayout,botDifficulty:tutorialSetup?'easy':chosenDifficulty,...(tutorialSetup?{tutorial:true}:{})};
       (onStart || send)(payload);
-    },'arrow-up-right'); start.id = 'local-start';start.setAttribute('data-menu-default','');
-    const setupActions = element('div','local-actions'),setupBack=button('Назад',()=>setup.close(),'x');setupBack.id='local-setup-back';setupActions.append(setupBack,start);
-    const raceOptions=element('div','local-race-options');
-    for(const [label,field] of [['Игроки',count],['Боты',difficulty],['Экран',layout]]){const wrapper=element('label','local-option');wrapper.append(element('span','',label),field);raceOptions.append(wrapper);}
-    setup.append(setupHeading,setupRows,raceOptions,setupError,setupActions); document.body.append(setup);
+    }
+    let setupControlEditor=null,setupControlSeat=-1,setupControlOpener=null,setupControlFocusKey=null;
+    const playerControls=element('dialog','local-dialog');playerControls.id='local-player-controls';
+    const playerControlsTitle=element('h2');playerControlsTitle.id='local-player-controls-title';
+    playerControls.setAttribute('aria-labelledby',playerControlsTitle.id);
+    const playerControlsBody=element('div');
+    const playerControlsBack=button('Назад',()=>playerControls.close(),'x');playerControlsBack.id='local-player-controls-back';
+    const playerControlsActions=element('div','local-actions');playerControlsActions.append(playerControlsBack);
+    playerControls.append(playerControlsTitle,playerControlsBody,playerControlsActions);document.body.append(playerControls);
+    function openSetupControls(index) {
+      const seat=activeSetupSeats()[index];
+      if(!seat||!setup.open)return;
+      setupControlEditor?.destroy();setupControlSeat=index;
+      setupControlOpener=document.activeElement;setupControlFocusKey=setupControlOpener?.dataset.focusKey;
+      playerControlsTitle.textContent=`Управление P${index+1}`;
+      setupControlEditor=controls.create({profile:savedProfiles[index],device:seat.device,onChange:value=>saveProfile(index,value)});
+      for(const field of setupControlEditor.node.querySelectorAll('input,select,button'))field.dataset.focusKey=`setup-control-${index}-${field.dataset.control||'reset'}`;
+      playerControlsBody.replaceChildren(setupControlEditor.node);playerControls.showModal();
+    }
+    playerControls.addEventListener('close',()=> {
+      if(playerControls.open)return;
+      setupControlEditor?.destroy();setupControlEditor=null;setupControlSeat=-1;
+      if(setup.open) {
+        const opener=setupControlOpener?.isConnected?setupControlOpener:Array.from(setup.querySelectorAll('[data-focus-key]')).find(node=>node.dataset.focusKey===setupControlFocusKey);
+        opener?.focus({preventScroll:true});
+      }
+      setupControlOpener=null;setupControlFocusKey=null;
+    });
+    setup.addEventListener('close',()=>{if(!setup.open)playerControls.close();});
     const pause = element('dialog','local-dialog'); pause.id = 'local-pause';
     const pauseTitle = element('h2','','Пауза'), pauseRows = element('div','local-setup-rows'), pauseError = element('p','local-error'); pauseError.setAttribute('role','alert');
     const graphics = element('fieldset','local-graphics'), qualityOptions = element('div','local-quality-options');
@@ -100,30 +146,25 @@
     function deviceOptions(current) { return [[-2,'Выберите контроллер'],[-1,'Клавиатура'],...pads.map(pad=>[pad.id,`${pad.name || 'Геймпад'} (${pad.id+1})`]),...(current>=0&&!pads.some(pad=>pad.id===current)?[[current,'Контроллер отключён']]:[])]; }
     function markDevices(select,seats,index) {for(const option of select.options)option.disabled=Number(option.value)<-1||seats.some((seat,other)=>other!==index&&seat.device===Number(option.value));}
     function preferController() {
-      if(state||manualDevices.has(0))return;
-      const first=setupSeats[0],otherDevices=new Set(setupSeats.slice(1).map(seat=>seat.device));
+      if(state||(tutorialSetup?tutorialManualDevice:manualDevices.has(0)))return;
+      const seats=activeSetupSeats(),first=seats[0],otherDevices=new Set(seats.slice(1).map(seat=>seat.device));
       if(first.device>=0&&pads.some(pad=>pad.id===first.device))return;
       first.device=pads.find(pad=>!otherDevices.has(pad.id))?.id??(otherDevices.has(-1)?-2:-1);
     }
     function renderSetup() {
-      layout.parentElement.hidden = setupSeats.length !== 2||tutorialSetup;
-      count.parentElement.hidden=tutorialSetup;difficulty.parentElement.hidden=tutorialSetup;
-      preserveRows(setupRows,()=>setupRows.replaceChildren(...(tutorialSetup?setupSeats.slice(0,1):setupSeats).map((seat,index)=> {
-        const row = element('div','local-setup-row'); row.style.setProperty('--seat',colors[index]);
-        const device = select(deviceOptions(seat.device),seat.device,`Контроллер P${index+1}`);device.dataset.focusKey=`device-${index}`;markDevices(device,setupSeats,index);
-        device.addEventListener('change',()=>{seat.device=Number(device.value);manualDevices.add(index);setupError.textContent='';renderSetup();});
-        const style = select(Object.entries(styles),seat.style_id,`Стиль P${index+1}`); style.addEventListener('change',()=>seat.style_id=style.value);
-        style.dataset.focusKey=`style-${index}`;
-        row.append(element('strong','',`P${index+1}`),device,style,profileEditor(index,savedProfiles[index],false,seat.device)); return row;
-      })));
+      lobby.update({seats:activeSetupSeats(),pads,layout:chosenLayout,difficulty:chosenDifficulty,tutorial:tutorialSetup});
+      if(setupControlEditor) {
+        const seat=activeSetupSeats()[setupControlSeat];
+        if(seat)setupControlEditor.setDevice(seat.device);
+        else playerControls.close();
+      }
     }
-    count.addEventListener('change',()=> {
-      const number = Number(count.value);
+    function changeSeatCount(number) {
+      if(tutorialSetup||!Number.isInteger(number)||number<1||number>4)return;
       while(setupSeats.length<number) { const used = new Set(setupSeats.map(seat=>seat.device)); setupSeats.push({device:pads.find(pad=>!used.has(pad.id))?.id ?? (used.has(-1)?-2:-1),style_id:Object.keys(styles)[setupSeats.length%4],name:`P${setupSeats.length+1}`}); }
       for(const index of manualDevices)if(index>=number)manualDevices.delete(index);
-      setupSeats = setupSeats.slice(0,number); renderSetup();
-    });
-    layout.addEventListener('change',()=>chosenLayout=layout.value);
+      setupSeats = setupSeats.slice(0,number);setupError.textContent='';renderSetup();
+    }
     function buildPane(index) {
       const pane = element('section','local-pane'); pane.dataset.seat=index; pane.style.setProperty('--seat',colors[index]);
       const blur = element('div','local-sector-blur');
@@ -176,7 +217,7 @@
     function update(next) {
       if(next.error) { setupError.textContent=next.error;pauseError.textContent=next.error;start.disabled=false;return; }
       if(!Array.isArray(next.seats)||!next.seats.length)return;
-      state=next;layer.dataset.phase=next.phase;start.disabled=false;if(setup.open)setup.close();layer.hidden=false;
+      state=next;layer.dataset.phase=next.phase;start.disabled=false;playerControls.close();if(setup.open)lobby.close();layer.hidden=false;
       const tutorial=next.tutorial||{};lesson.hidden=!tutorial.step;layer.classList.toggle('tutorial-active',!lesson.hidden);
       const trackEvent=next.trackEvent||{},trackPhase=trackEvent.phase;
       trackStatus.hidden=Boolean(tutorial.step)||!['warning','active'].includes(trackPhase);
@@ -235,8 +276,13 @@
       if(next.paused) {const key=JSON.stringify([next.seats.map(s=>s.device),next.disconnected,pads]),changed=key!==pauseSignature;if(changed){renderPause();pauseSignature=key;}if(!pause.open)pause.showModal();if(changed&&next.disconnected?.length&&!pauseSettings.open)pauseSettings.showModal();} else {pauseSettings.close();if(pause.open){pause.close();onResume?.();}pauseSignature='';pauseError.textContent='';}
     }
     function updateDevices(devices) {const next=(devices || []).filter(pad=>Number.isInteger(pad.id)&&pad.id>=0).sort((a,b)=>a.id-b.id);if(JSON.stringify(pads)===JSON.stringify(next))return;pads=next;preferController();if(setup.open)renderSetup();if(pause.open){renderPause();pauseSignature='';}}
-    function hide() {layer.hidden=true;setup.close();pauseSettings.close();pause.close();state=null;}
-    function showSetup({tutorial=false}={}) {tutorialSetup=tutorial;preferController();start.disabled=false;start.textContent=tutorial?'Начать обучение':'На старт';setupHeading.textContent=tutorial?'Обучение':'Локальная гонка';setupError.textContent='';renderSetup();setup.showModal();}
+    function hide() {layer.hidden=true;playerControls.close();lobby.close();pauseSettings.close();pause.close();state=null;}
+    function showSetup({tutorial=false}={}) {
+      tutorialSetup=tutorial;
+      // Training borrows P1's initial choices, not the multiplayer device reservation.
+      if(tutorial){tutorialSeat={...setupSeats[0]};tutorialManualDevice=manualDevices.has(0);}
+      preferController();start.disabled=false;setupError.textContent='';renderSetup();setup.showModal();
+    }
     function handleMenuAction({action,device,container}) {
       if(container===lesson&&state?.tutorial?.complete&&(action==='back'||action==='menu')){hide();onExit?.();return true;}
       if(container!==layer||state?.phase!=='results')return false;
@@ -245,7 +291,7 @@
       if(action==='back'||action==='menu'){if(index===0){hide();onExit?.();}return true;}
       return true;
     }
-    function destroy() {layer.remove();setup.remove();pauseSettings.remove();pause.remove();}
+    function destroy() {setupControlEditor?.destroy();playerControls.remove();layer.remove();lobby.destroy();pauseSettings.remove();pause.remove();}
     return {showSetup,update,updateDevices,hide,destroy,handleMenuAction,getDefaultProfile:()=>({...savedProfiles[0]}),setDefaultProfile:profile=>{const valid=controls.normalize(profile);if(valid)saveProfile(0,valid);},menuScope:()=>!layer.hidden?(state?.tutorial?.complete?lesson:state?.phase==='results'?layer:null):null,showError:message=>update({error:String(message)})};
   }
   root.GnomLocalUI=Object.freeze({create,validateSeats,formatTime:time});

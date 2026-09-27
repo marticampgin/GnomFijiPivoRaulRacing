@@ -23,7 +23,7 @@ const track = JSON.parse(fs.readFileSync(path.join(root, 'shared/track-manifest.
       return route.fulfill({ status: 404, body: '' });
     });
     await page.goto('http://localhost/');
-    for (const file of ['track-map.js', 'control-settings.js', 'local-race.js']) await page.addScriptTag({ path: path.join(root, 'web', file) });
+    for (const file of ['track-map.js', 'control-settings.js', 'race-lobby.js', 'local-race.js']) await page.addScriptTag({ path: path.join(root, 'web', file) });
     await page.evaluate(() => { window.commands = []; window.ui = GnomLocalUI.create({ send: value => commands.push(value) }); });
     const effects = Object.fromEntries(['fanta', 'mermaid_rum', 'ice_rum', 'stroh80', 'lays_crab', 'burn', 'crystal_shield', 'weapon_guard'].map(key => [key, { remaining: 9.9 }]));
     const players = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, rank: i + 1, name: 'ОченьДлинноеИмяСоперникаДляПроверкиГраниц', position: [0, 0] }));

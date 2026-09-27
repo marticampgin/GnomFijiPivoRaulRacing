@@ -104,7 +104,7 @@ export async function buildApp(config: Config, pool: Pool, options: { staticRoot
     });
     app.get<{ Params: { filename: string } }>('/:filename', async (request, reply) => {
       const filename = request.params.filename;
-      if (['app.js', 'app.css', 'track-map.js', 'local-race.js', 'local-race.css', 'control-settings.js', 'control-settings.css', 'menu-navigation.js'].includes(filename)) return reply.sendFile(filename, web);
+      if (['app.js', 'app.css', 'track-map.js', 'local-race.js', 'local-race.css', 'race-lobby.js', 'race-lobby.css', 'control-settings.js', 'control-settings.css', 'menu-navigation.js'].includes(filename)) return reply.sendFile(filename, web);
       if (/^index\.(js|wasm|pck|png|icon\.png|apple-touch-icon\.png|audio\.worklet\.js|audio\.position\.worklet\.js)$/.test(filename)) return reply.sendFile(filename, build);
       return reply.code(404).send({ error: 'not_found' });
     });

@@ -28,7 +28,7 @@ if (args.includes('--detach')) {
   });
   child.once('error', error => { clearTimeout(timer); console.error(error); process.exitCode = 1; });
 } else {
-  const webFiles = new Set(['app.js', 'app.css', 'track-map.js', 'local-race.js', 'local-race.css', 'control-settings.js', 'control-settings.css', 'menu-navigation.js']);
+  const webFiles = new Set(['app.js', 'app.css', 'track-map.js', 'local-race.js', 'local-race.css', 'race-lobby.js', 'race-lobby.css', 'control-settings.js', 'control-settings.css', 'menu-navigation.js']);
   const types = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.wasm':'application/wasm', '.png':'image/png', '.jpg':'image/jpeg', '.svg':'image/svg+xml', '.json':'application/json' };
   const server = createServer(async (request, response) => {
     try {

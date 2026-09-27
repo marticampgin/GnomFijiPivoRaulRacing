@@ -2,6 +2,7 @@
 const assert = require('node:assert/strict');
 const {chromium} = require('playwright');
 const sharp = require('sharp');
+const menuOnly = process.env.GNOM_QA_MENU_ONLY === '1';
 (async () => {
   const browser = await chromium.launch({headless:false});
   try {
@@ -16,7 +17,7 @@ const sharp = require('sharp');
     const url = process.env.GNOM_QA_URL || 'http://127.0.0.1:8787/';
     await page.goto(url);
     assert.equal(new URL(page.url()).origin,new URL(url).origin);
-    assert.match(await page.title(),/GNOM FIJI/);
+    assert.match(await page.title(),/GNOM FIJI/i);
     await page.waitForFunction(()=>!document.querySelector('#local-button').disabled,{},{timeout:90000});
     await page.evaluate(()=>window.qaConnect());
     async function pad(button) {await page.evaluate(i=>qaButton(i,true),button);await page.waitForTimeout(100);await page.evaluate(i=>qaButton(i,false),button);await page.waitForTimeout(120);}
@@ -27,24 +28,44 @@ const sharp = require('sharp');
     await page.setViewportSize({width:1280,height:800});await pad(0);
     await page.waitForFunction(()=>document.querySelector('#local-setup').open);
     // Do not manually select the controller: this is the original auto-default regression.
-    await page.waitForFunction(()=>document.querySelector('[aria-label="Контроллер P1"]').value==='0');
+    await page.waitForFunction(()=>document.querySelector('[aria-label="Контроллер P1"]').getAttribute('aria-valuetext')==='Геймпад 1');
     await page.waitForFunction(()=>document.activeElement.id==='local-start');
     await page.screenshot({path:'/tmp/gnom-controller-live-setup-1280.png'});
     await page.setViewportSize({width:390,height:844});
     await page.screenshot({path:'/tmp/gnom-controller-live-setup-390.png'});
     assert.ok(await page.locator('#local-setup').evaluate(node=>node.scrollWidth<=node.clientWidth+1),'Setup horizontal overflow');
     await page.setViewportSize({width:1280,height:800});
-    // Reach and change the style with directional input, not mouse or a native popup.
-    for(let i=0;i<12;i++) {
-      if(await page.evaluate(()=>document.activeElement.getAttribute('aria-label')==='Стиль P1'))break;
-      await pad(12);
-    }
-    assert.equal(await page.evaluate(()=>document.activeElement.getAttribute('aria-label')),'Стиль P1');
+    // Exercise the visible spatial route with pad edges only, without click/focus shortcuts.
     await pad(14);
-    assert.equal(await page.locator('[aria-label="Стиль P1"]').inputValue(),'speed');
-    for(let i=0;i<12;i++) {if(await page.evaluate(()=>['local-start','local-setup-back'].includes(document.activeElement.id)))break;await pad(13);}
-    if(await page.evaluate(()=>document.activeElement.id==='local-setup-back'))await pad(15);
+    assert.equal(await page.evaluate(()=>document.activeElement.id),'local-setup-back','Left follows the footer actions');
+    await pad(12);
+    assert.equal(await page.evaluate(()=>document.activeElement.dataset.styleId),'handling','Up from Back reaches the style strip');
+    await pad(15);await pad(15);
+    assert.equal(await page.evaluate(()=>document.activeElement.dataset.styleId),'speed');
+    await pad(0);
+    assert.equal(await page.locator('[data-style-id="speed"]').getAttribute('aria-pressed'),'true');
+    await pad(15);await pad(15);
+    assert.equal(await page.evaluate(()=>document.activeElement.dataset.focusKey),'lobby-controls','Right from the style strip reaches player controls');
+    await pad(0);
+    await page.waitForFunction(()=>document.querySelector('#local-player-controls').open);
+    await pad(1);
+    await page.waitForFunction(()=>!document.querySelector('#local-player-controls').open);
+    assert.equal(await page.evaluate(()=>document.activeElement.dataset.focusKey),'lobby-controls','Back restores the controls button');
+    await pad(13);
     assert.equal(await page.evaluate(()=>document.activeElement.id),'local-start');
+    await pad(12);
+    assert.equal(await page.evaluate(()=>document.activeElement.dataset.focusKey),'lobby-controls','Up from Start returns directly to player controls');
+    await pad(13);
+    assert.equal(await page.evaluate(()=>document.activeElement.id),'local-start','Down from Controls returns directly to Start');
+    if (menuOnly) {
+      assert.notEqual(await page.evaluate(()=>GnomHost.state?.mode),'local','Menu-only mode must never start a local race');
+      await page.screenshot({path:'/tmp/gnom-controller-live-menu-only-1280.png'});
+      await pad(1);
+      await page.waitForFunction(()=>!document.querySelector('#local-setup').open);
+      assert.deepEqual(errors,[]);
+      console.log(JSON.stringify({result:'PASS',scope:'menu-only; no race start command',url,style:'speed',gamepad:'virtual standard mapping; physical Bluetooth not tested',screenshot:'/tmp/gnom-controller-live-menu-only-1280.png'}));
+      return;
+    }
     await page.evaluate(()=>qaButton(0,true));
     await page.waitForTimeout(500);
     assert.equal(await page.$eval('#local-setup',node=>node.open),true,'Held A must not activate before release');
