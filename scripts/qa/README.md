@@ -7,6 +7,19 @@ is `http://127.0.0.1:8788/`.
 
 ## Prerequisites
 
+Focused local HUD audit (no exported game or server required):
+
+```sh
+node scripts/qa/local-hud.cjs
+```
+
+This isolated Chromium fixture covers all five layouts at 1600x900, 1280x720,
+844x390 and 390x844 with simultaneous effects, incoming warnings, reverse,
+countdown, destruction, results and readiness. It checks camera-sector bounds,
+non-overlap, loaded item art, own-seat commands and blur isolation. Screenshots
+and report are written to `/tmp/gnom-hud-audit` (override with `GNOM_QA_OUT`).
+These seeded UI states do not prove a completed Web race or physical pad support.
+
 Track v11 checks use controlled short sections, not three-lap playthroughs:
 
 ```sh

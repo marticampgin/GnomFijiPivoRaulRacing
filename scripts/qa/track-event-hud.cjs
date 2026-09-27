@@ -36,10 +36,11 @@ track.minimap.shortcuts = [[track.minimap.polyline[0], track.minimap.polyline[Ma
         const geometry = await page.evaluate(() => {
           const status = document.querySelector('.local-race:not([hidden]) .local-track-status');
           const r = status.getBoundingClientRect();
-          return { text: status.textContent, height: r.height, width: status.scrollWidth <= status.clientWidth, clear: [...document.querySelectorAll('.local-race:not([hidden]) .local-pane')].every(pane => pane.getBoundingClientRect().bottom <= r.top) };
+          const grid = document.querySelector('.local-race:not([hidden]) .local-grid').getBoundingClientRect();
+          return { text: status.textContent, height: r.height, width: status.scrollWidth <= status.clientWidth, fullViewport: grid.top === 0 && grid.left === 0 && grid.bottom === innerHeight && grid.right === innerWidth, clear: [...document.querySelectorAll('.local-race:not([hidden]) .local-health, .local-race:not([hidden]) .local-speed, .local-race:not([hidden]) .local-drift')].every(node => node.getBoundingClientRect().bottom <= r.top) };
         });
         check(geometry.text === 'ТРАССА МЕНЯЕТСЯ · 3 с', 'Rounded warning countdown');
-        check(geometry.height === 24 && geometry.width && geometry.clear, `Local HUD space ${width}x${height}, ${count}, ${layout}`);
+        check(geometry.height === 24 && geometry.width && geometry.clear && geometry.fullViewport, `Local HUD space ${width}x${height}, ${count}, ${layout}`);
         check(await page.evaluate(() => {
           const canvas = document.querySelector('.local-race:not([hidden]) .local-map');
           const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;

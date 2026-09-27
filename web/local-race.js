@@ -7,6 +7,13 @@
   const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
   const time = value => { const ms = Math.max(0, Math.floor((Number(value) || 0) * 1000)); return `${String(Math.floor(ms/60000)).padStart(2,'0')}:${String(Math.floor(ms/1000)%60).padStart(2,'0')}.${String(ms%1000).padStart(3,'0')}`; };
   function element(tag, className, text) { const node = document.createElement(tag); node.className = className || ''; if (text !== undefined) node.textContent = text; return node; }
+  function effectBadge(id, label, seconds) {
+    const compact=label.match(/\d+%/)?.[0]||({'start-boost':'СТ','slipstream':'ПТ','drift-boost':'ДР'}[id]||'');
+    const node=element('span',`local-effect ${id}`),icon=element('img'),name=element('span','local-effect-name',label),timer=element('b','',seconds===null?compact:`${seconds}с`);
+    const item=id==='burn'?'stroh80':['invulnerable','weapon_guard'].includes(id)?'crystal_shield':id;
+    icon.src=Object.hasOwn(items,item)?`/assets/items/${item}.png`:`/assets/icons/${id==='recovery'?'rotate-ccw':'arrow-up-right'}.svg`;icon.alt='';
+    node.title=seconds===null?label:`${label}: ${seconds} с`;node.setAttribute('aria-label',node.title);node.append(icon,name,timer);return node;
+  }
   function button(label, action, icon) { const node = element('button','local-button',label); node.type = 'button'; if (icon) { const img = element('img'); img.src = `/assets/icons/${icon}.svg`; img.alt = ''; node.prepend(img); } node.addEventListener('click', action); return node; }
   function select(options, value, label) { const node = element('select'); node.setAttribute('aria-label',label); for (const [id,name] of options) { const option = element('option','',name); option.value = id; node.append(option); } node.value = String(value); return node; }
   function validateSeats(seats, pads) {
@@ -172,13 +179,14 @@
         const labels={...items,crystal_shield:'Щит',weapon_guard:'Защита от удара',burn:'Горение',invulnerable:'Защита',recovery:'Восстановление'};
         p.warning.hidden=!Object.hasOwn(warnings,seat.attackWarning);p.warning.textContent=p.warning.hidden?'':`! ${warnings[seat.attackWarning]}`;
         const effects={...seat.effects};if(seat.invulnerableRemaining>0)effects.invulnerable=seat.invulnerableRemaining;if(seat.destroyedRemaining>0)effects.recovery=seat.destroyedRemaining;
-        p.effects.replaceChildren(...Object.entries(effects).filter(([key,value])=>labels[key]&&Number(value?.remaining ?? value)>0).map(([key,value])=>element('span',`local-effect ${key}`,`${labels[key]} ${Math.ceil(Number(value?.remaining ?? value))} с`)));
+        p.effects.replaceChildren(...Object.entries(effects).filter(([key,value])=>labels[key]&&Number(value?.remaining ?? value)>0).map(([key,value])=>effectBadge(key,labels[key],Math.ceil(Number(value?.remaining ?? value)))));
         const driving=seat.driving||{};
-        if(driving.start_boost_remaining>0)p.effects.prepend(element('span','local-effect start-boost','СТАРТ'));
-        if(driving.slipstream_boost_remaining>0)p.effects.prepend(element('span','local-effect slipstream','ПОТОК'));
-        else if(driving.slipstream_charge>0)p.effects.prepend(element('span','local-effect slipstream',`ПОТОК ${Math.round(clamp(driving.slipstream_charge,0,1)*100)}%`));
-        if(seat.boost>0&&!(driving.start_boost_remaining>0)&&!(driving.slipstream_boost_remaining>0))p.effects.prepend(element('span','local-effect drift-boost','УСКОРЕНИЕ'));
+        if(driving.start_boost_remaining>0)p.effects.prepend(effectBadge('start-boost','СТАРТ',null));
+        if(driving.slipstream_boost_remaining>0)p.effects.prepend(effectBadge('slipstream','ПОТОК',null));
+        else if(driving.slipstream_charge>0)p.effects.prepend(effectBadge('slipstream',`ПОТОК ${Math.round(clamp(driving.slipstream_charge,0,1)*100)}%`,null));
+        if(seat.boost>0&&!(driving.start_boost_remaining>0)&&!(driving.slipstream_boost_remaining>0))p.effects.prepend(effectBadge('drift-boost','УСКОРЕНИЕ',null));
         const results=next.phase==='results';
+        p.pane.classList.toggle('is-finished',Boolean(seat.finished)||results);
         p.countdown.textContent=next.countdown>0?Math.ceil(next.countdown):'';p.finish.hidden=!seat.finished&&!results;p.finishTitle.textContent=seat.dnf?'DNF':`${seat.rank || '-'} МЕСТО`;p.finishTime.textContent=time(seat.elapsed);p.ready.textContent=!results?'Ждём остальных':seat.ready?'Готов':'Ещё заезд';p.ready.disabled=!results||Boolean(seat.ready)||next.paused;
         drawMap(p.map,next.trackDescriptor,next.players || [],seat.id);
       });

@@ -4,6 +4,14 @@ Status: **accepted by the user**, 2026-09-27. This revision does not change the 
 The previous accepted Figma page is untouched. Artwork is the accepted concept
 background, not a screenshot of implemented split-screen or a promise of final graphics.
 
+Runtime handoff, 2026-09-27: the five local layouts preserve this hierarchy.
+Compact sectors use item icons with timers and named tooltips instead of long
+effect chips; R sits beside speed. Results replace the finished seat's racing HUD.
+The global track warning never changes sector/camera dimensions. The three-player
+overview retains its map and places even in portrait. Narrow/short racing sectors
+omit their individual minimap to keep driving telemetry readable. Responsive
+checks do not imply touch controls or a confirmed four-camera performance budget.
+
 ## Figma Review
 
 - [Revision overview](https://www.figma.com/design/OejURNEY5ZRhWWOBicFNYP?node-id=16-3)

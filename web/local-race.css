@@ -1,6 +1,6 @@
 .local-race{position:fixed;inset:0;z-index:15;pointer-events:none;font-family:Arial, sans-serif;font-weight:700;color:#f5f7f4;letter-spacing:0;text-shadow:0 2px 4px #000b}
 .local-race[hidden],.local-race [hidden]{display:none!important}
-.local-track-status{position:absolute;inset:auto 0 0;height:24px;display:flex;align-items:center;justify-content:center;background:#131715e8;color:#64e3db;font-size:12px;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}.local-track-status.warning{color:#ffd36b}.track-event-visible .local-grid{bottom:24px}
+.local-track-status{position:absolute;inset:auto 0 0;height:24px;display:flex;align-items:center;justify-content:center;background:#131715e8;color:#64e3db;font-size:12px;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}.local-track-status.warning{color:#ffd36b}
 .local-controls{grid-column:1/-1;border-top:1px solid #3b4540;padding-top:8px;color:#a8b7af;font-size:14px}.local-controls summary{cursor:pointer;min-height:28px;line-height:28px}.local-controls[open] summary{color:#64e3db}
 .local-lesson{position:absolute;left:50%;top:76px;transform:translateX(-50%);width:280px;max-width:calc(100% - 32px);box-sizing:border-box;display:grid;gap:10px;padding:16px;background:#131715ed;border:1px solid #64e3db;border-radius:4px;pointer-events:auto;text-align:center}.local-lesson-count{font-size:12px;color:#a8b7af}.local-lesson>strong{font-size:22px}.local-lesson-keys{display:flex;justify-content:center;gap:8px;min-height:30px}.local-lesson kbd{display:grid;place-items:center;min-width:28px;padding:4px 6px;border:1px solid #617268;border-bottom-width:3px;border-radius:4px;font:700 14px Arial,sans-serif}.local-lesson .local-actions{margin-top:2px;gap:8px;justify-content:center}.local-lesson .local-button{font-size:12px;padding:6px 8px;min-height:32px}.tutorial-active .local-lap,.tutorial-active .local-rank{display:none}
 @media(max-width:600px){.local-lesson{top:190px;width:260px}.local-actions{flex-wrap:wrap}}
@@ -41,3 +41,68 @@
 @container (max-width:350px){.local-crystals{top:90px;left:8px}.local-crystals strong{font-size:18px}.local-race .local-effects{top:130px}.local-drift-segments{gap:3px}}
 @container (max-width:600px){.local-attack-warning{top:112px;left:auto;right:var(--inset);transform:none;font-size:12px;padding:8px;max-width:calc(100% - 100px)}}
 @container (max-width:350px){.local-attack-warning{top:94px;right:8px;font-size:10px;padding:6px;max-width:calc(100% - 75px)}}
+
+/* Keep sector bounds identical to the Godot cameras, including during global warnings. */
+.local-pane{--status-space:0px}
+.track-event-visible .local-pane{--status-space:24px}
+.local-health,.local-drift,.local-speed,.local-rank,.local-map{margin-bottom:var(--status-space)}
+.local-effect{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;min-width:0;pointer-events:auto}
+.local-effect img{width:22px;height:22px;object-fit:contain;flex:none}
+.local-effect b{font-size:12px;font-variant-numeric:tabular-nums}
+.local-attack-warning{white-space:normal;overflow-wrap:anywhere}
+.local-finish{box-sizing:border-box;max-width:calc(100% - 16px)}
+.is-finished>:not(.local-sector-blur):not(.local-identity):not(.local-finish){visibility:hidden}
+.local-overview{container-type:size}
+@container (max-width:900px){
+  .local-effect-name{display:none}
+  .local-effect{padding:3px 5px;gap:3px}
+  .local-race .local-effects{max-width:calc(100% - 2 * var(--inset));right:var(--inset)}
+}
+@container (max-width:350px){
+  .local-effect{padding:2px;gap:1px}
+  .local-effect img{width:18px;height:18px}
+  .local-effect b{font-size:9px}
+  .local-finish .local-button{white-space:normal;min-width:0}
+}
+@container (max-height:400px) and (min-width:351px){
+  .local-identity{top:4px;left:8px;transform:none;font-size:10px;padding:3px 5px;max-width:calc(100% - 140px)}
+  .local-lap{top:4px;right:8px;font-size:9px;gap:0 5px}
+  .local-lap strong{font-size:14px}.local-lap>span:last-child{font-size:10px}
+  .local-inventory{top:32px;left:8px;gap:4px;height:44px}
+  .local-slot{width:32px;height:32px;padding:2px!important}.local-slot>img{width:24px;height:24px}
+  .local-slot-key{top:27px;font-size:9px;line-height:13px;padding:0 3px}
+  .local-crystals{top:34px;left:88px;height:26px;gap:4px}.local-crystals img{width:18px;height:24px}.local-crystals strong{font-size:18px}
+  .local-attack-warning{top:34px;left:auto;right:8px;transform:none;max-width:calc(100% - 152px);font-size:10px;padding:5px}
+  .local-race .local-effects{top:84px;left:8px;right:8px;max-width:none;gap:3px}
+  .local-effect-name{display:none}.local-effect{padding:2px;gap:2px}.local-effect img{width:18px;height:18px}.local-effect b{font-size:10px}
+  .local-health{bottom:6px;left:8px;width:80px;font-size:8px;gap:2px}.local-health strong{font-size:11px}
+  .local-drift{bottom:6px;left:50%;right:auto;transform:translateX(-50%);width:80px;font-size:9px;gap:5px}
+  .local-speed{bottom:6px;right:8px;gap:3px}.local-speed strong{font-size:22px}.local-speed span{font-size:8px}
+  .local-reverse{font-size:12px;line-height:14px}
+  .local-rank{bottom:34px;left:8px;gap:4px}.local-rank strong{font-size:24px}.local-rank span{font-size:10px}.local-rank small{display:none}
+  .local-countdown{top:48%;font-size:32px}
+  .local-finish{top:50%;transform:translate(-50%,-50%);min-width:0;width:190px;padding:8px;gap:4px}
+  .local-finish .local-button{min-height:28px;padding:4px 8px;font-size:12px}
+}
+@container (max-width:600px){.local-overview h3{font-size:14px}.local-overview ol{font-size:10px;gap:2px}.local-overview li{grid-template-columns:16px minmax(0,1fr);gap:3px}}
+@container (max-height:330px){.local-overview h3{font-size:12px}.local-overview ol{font-size:10px;gap:0}.local-overview li{line-height:12px}}
+.local-reverse{position:static;order:-1}
+.local-pause-button{top:0;transform:none;width:24px;height:24px;padding:2px}
+@container (min-width:601px) and (min-height:401px){.local-inventory{top:28px}}
+@container (max-width:350px){
+  .local-identity{top:4px;left:30px;transform:none;max-width:calc(100% - 38px);font-size:9px;padding:3px}
+  .local-inventory{height:43px}
+  .local-crystals{top:98px;height:24px;gap:3px}.local-crystals img{width:18px;height:24px}
+  .local-attack-warning{top:98px;max-width:calc(100% - 85px);padding:4px}
+}
+@container (max-height:400px) and (min-width:351px){
+  .local-identity{left:30px;max-width:calc(100% - 160px)}
+  .local-map{display:none}
+  .local-effect{padding:1px;gap:1px}.local-effect img{width:16px;height:16px}.local-effect b{font-size:9px}
+}
+@media(max-width:600px){
+  .local-overview{grid-template-rows:auto 100px minmax(0,1fr)}
+  .local-overview canvas{display:block;width:100px;height:100px;justify-self:center}
+}
+.local-overview{padding:12px;gap:8px}
+.track-event-visible .local-overview{padding-bottom:36px}
