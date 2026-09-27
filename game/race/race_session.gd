@@ -8,6 +8,7 @@ const VehicleContacts = preload("res://vehicle/vehicle_contacts.gd")
 const Items = preload("res://items/race_items.gd")
 const Techniques = preload("res://race/race_techniques.gd")
 const TrackEvent = preload("res://race/track_event.gd")
+const RecoveryPlacement = preload("res://race/recovery_placement.gd")
 const MAX_PLAYERS: int = 10
 const RACE_LAPS: int = 3
 
@@ -58,8 +59,10 @@ func _step_session(delta: float) -> void:
 		_race_elapsed += delta
 		_step_track_event(delta)
 		for id: String in _items.step(_players, delta):
-			_recover(_players[id])
-			_items.restore(_players[id])
+			if _recover(_players[id]):
+				_items.restore(_players[id])
+			else:
+				_players[id].combat.destroyed_remaining = delta
 		if _finish_remaining >= 0.0:
 			_finish_remaining = maxf(0.0, _finish_remaining - delta)
 		_techniques.step(_players, delta)
@@ -238,9 +241,17 @@ func _update_progress(player: Dictionary) -> void:
 				_finish_remaining = 30.0
 
 
-func _recover(player: Dictionary) -> void:
+func _recover(player: Dictionary) -> bool:
+	var pose: Variant = RecoveryPlacement.find_pose(_track, player, _players)
+	if pose == null:
+		return false
+	_reset_player_at(player, pose)
+	return true
+
+
+func _reset_player_at(player: Dictionary, pose: Transform3D) -> void:
 	player["driving"] = Techniques.new_state()
-	player["vehicle"].reset_at(_track.recovery_transform(player["progress"]))
+	player["vehicle"].reset_at(pose)
 	_track.mark_recovered(player["progress"])
 	player["previous_position"] = player["vehicle"].global_position
 	player["queue"].clear()
@@ -263,9 +274,7 @@ func _reset_race(player: Dictionary) -> void:
 	player["elapsed"] = 0.0
 	player["dnf"] = false
 	player["ready"] = player["is_bot"]
-	_recover(player)
-	player["vehicle"].reset_at(_track.spawn_transform(int(player["slot"])))
-	player["previous_position"] = player["vehicle"].global_position
+	_reset_player_at(player, _track.spawn_transform(int(player["slot"])))
 
 
 func _race_progress(player: Dictionary) -> float:

@@ -59,9 +59,11 @@ func _update_progress(player: Dictionary) -> void:
 	_finish_remaining = -1.0
 
 
-func _recover(player: Dictionary) -> void:
-	super._recover(player)
-	_drift_charged = false
+func _recover(player: Dictionary) -> bool:
+	var recovered: bool = super._recover(player)
+	if recovered:
+		_drift_charged = false
+	return recovered
 
 
 func step_local(delta: float, snapshots: Variant = null) -> void:

@@ -143,8 +143,9 @@ func recover_seat(seat: int) -> bool:
 	var player: Dictionary = _players[_seats[seat]]
 	if player.finished or float(player.combat.destroyed_remaining) > 0.0 or _tick - int(player.last_recover_at) < 60:
 		return false
+	if not _recover(player):
+		return false
 	player.last_recover_at = _tick
-	_recover(player)
 	return true
 
 

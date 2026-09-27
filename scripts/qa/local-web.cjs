@@ -188,6 +188,11 @@ async function measureBrowserCadence(page) {
       await page.locator('.local-pause-button').click();
       await checkFrozen(page);
       await resume(page);
+      const recoveryEpoch = await page.evaluate(() => GnomHost.state.seats[0].epoch);
+      await page.locator('.local-pause-button').click();
+      await page.locator('#local-pause').getByRole('button', { name: 'На трассу', exact: true }).first().click();
+      await page.waitForFunction(epoch => !GnomHost.state.paused
+        && GnomHost.state.seats[0].epoch > epoch, recoveryEpoch);
       if (count > 1) {
         await page.evaluate(() => qaSetPadConnected(0, false));
         await page.waitForFunction(() => GnomHost.state.paused && GnomHost.state.disconnected?.includes(1));
@@ -202,7 +207,7 @@ async function measureBrowserCadence(page) {
       await checkFrozen(page);
       await page.locator('#local-pause').getByRole('button', { name: 'Выйти', exact: true }).click();
       await page.waitForFunction(() => document.querySelector('#local-race').hidden);
-      results.push({ count, layout, sectorColors, movement: true, pause: true, resume: true,
+      results.push({ count, layout, sectorColors, movement: true, pause: true, resume: true, recovery: true,
         disconnectReconnect: count > 1 ? true : 'not applicable', exit: true });
     }
     assert.deepEqual(errors, []);

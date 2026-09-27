@@ -27,10 +27,11 @@ class TestRace extends "res://app/prototype.gd":
 		pass
 	func _human_count() -> int:
 		return 1
-	func _recover(player: Dictionary) -> void:
-		if running:
+	func _recover(player: Dictionary) -> bool:
+		var recovered: bool = super._recover(player)
+		if running and recovered:
 			recoveries += 1
-		super._recover(player)
+		return recovered
 	func _update_progress(player: Dictionary) -> void:
 		var was_finished: bool = player.finished
 		super._update_progress(player)
