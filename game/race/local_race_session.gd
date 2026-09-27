@@ -154,11 +154,16 @@ func vehicle_for_seat(seat: int) -> CharacterBody3D:
 
 func presentation() -> Dictionary:
 	var standings: Array = _players.values()
+	# Route projection is constant within this snapshot, not within the next one.
+	var distances: Dictionary = {}
+	for player: Dictionary in standings:
+		if not player.finished:
+			distances[player.id] = float(player.get("result_progress", 0.0)) if _phase == "results" else _race_progress(player)
 	standings.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		if a.finished or b.finished:
 			return int(a.finish_order) < int(b.finish_order) if a.finished and b.finished else bool(a.finished)
-		var distance_a: float = float(a.get("result_progress", 0.0)) if _phase == "results" else _race_progress(a)
-		var distance_b: float = float(b.get("result_progress", 0.0)) if _phase == "results" else _race_progress(b)
+		var distance_a: float = distances[a.id]
+		var distance_b: float = distances[b.id]
 		return int(a.slot) < int(b.slot) if is_equal_approx(distance_a, distance_b) else distance_a > distance_b)
 	var entries: Array = []
 	var seats: Dictionary = {}

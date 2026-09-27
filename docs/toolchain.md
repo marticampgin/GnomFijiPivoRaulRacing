@@ -59,6 +59,21 @@ and [synchronous WebGL queries](https://developer.mozilla.org/en-US/docs/Web/API
 
 The custom HTML shell lives in `game/web/shell.html`. Its companion application files are served by the backend from `web/`; changing those files does not require rebuilding the engine. Changes inside `game/` do require a new export. Serve the output over HTTP on localhost or HTTPS in a deployment, not through `file://`. The server must return `.wasm` as `application/wasm` and retain all exported filenames. An exported HTML file is not proof that the game rendered: browser console, screenshots, canvas pixels and interaction must also be checked.
 
+## Local CPU Diagnostics
+
+```sh
+"${GODOT_BIN:-godot}" --headless --path game --fixed-fps 60 --script res://tests/local_cost_probe.gd
+"${GODOT_BIN:-godot}" --headless --path game --script res://tests/local_standings_probe.gd
+```
+
+The cost probe warms up 60 ticks and samples 300 ticks with four local seats and
+six bots. It separates simulation, visual updates and presentation; nested track,
+vehicle and item totals are inclusive, so do not add them to the outer totals.
+It deliberately requests presentation every sampled tick for diagnosis, whereas
+the Web adapter publishes HUD at 10 Hz. Headless timings do not measure browser
+rendering or predict FPS. The standings regression preserves the previous sort
+semantics and bounds route projections per snapshot, including results with none.
+
 ## Prepare ARM64 Artifact
 
 ```sh
