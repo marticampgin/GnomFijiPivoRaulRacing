@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "asset": "hero-blockout",
+  "recordedOn": "2026-09-27",
+  "change": "build-presentation-faithful-racing-slice",
+  "stage": "editable-review-blockout",
+  "reviewStatus": "awaiting-user-approval",
+  "modelSheetApproved": false,
+  "finalModelApproved": false,
+  "source": {
+    "path": "art-source/hero/hero-blockout.blend",
+    "sha256": "70fba18532fc6003ed00bb441f2a427f21aca88ad1516a06fcf2ab2381533880",
+    "bytes": 856151,
+    "compressed": true,
+    "includesReviewStudio": true,
+    "builder": "art-source/hero/build_blockout.py",
+    "builderSha256": "529a0eedf0da191611ad58da81493a1f13ff9dc96147e38d82caed40e71021af",
+    "reproduction": "art-source/hero/README.md"
+  },
+  "runtime": {
+    "path": "game/art/vehicles/hero-blockout.glb",
+    "sha256": "98080f644da5db890b8151b7451a6b0962bbc24faffc5429bab917221070c9f8",
+    "bytes": 1348296,
+    "selfContained": true,
+    "meshCount": 13,
+    "materialCount": 21,
+    "materialSurfaceCount": 54,
+    "triangles": 73208,
+    "textures": 0,
+    "uvUnwrapComplete": false,
+    "skeletalRigComplete": false,
+    "animationClips": 0,
+    "lodsComplete": false,
+    "physicsNodes": 0,
+    "studioExported": false,
+    "sourcePlusRuntimeBytes": 2204447,
+    "sourcePlusRuntimeLimitBytes": 10485760
+  },
+  "toolchain": {
+    "blenderVersion": "4.5.13 LTS",
+    "blenderBuildHash": "daeeeca98fb0",
+    "blenderBinary": "/private/tmp/gnom-blender-4.5.13/Blender.app/Contents/MacOS/Blender",
+    "installationVerification": "tooling/blender.json",
+    "godotVersion": "4.7.2.stable.official.ed1daf0bf",
+    "networkRequired": false,
+    "externalDownloadsUsedForAsset": false,
+    "launchNote": "Approved local Blender offline-mode process; restricted macOS sandbox cannot initialize its Metal detection. No extra environment variables or Python dependencies."
+  },
+  "provenance": {
+    "method": "Locally authored editable mesh geometry, with custom lofts/curved forms and supporting meshes, informed by accepted and proposed reference art. No downloaded third-party model.",
+    "referenceManifest": "design/reviews/presentation-slice/reference-manifest.json",
+    "originalPresentation": { "figmaFileKey": "JK4YNN8zKqhuZonVbDZ8YB", "nodeId": "2:291" },
+    "acceptedRaceHud": { "figmaFileKey": "OejURNEY5ZRhWWOBicFNYP", "nodeId": "3:101" },
+    "acceptedGarage": { "figmaFileKey": "OejURNEY5ZRhWWOBicFNYP", "nodeId": "3:22" },
+    "primaryRearReference": {
+      "path": "design/assets/race-concept.jpg",
+      "sha256": "509963b0197689f49b98610401b1cc8e05dbe12af85b6f03f1cd6bcea8125df6"
+    },
+    "secondaryFrontReference": {
+      "path": "design/assets/kart-concept.jpg",
+      "sha256": "3cbe95e6742730515bac51d3bb2eb4986d8e22025d9db6759ff6b402b399c1e8"
+    },
+    "proposedSheet": {
+      "path": "design/reviews/presentation-slice/hero-kart-review-01.png",
+      "sha256": "942a42d4367fa03d537e0b655ce6ba25b549c4bc2f197f5c9c968f864aab80ef",
+      "approved": false,
+      "exactGeometricBlueprint": false
+    },
+    "rightsNote": "Project-supplied reference art and project-generated review concept; no claim of third-party model licensing or new external asset acquisition."
+  },
+  "coordinates": {
+    "units": "meters",
+    "up": "+Y",
+    "forward": "-Z",
+    "scale": [1, 1, 1],
+    "root": "HeroBlockout",
+    "godotMayAddFileNameWrapper": true,
+    "groundY": 0,
+    "aabbMin": [-1.089999914, 0, -1.372000098],
+    "aabbMax": [1.089999914, 2.080935001, 1.324000001],
+    "widthHeightLength": [2.179999828, 2.080935001, 2.696000099],
+    "existingColliderAdapterOffset": [0, -0.35, 0],
+    "colliderChangedByAsset": false
+  },
+  "articulation": {
+    "frontSteering": { "nodes": ["FrontLeftSteer", "FrontRightSteer"], "localAxis": [0, 1, 0], "restBasis": "identity" },
+    "wheelRoll": { "nodes": ["FrontLeftRoll", "FrontRightRoll", "RearLeftRoll", "RearRightRoll"], "localAxis": [1, 0, 0], "restBasis": "identity" },
+    "driver": { "pivot": "DriverLean", "children": ["DriverBody", "HeadMotion"], "headChildren": ["Head", "Hat"], "deformation": "limited rigid articulation only" },
+    "steeringWheel": { "pivot": "SteeringPivot", "localAxisToNormalize": [0, 0.48, -0.877], "restBasis": "identity", "children": ["SteeringWheel", "LeftHand", "RightHand"], "driverLeanSibling": true },
+    "crystal": { "pivot": "CrystalPivot", "child": "Crystal", "globalTopY": 1.172016144, "driverShoulderY": 1.252016306 },
+    "exhaust": { "nodes": ["ExhaustLeft", "ExhaustRight"], "localEmitDirection": [0, 0, 1], "leftPosition": [-0.39, 0.517016232, 1.315], "rightPosition": [0.39, 0.517016232, 1.315] },
+    "retainImportedChildTransforms": true
+  },
+  "verification": {
+    "standaloneGodotProbe": "art-source/hero/godot/import_probe.gd",
+    "report": "art-source/hero/import-check.json",
+    "reportSha256": "537ac27b7609217a382ee015ce4e2228e9f4ab373bbf52168d8ac969d7d43c72",
+    "checksPassed": 262,
+    "checksFailed": 0,
+    "sameMeshReviewViewsInspected": ["front", "rear", "side", "three-quarter"],
+    "temporaryRenderDirectory": "/private/tmp/gnom-hero-blockout-renders",
+    "rendersCommitted": false,
+    "renderSha256": {
+      "FrontCamera.png": "fd3659cebe61635c3271092b1f801271c2b3b067b6f1dbfa36b69f7a5c10ec45",
+      "RearCamera.png": "a25f49ad4355adbf9f4c1d709df00ed2e256abcae0ffa237f6b4b120ddb1d6e7",
+      "SideCamera.png": "28309b19d5424a8792cb8df41a35a0d5404937e0b558708101f53c8d47914452",
+      "ThreeQuarterCamera.png": "44d2c686e9f4d9a60d31438702e7ee7fcdb69d8d863eea55e04e348f626c887c"
+    },
+    "browserIntegration": "outside this asset probe; consult the runtime owner's separate QA, not asserted here",
+    "tenVisibleKartPerformance": "unmeasured by this asset probe"
+  },
+  "remainingGates": [
+    "Explicit user approval of the proposed sheet and this blockout",
+    "Final topology, facial/hair refinements, UVs and textures",
+    "Finished animation deformation and contact-preserving arm rig",
+    "LOD and material-surface optimization informed by ten-kart Web profiling"
+  ]
+}

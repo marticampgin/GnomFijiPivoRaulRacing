@@ -1,0 +1,132 @@
+{
+  "url": "http://127.0.0.1:8787/",
+  "browser": "Playwright; Browser plugin not available",
+  "checks": [
+    {
+      "name": "real server driving, drift and boost",
+      "drift": 0.312,
+      "boost": 0.925666666666667,
+      "speed": 78.9026824951172,
+      "fps": 39
+    },
+    {
+      "name": "desktop",
+      "viewport": [
+        1600,
+        900
+      ],
+      "canvasVariance": [
+        59.27559573387408,
+        63.43513953063383,
+        67.77501479063079
+      ],
+      "hud": [
+        {
+          "name": "participants hud-panel",
+          "inside": true
+        },
+        {
+          "name": "racers hud-panel",
+          "inside": true
+        },
+        {
+          "name": "lap-time hud-panel",
+          "inside": true
+        },
+        {
+          "name": "minimap hud-panel",
+          "inside": true
+        },
+        {
+          "name": "drift hud-panel",
+          "inside": true
+        },
+        {
+          "name": "speed hud-panel",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "name": "portrait",
+      "viewport": [
+        390,
+        844
+      ],
+      "canvasVariance": [
+        59.964462147135855,
+        66.83746114878089,
+        72.81050271998483
+      ],
+      "hud": [
+        {
+          "name": "participants hud-panel",
+          "inside": true
+        },
+        {
+          "name": "racers hud-panel",
+          "inside": true
+        },
+        {
+          "name": "lap-time hud-panel",
+          "inside": true
+        },
+        {
+          "name": "minimap hud-panel",
+          "inside": true
+        },
+        {
+          "name": "drift hud-panel",
+          "inside": true
+        },
+        {
+          "name": "speed hud-panel",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "name": "landscape",
+      "viewport": [
+        844,
+        390
+      ],
+      "canvasVariance": [
+        61.569358705088035,
+        67.41795857994582,
+        71.87883716440325
+      ],
+      "hud": [
+        {
+          "name": "participants hud-panel",
+          "inside": true
+        },
+        {
+          "name": "racers hud-panel",
+          "inside": true
+        },
+        {
+          "name": "lap-time hud-panel",
+          "inside": true
+        },
+        {
+          "name": "minimap hud-panel",
+          "inside": true
+        },
+        {
+          "name": "drift hud-panel",
+          "inside": true
+        },
+        {
+          "name": "speed hud-panel",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "name": "recover, menu and exit still work"
+    }
+  ],
+  "errors": [],
+  "warnings": []
+}

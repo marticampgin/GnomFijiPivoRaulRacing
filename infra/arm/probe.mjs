@@ -17,11 +17,44 @@ export function loopbackOrigin(value) {
   return origin.origin;
 }
 
-export function steeringFor(state) {
+export function routeFor(descriptor) {
+  const route = descriptor?.minimap?.polyline;
+  if (!Array.isArray(route) || route.length < 4 || route.length > 4096
+    || !route.every(point => Array.isArray(point) && point.length === 2 && point.every(Number.isFinite))
+    || Math.hypot(route[0][0] - route.at(-1)[0], route[0][1] - route.at(-1)[1]) > 0.01) throw new Error('Load probe requires a valid closed track descriptor');
+  if (route.slice(1).some((point, index) => Math.hypot(point[0] - route[index][0], point[1] - route[index][1]) < 0.00001)) throw new Error('Load probe rejects zero-length route segments');
+  return route;
+}
+
+export function steeringFor(state, route) {
   if (!state) return 0;
+  if (!Array.isArray(route) || route.length < 4) throw new Error('Load probe has no route');
   const [x, , z] = state.position;
-  const angle = Math.atan2(z / 42, x / 62) + 0.16;
-  const dx = 62 * Math.cos(angle) - x, dz = 42 * Math.sin(angle) - z;
+  let segment = 0, fraction = 0, distance = Infinity;
+  for (let index = 0; index < route.length - 1; index++) {
+    const [ax, az] = route[index], [bx, bz] = route[index + 1];
+    const dx = bx - ax, dz = bz - az;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
+    const candidate = Math.hypot(x - ax - dx * t, z - az - dz * t);
+    if (candidate < distance) { segment = index; fraction = t; distance = candidate; }
+  }
+  // This is only a deterministic load-fixture driver, not the game's bot AI.
+  let lookAhead = 12;
+  let target;
+  for (let step = 0; step < route.length; step++) {
+    const [ax, az] = route[segment], [bx, bz] = route[segment + 1];
+    const length = Math.hypot(bx - ax, bz - az);
+    if (lookAhead <= length * (1 - fraction)) {
+      const t = fraction + lookAhead / length;
+      target = [ax + (bx - ax) * t, az + (bz - az) * t];
+      break;
+    }
+    lookAhead -= length * (1 - fraction);
+    segment = (segment + 1) % (route.length - 1);
+    fraction = 0;
+  }
+  if (!target) target = route[segment];
+  const dx = target[0] - x, dz = target[1] - z;
   const fx = -state.basis[2][0], fz = -state.basis[2][2];
   const turn = Math.atan2(fz * dx - fx * dz, fx * dx + fz * dz);
   return Math.max(-1, Math.min(1, -turn * 2.2));
@@ -55,12 +88,13 @@ async function run() {
       const response = await fetch(`${origin}/api/race/ticket`, { method: 'POST', headers: { Origin: origin, Cookie: cookie, 'X-CSRF-Token': session.csrfToken, 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(5000) });
       if (!response.ok) throw new Error(`Ticket rejected: ${response.status}`);
       const join = await response.json();
+      const route = routeFor(join.track);
       const socketUrl = new URL(join.websocketUrl);
       if (socketUrl.protocol !== 'ws:' || !['127.0.0.1', 'localhost', '[::1]'].includes(socketUrl.hostname)) throw new Error('Refusing non-loopback race URL');
       const socket = new WebSocket(socketUrl);
-      const peer = { socket, id: join.playerId, sequence: 0, state: null, sent: new Map(), lastSnapshot: null, firstTick: null, lastTick: null, firstAt: null, lastAt: null, welcome: false, distance: 0, lastPosition: null, restarts: 0, lastRestart: 0, snapshots: 0 };
+      const peer = { socket, route, id: join.playerId, sequence: 0, state: null, sent: new Map(), lastSnapshot: null, firstTick: null, lastTick: null, firstAt: null, lastAt: null, welcome: false, distance: 0, lastPosition: null, restarts: 0, lastRestart: 0, snapshots: 0 };
       peers.push(peer);
-      socket.addEventListener('open', () => socket.send(JSON.stringify({ type: 'join', ticket: join.ticket })));
+      socket.addEventListener('open', () => socket.send(JSON.stringify({ type: 'join', ticket: join.ticket, compatibility: join.compatibility })));
       socket.addEventListener('error', () => errors.push(`peer ${index}: socket error`));
       socket.addEventListener('close', event => { if (!deliberateShutdown) errors.push(`peer ${index}: closed ${event.code} ${event.reason}`); });
       socket.addEventListener('message', event => {
@@ -101,7 +135,7 @@ async function run() {
         if (peer.socket.readyState !== WebSocket.OPEN) continue;
         if (peer.socket.bufferedAmount > 65536 || peer.sent.size >= 120) { errors.push('Load generator input backlog'); peer.socket.close(); continue; }
         peer.sent.set(++peer.sequence, now);
-        peer.socket.send(JSON.stringify({ type: 'input', sequence: peer.sequence, steering: steeringFor(peer.state), throttle: 1, brake: 0, drift: false }));
+        peer.socket.send(JSON.stringify({ type: 'input', sequence: peer.sequence, steering: steeringFor(peer.state, peer.route), throttle: 1, brake: 0, drift: false }));
       }
       nextInputAt += 1000 / 60;
       if (nextInputAt < now - 1000 / 30) nextInputAt = now + 1000 / 60;

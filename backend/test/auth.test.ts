@@ -12,6 +12,7 @@ import { readConfig, type Config } from '../src/config.js';
 import { migrate } from '../src/database.js';
 import { buildApp } from '../src/app.js';
 import { AuthService } from '../src/auth.js';
+import { loadTrackManifest, raceCompatibility, TICKET_VERSION } from '../src/race-compatibility.js';
 
 let local: Awaited<ReturnType<typeof startLocalDatabase>>;
 let directory: string;
@@ -161,9 +162,21 @@ test('ticket is signed, short-lived and issued only with session and CSRF', asyn
   assert.equal(payload.match_id, 'prototype-1');
   assert.ok(payload.expires_at <= Math.floor(Date.now() / 1000) + 60);
   assert.ok(payload.expires_at > Math.floor(Date.now() / 1000));
-  assert.equal(payload.protocol_version, 1);
+  const track = loadTrackManifest(config.trackManifestPath);
+  assert.equal(payload.v, TICKET_VERSION);
+  assert.deepEqual(result.track, track);
+  assert.deepEqual(result.compatibility, raceCompatibility(track));
+  assert.equal(payload.protocol_version, result.compatibility.protocol_version);
+  assert.equal(payload.vehicle_state_version, result.compatibility.vehicle_state_version);
+  assert.deepEqual(payload.track, result.compatibility.track);
+  assert.equal(payload.track.simulation_hash, track.simulation_hash);
+  assert.equal(payload.track.track_id, track.track_id);
   const account = await login(client);
   assert.equal((await post(account, '/api/race/ticket', {})).json().playerId, account.user.id);
+});
+
+test('race startup fails closed for a missing or untrusted manifest path', () => {
+  assert.throws(() => new AuthService(pool, { ...config, trackManifestPath: join(directory, 'absent-track.json') }), /ENOENT/);
 });
 
 test('expired sessions reject account API and changing deployment rejects database', async () => {

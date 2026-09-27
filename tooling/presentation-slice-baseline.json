@@ -1,0 +1,16 @@
+{
+  "capturedOn": "2026-09-27",
+  "change": "build-presentation-faithful-racing-slice",
+  "source": "Existing live snapshot before authored route migration; includes uncommitted visual pass",
+  "localArchive": "/private/tmp/gnom-slice-baseline-20260927.tar.gz",
+  "archiveSha256": "ffaf6a9460386922d2afece5c7227be672c0d6bd789551c7f5b1edfb48bbf77c",
+  "archiveIncludes": ["game (without .godot)", "backend/dist", "scripts", "tooling", "build/web"],
+  "archiveExcludes": ["database", "credentials", "runtime state", "node_modules", "editor cache"],
+  "sourceUrl": "http://127.0.0.1:8787/",
+  "godotVersion": "4.7.2.stable.official.ed1daf0bf",
+  "protocolVersion": 1,
+  "track": "prototype ellipse with intermediate fantasy visuals",
+  "priorEvidence": "/private/tmp/gnom-art-qa/result.json",
+  "baselinePerformanceStatus": "pending fresh measurement; prior 39-60 FPS observations are not a budget",
+  "rollback": "Extract to a new local directory, provide the pinned engine and installed backend dependencies, and start that client/worker pair together. Never extract over a dirty checkout or copy .local/credentials. Keep current database intact."
+}

@@ -7,6 +7,7 @@ COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --ignore-scripts --include=dev --no-audit --no-fund
 COPY backend/src ./backend/src
 COPY backend/migrations ./backend/migrations
+COPY shared/track-manifest.json ./shared/track-manifest.json
 COPY web ./web
 COPY build/web ./build/web
 COPY infra/arm/api-entry.ts ./infra/arm/api-entry.ts

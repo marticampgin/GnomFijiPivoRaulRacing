@@ -3,6 +3,7 @@ extends SceneTree
 const Protocol = preload("res://net/prototype_protocol.gd")
 const Vehicle = preload("res://vehicle/racing_vehicle.gd")
 const Transport = preload("res://net/prototype_socket_server.gd")
+const Track = preload("res://track/authored_track.gd")
 
 class TestClient extends "res://app/prototype.gd":
 	var applied_in_physics: bool = false
@@ -30,21 +31,26 @@ func _run() -> void:
 	var state: Dictionary = Protocol.pack_state(source.capture_state())
 	source.free()
 	var connection: Dictionary = {"peer_id": -1}
+	var track: Node3D = Track.new()
+	var compatibility: Dictionary = Protocol.compatibility(track.descriptor())
 	var server: Node = Transport.new()
 	root.add_child(server)
 	var port: int = int(OS.get_environment("NETWORK_RESUME_TEST_PORT")) if OS.has_environment("NETWORK_RESUME_TEST_PORT") else 19081
 	if server.listen(port) != OK:
 		push_error("Resume probe needs available loopback port %d" % port)
 		server.queue_free()
+		track.free()
 		quit(1)
 		return
 	server.received.connect(func(peer_id: int, packet: Dictionary) -> void:
 		if packet.get("type") == "join":
 			connection["peer_id"] = peer_id
 			server.authenticate(peer_id)
-			server.send_to(peer_id, {"type": "welcome", "player_id": "probe", "ack": 0})
+			server.send_to(peer_id, {"type": "welcome", "player_id": "probe", "ack": 0, "compatibility": compatibility})
 			server.send_to(peer_id, _snapshot(30, 0, state)))
 	var client: TestClient = TestClient.new()
+	client._kart_script = load("res://vehicle/prototype_kart.gd")
+	client._track = track
 	root.add_child(client)
 	client._connect_client("ws://127.0.0.1:%d" % port, "test-only-fake-server")
 	for attempt: int in 100:
@@ -67,6 +73,7 @@ func _run() -> void:
 		_check(client.applied_in_physics, "resumed socket snapshot still applies only in physics callback")
 	client._leave("ready")
 	client.queue_free()
+	track.free()
 	server.queue_free()
 	await process_frame
 	print("NETWORK_RESUME_PROBE %d/%d passed" % [_checks - _failures, _checks])

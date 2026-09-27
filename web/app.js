@@ -4,11 +4,32 @@
   const ui = Object.fromEntries(['hub','hud','canvas','join-button','profile-button','profile-dialog','menu-dialog','result-dialog'].map(id => [id, $(id)]));
   let session = null, receiver = null, engineReady = false, inRace = false, busy = false;
   let lastState = null, lastFinish = false, restarting = false, mergeId = null;
+  let mapProjection = null, mapHash = null;
+  const graphicsKey = 'gnom.graphics.v1';
+  let graphics = { quality:'standard', reducedEffects:matchMedia('(prefers-reduced-motion:reduce)').matches };
+  try {
+    const saved = JSON.parse(localStorage.getItem(graphicsKey));
+    if (saved && ['standard','low'].includes(saved.quality) && typeof saved.reducedEffects === 'boolean') graphics = { quality:saved.quality, reducedEffects:saved.reducedEffects };
+  } catch { /* Browser storage is optional; the current session still works. */ }
   const formatTime = (seconds) => {
     const ms = Math.max(0, Math.round(seconds * 1000));
     return `${String(Math.floor(ms / 60000)).padStart(2,'0')}:${String(Math.floor(ms / 1000) % 60).padStart(2,'0')}.${String(ms % 1000).padStart(3,'0')}`;
   };
   function send(message) { receiver?.(JSON.stringify(message)); }
+  function applyGraphics() {
+    for (const input of document.querySelectorAll('input[name="quality"]')) input.checked = input.value === graphics.quality;
+    $('reduced-effects').checked = graphics.reducedEffects;
+    send({type:'graphics', quality:graphics.quality, reduced_effects:graphics.reducedEffects});
+  }
+  function saveGraphics() {
+    try { localStorage.setItem(graphicsKey, JSON.stringify(graphics)); } catch { /* Storage may be disabled. */ }
+    applyGraphics();
+  }
+  for (const input of document.querySelectorAll('input[name="quality"]')) input.addEventListener('change', () => {
+    if (input.checked) { graphics.quality = input.value; saveGraphics(); }
+  });
+  $('reduced-effects').addEventListener('change', event => { graphics.reducedEffects = event.target.checked; saveGraphics(); });
+  applyGraphics();
   function setError(message) { $('hub-error').textContent = message; $('hub-error').hidden = !message; }
   function updateReady() { ui['join-button'].disabled = !engineReady || !session || busy; ui['profile-button'].disabled = !session || busy; }
   function messageFor(error) {
@@ -65,7 +86,7 @@
       inRace = true; lastFinish = false; restarting = false;
       ui.hub.hidden = true; ui.hud.hidden = false;
       $('disconnect').hidden = true;
-      send({type:'join', url:connection.websocketUrl, ticket:connection.ticket});
+      send({type:'join', url:connection.websocketUrl, ticket:connection.ticket, compatibility:connection.compatibility});
       send({type:'input_enabled', enabled:!document.querySelector('dialog[open]')});
       send({type:'focus', visible:!document.hidden});
       ui.canvas.focus();
@@ -97,7 +118,7 @@
   $('resume-button').addEventListener('click', () => ui['menu-dialog'].close());
   $('recover-button').addEventListener('click', () => { send({type:'recover'}); ui['menu-dialog'].close(); });
   for (const id of ['exit-button','result-exit','disconnect-exit']) $(id).addEventListener('click', leave);
-  $('reconnect-button').addEventListener('click', join);
+  $('reconnect-button').addEventListener('click', () => lastState?.status === 'update_required' ? window.location.reload() : join());
   $('restart-button').addEventListener('click', () => { restarting = true; send({type:'restart'}); ui['result-dialog'].close(); });
   $('fullscreen-button').addEventListener('click', async () => {
     try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { /* Optional browser capability. */ }
@@ -127,14 +148,26 @@
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape' && inRace && !document.querySelector('dialog[open]')) { event.preventDefault(); openDialog(ui['menu-dialog']); }
   });
-  function drawMap(players, currentId) {
+  function drawMap(players, currentId, descriptor) {
     const canvas = $('minimap'), context = canvas.getContext('2d');
-    context.clearRect(0,0,240,150);
+    context.clearRect(0,0,canvas.width,canvas.height);
+    if (!mapProjection || descriptor?.simulation_hash !== mapHash) {
+      mapProjection = window.GnomTrackMap.project(descriptor, canvas.width, canvas.height);
+      mapHash = mapProjection?.hash;
+    }
+    if (!mapProjection) return;
     context.strokeStyle = '#617268'; context.lineWidth = 12;
-    context.beginPath(); context.ellipse(120,75,95,54,0,0,2*Math.PI); context.stroke();
+    context.lineJoin = 'round'; context.lineCap = 'round';
+    context.beginPath();
+    mapProjection.points.forEach(([x,z], index) => index ? context.lineTo(x,z) : context.moveTo(x,z));
+    context.closePath(); context.stroke();
+    context.fillStyle = '#f5f7f4';
+    context.fillRect(mapProjection.start[0]-3, mapProjection.start[1]-5, 6, 10);
     for (const player of players) {
       const [x,,z] = player.worldPosition || [0,0,0];
-      context.beginPath(); context.arc(120+x/62*95,75+z/42*54,player.id === currentId ? 6 : 4,0,2*Math.PI);
+      const location = mapProjection.worldToMap(x,z);
+      if (!location) continue;
+      context.beginPath(); context.arc(...location,player.id === currentId ? 6 : 4,0,2*Math.PI);
       context.fillStyle = player.id === currentId ? '#e5ff58' : '#f5f7f4'; context.fill();
     }
   }
@@ -150,6 +183,8 @@
     $('network-status').textContent = healthy ? 'На связи' : state.status === 'connecting' ? 'Подключение' : 'Нет связи';
     const disconnected = !healthy && state.status !== 'connecting';
     $('disconnect').hidden = !disconnected;
+    $('disconnect-title').textContent = state.status === 'update_required' ? 'Нужна новая версия игры' : 'Соединение прервано';
+    $('reconnect-button').textContent = state.status === 'update_required' ? 'ОБНОВИТЬ ИГРУ' : 'ПЕРЕПОДКЛЮЧИТЬСЯ';
     $('countdown').hidden = state.countdown <= 0 || disconnected;
     $('countdown').textContent = state.countdown > 0 ? Math.ceil(state.countdown) : '';
     $('drift-fill').style.width = `${Math.round(Math.min(1, state.boost > 0 ? state.boost/2 : state.drift)*100)}%`;
@@ -167,14 +202,14 @@
       mark.textContent = player.id === state.playerId ? 'ВЫ' : player.connected ? '' : 'OFF';
       row.append(number,name,mark); return row;
     }));
-    drawMap(state.players,state.playerId);
+    drawMap(state.players,state.playerId,state.track);
     if (!state.finished) { lastFinish = false; restarting = false; }
     if (state.finished && !lastFinish && !restarting) {
       lastFinish = true; $('finish-time').textContent = formatTime(state.elapsed); openDialog(ui['result-dialog']);
     }
   }
   window.GnomHost = {
-    register(callback) { receiver = callback; engineReady = true; $('load-state').hidden = true; updateReady(); },
+    register(callback) { receiver = callback; engineReady = true; applyGraphics(); $('load-state').hidden = true; updateReady(); },
     update(json) { render(JSON.parse(json)); },
     get state() { return lastState; },
     async boot(config) {

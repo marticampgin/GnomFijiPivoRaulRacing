@@ -44,6 +44,8 @@ The root page serves `build/web/index.html`, exported by Godot. `web/app.js`, `w
 
 The complete project launcher should also generate a private shared `RACE_TICKET_SECRET` of at least 32 bytes for API and Godot worker. This secret is never sent to the client. Without it, ticket requests return 503. `RACE_WEBSOCKET_URL` defaults to `ws://127.0.0.1:9080` only for local/test. The prototype match is `prototype-1`; this is not a rated public allocator.
 
+When racing is enabled, startup loads the generated `shared/track-manifest.json` beside the backend directory. `RACE_TRACK_MANIFEST_PATH` can select an explicit server-owned versioned package. Missing or malformed manifests fail startup rather than issuing tickets for a guessed route. Include this file in temporary stand copies and deployments, and deploy it together with the matching Godot bake/Web export. The API never accepts a client-selected hash. Tickets and launch responses bind wire version 2, vehicle-state schema 1, track schema 1 and `prototype-v2` vehicle simulation separately; an art revision alone does not change simulation compatibility.
+
 ## HTTP Contract
 
 All mutating requests require the session cookie, exact `Origin`, `Content-Type: application/json` and `X-CSRF-Token` returned by bootstrap. Unknown body properties are rejected, and no CORS origins are enabled.
@@ -57,7 +59,7 @@ All mutating requests require the session cookie, exact `Origin`, `Content-Type:
 | `GET /api/account/progress` | Account-only probe; guests get 403. |
 | `POST /api/auth/logout` | `{}` revokes current session, invalidates pending attempts, returns a guest bootstrap. Unmerged guest progress is preserved. |
 | `POST /api/guest/merge` | `{targetAccountId,confirmed:true,mergeId:UUID}` transfers server-held guest progress once; returns `{merged:true,progress}`. |
-| `POST /api/race/ticket` | `{}` returns `{ticket,websocketUrl,matchId,playerId}` for guest practice or an account; expires in 60 seconds. |
+| `POST /api/race/ticket` | `{}` returns `{ticket,websocketUrl,matchId,playerId,compatibility,track}` for guest practice or an account; expires in 60 seconds. `compatibility` contains the signed simulation identity and schemas; `track` is the generated compact route/minimap descriptor. |
 
 `user` is `{kind:"guest"|"account",id,displayName}`. `progress` currently contains only `practiceFinishes`; no browser endpoint awards progress, currency or inventory. Tests create verified progress fixtures directly in their isolated database. Future authoritative result handling must own actual rewards. Login never merges progress automatically; the browser must separately name and confirm the target account. Sending a guest ID is not ownership proof and is rejected.
 
@@ -85,5 +87,7 @@ npm --prefix backend audit --omit=dev
 Tests use real temporary PostgreSQL clusters, ephemeral loopback ports and Fastify injection. Coverage includes cookie flags, session hashing/rotation/revocation/expiry, Origin/CSRF, profile whitelist and extra fields, nonce ownership/expiry/replay, concurrent login, confirmed/idempotent concurrent merge, environment isolation, disabled/public dev routes, copied dev sessions and signed race tickets. Lifecycle coverage includes configuration failures, interrupted acquisition/query/listen, repeated signals, cleanup failures, default binary resolution and native PostgreSQL/initdb cancellation. Temporary test clusters are stopped and removed after successful checks. Native Linux ARM64 runtime capacity is a separate check, not implied by these macOS tests.
 
 Verified on 2026-09-26 with Node.js 24.19.0 and PostgreSQL 18.4 on macOS: 22 tests passed (11 authentication integration tests and 11 lifecycle tests), with a clean TypeScript check and bundle build. Real database checks used the materialized bundle/SQL and `PG_BIN_DIR` workaround; default platform-package binary resolution was also verified. The runtime's reported build string was x86_64 Darwin, so this is not evidence of Linux ARM64 compatibility or capacity.
+
+Reverified on 2026-09-27 after authored-track compatibility: 27 tests passed (12 authentication, 11 lifecycle and 4 manifest tests). Manifest tests compare the API descriptor with the actual Godot bake; ticket tests verify the signed fields and launch descriptor agree. This does not replace the separate Godot/socket/Web integration checks or establish ARM capacity.
 
 References: [Fastify testing](https://fastify.dev/docs/latest/Guides/Testing/), [static plugin compatibility](https://github.com/fastify/fastify-static), [embedded PostgreSQL runtime](https://github.com/leinelissen/embedded-postgres).

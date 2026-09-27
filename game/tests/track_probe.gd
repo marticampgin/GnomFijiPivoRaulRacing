@@ -52,7 +52,7 @@ func _run() -> void:
 	_check(visual_track.find_children("*", "StaticBody3D", true, false).size() == 192, "visuals do not change collision count")
 	var kart: Node3D = KartScript.create(Color("64e3db"))
 	root.add_child(kart)
-	_check(kart.get_child_count() > 10, "kart has body and wheels")
+	_check(kart.find_children("*", "MeshInstance3D", true, false).size() > 10, "kart has body and wheels")
 	kart.queue_free()
 	visual_track.queue_free()
 	await process_frame

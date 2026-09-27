@@ -39,7 +39,7 @@
     <div class="drift hud-panel"><div><strong>ДРИФТ</strong><span id="boost-label">ЗАРЯД</span></div><div class="drift-track"><div id="drift-fill"></div></div></div>
     <div class="speed hud-panel"><strong id="speed">0</strong><span>км/ч</span></div>
     <div id="countdown" class="countdown" role="status" hidden></div>
-    <div id="disconnect" class="disconnect hud-panel" hidden><h2>Соединение прервано</h2><button id="reconnect-button" class="primary">ПЕРЕПОДКЛЮЧИТЬСЯ</button><button id="disconnect-exit" class="text-button">Вернуться в меню</button></div>
+    <div id="disconnect" class="disconnect hud-panel" hidden><h2 id="disconnect-title">Соединение прервано</h2><button id="reconnect-button" class="primary">ПЕРЕПОДКЛЮЧИТЬСЯ</button><button id="disconnect-exit" class="text-button">Вернуться в меню</button></div>
   </section>
   <dialog id="profile-dialog">
     <div class="dialog-heading"><h2>Профиль</h2><button class="icon-button close-dialog" aria-label="Закрыть"><img src="/assets/icons/x.svg" alt=""></button></div>
@@ -49,9 +49,23 @@
     <button id="logout-button" class="text-button" hidden>Выйти из аккаунта</button>
     <p id="profile-feedback" role="status"></p>
   </dialog>
-  <dialog id="menu-dialog"><div class="dialog-heading"><h2>Гонка продолжается</h2><button class="icon-button close-dialog" aria-label="Закрыть"><img src="/assets/icons/x.svg" alt=""></button></div><button id="resume-button" class="primary">ПРОДОЛЖИТЬ</button><button id="recover-button" class="secondary-button"><img src="/assets/icons/rotate-ccw.svg" alt="">Вернуть машину</button><button id="exit-button" class="text-button">Вернуться в меню</button></dialog>
+  <dialog id="menu-dialog" aria-labelledby="menu-title">
+    <div class="dialog-heading"><h2 id="menu-title">Гонка продолжается</h2><button class="icon-button close-dialog" aria-label="Закрыть"><img src="/assets/icons/x.svg" alt=""></button></div>
+    <button id="resume-button" class="primary">ПРОДОЛЖИТЬ</button>
+    <button id="recover-button" class="secondary-button"><img src="/assets/icons/rotate-ccw.svg" alt="">Вернуть машину</button>
+    <fieldset class="graphics-settings">
+      <legend>Графика</legend>
+      <div class="quality-options">
+        <label><input type="radio" name="quality" value="standard" checked><span>Стандарт</span></label>
+        <label><input type="radio" name="quality" value="low"><span>Низкая</span></label>
+      </div>
+      <label class="effects-option"><input id="reduced-effects" type="checkbox"><span>Меньше эффектов</span></label>
+    </fieldset>
+    <button id="exit-button" class="text-button">Вернуться в меню</button>
+  </dialog>
   <dialog id="result-dialog"><span class="mode-tag">ФИНИШ</span><h2>Заезд завершён</h2><p id="finish-time" class="finish-time"></p><button id="restart-button" class="primary">ЕЩЁ ЗАЕЗД</button><button id="result-exit" class="text-button">Вернуться в меню</button></dialog>
   <noscript>Для запуска игры нужен JavaScript.</noscript>
+  <script src="/track-map.js"></script>
   <script src="/app.js"></script>
   <script src="$GODOT_URL"></script>
   <script>window.GnomHost.boot($GODOT_CONFIG);</script>

@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "recordedOn": "2026-09-27",
+  "status": "passed-structural-round-trip-only",
+  "blender": "4.5.13 LTS daeeeca98fb0",
+  "godot": "4.7.2.stable.official.ed1daf0bf",
+  "generator": "art-source/probes/create_export_probe.py",
+  "checker": "art-source/probes/godot/import_probe.gd",
+  "fixture": {
+    "sourceBytes": 574283,
+    "glbBytes": 12216,
+    "glbSha256": "04abe3e754ac0f5f319849c10538954093feba1e1e314ea6ef2ffe1bcfc882d9",
+    "productionAsset": false,
+    "containsExternalDependencies": false
+  },
+  "checks": 43,
+  "failures": 0,
+  "checksInclude": [
+    "GLB parsed and scene generated without Blender",
+    "Five named meshes and PBR materials preserved",
+    "Unit transforms and 0.4-meter dimensions preserved",
+    "UV and normal arrays preserved",
+    "Brass metallic and rubber roughness preserved",
+    "Crystal emission preserved",
+    "Embedded 64x64 generated checker texture decoded",
+    "Three named attachment axes map to Godot +Y up, -Z forward, +X right"
+  ],
+  "notTested": [
+    "Production hero geometry, UV or rig",
+    "Animation export",
+    "Godot editor import and imported-scene customizations",
+    "Actual Web Compatibility rendering of the materials",
+    "Foliage and water shaders",
+    "Visual acceptance or performance budget"
+  ],
+  "log": "design/reviews/presentation-slice/glb-import-probe.log",
+  "environmentNotes": [
+    "Restricted Blender startup crashed in Metal detection before Python; explicitly approved offline launch succeeded.",
+    "Restricted Godot probe passed structural checks but could not create normal user-data directory or read system CA certificates. Final explicitly permissioned run passed 43/43 with no errors."
+  ]
+}

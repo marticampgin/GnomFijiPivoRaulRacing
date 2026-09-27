@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "status": "proposed-pending-user-approval",
+  "target": { "hardware": "Apple M4", "os": "macOS", "browser": "Chromium", "renderer": "Godot Compatibility WebGL2", "concurrentForegroundRenderers": 1 },
+  "profiles": {
+    "standard": { "viewport": [1600, 900], "renderScale": 1, "frameIntervalMs": { "p50Max": 16.7, "p95Max": 20, "p99Max": 33.3 } },
+    "low": { "viewport": [1600, 900], "renderScale": 0.75, "frameIntervalMs": { "p50Max": 16.7, "p95Max": 20, "p99Max": 33.3 } }
+  },
+  "limits": { "coldTransferBytesMax": 83886080, "localhostColdReadyMsMax": 8000, "jsHeapBytesMax": 67108864, "wasmAllocatedLinearMemoryBytesMax": 268435456 },
+  "memoryMetricDefinitions": {
+    "jsHeapBytes": "Chromium CDP Performance.getMetrics JSHeapUsedSize; proposed maximum 64 MiB. Not performance.memory.usedJSHeapSize, WASM allocation, process RSS or GPU memory.",
+    "wasmAllocatedLinearMemoryBytes": "Sum of distinct observed WebAssembly.Memory.buffer.byteLength values from the tested page; proposed maximum 256 MiB. Allocated linear-buffer capacity, not live C++ allocator bytes or total process memory. Re-read each buffer after growth.",
+    "measurementMethod": "A Playwright init script transparently observes this page's public WebAssembly.instantiate/instantiateStreaming arguments and results. It retains only Memory references and reads byteLength, never heap contents; CDP records JS heap separately.",
+    "scope": "Fresh ephemeral test context on localhost only; no existing user tabs or profiles inspected. Instrumented cold-load timings must not replace the uninstrumented loading baseline."
+  },
+  "unavailableMetrics": ["GPU allocated bytes", "Browser process RSS", "WASM live allocator bytes"],
+  "unmeasuredMetrics": ["Full-lap peak WASM allocated linear memory", "Three-lap peak CDP JS heap", "Ten-visible-kart peak memory"],
+  "requiredBeforeFinalAcceptance": ["Measure peak allocated WASM linear memory and CDP JS heap over the required full-lap and ten-kart scenarios; do not substitute startup samples", "User approval of target and limits", "Three complete warmed-up laps with raw frame intervals", "Separate 10-visible-kart rendering fixture", "Cold transfer/load measurements are local-machine results, not internet load-time claims", "Keep unavailable RSS, live allocator and GPU metrics explicitly unavailable; do not infer them by summing other metrics"],
+  "baseline": {
+    "capturedAt": "2026-09-26T22:10:52.243Z",
+    "browserVersion": "151.0.7922.34",
+    "scenario": "20 seconds stationary start; not full lap",
+    "rafIntervalMs": { "p50": 16.7, "p95": 17.7, "p99": 17.7 },
+    "coldReadyMs": 1949,
+    "resourceTransferBytes": 47139384,
+    "jsHeapBytes": 13232976,
+    "jsHeapSource": "Chromium CDP Performance.getMetrics JSHeapUsedSize",
+    "rawEvidence": "/private/tmp/gnom-slice-baseline-qa/result.json"
+  },
+  "wasmStartupBaseline": {
+    "recordedOn": "2026-09-27",
+    "browserVersion": "151.0.7922.34",
+    "url": "http://127.0.0.1:8787/",
+    "viewport": [1600, 900],
+    "scenario": "Loaded-idle Godot ready screen, ten samples at 250 ms intervals; no race input and no full lap",
+    "state": "ready",
+    "observedInstanceCount": 1,
+    "observedMemoryCount": 1,
+    "wasmAllocatedLinearMemoryBytes": 58064896,
+    "peakObservedStartupWasmAllocatedLinearMemoryBytes": 58064896,
+    "cdpJsHeapUsedBytes": 12347100,
+    "fullLapPeakBytes": null,
+    "runtimeErrors": 0,
+    "script": "/private/tmp/gnom-wasm-memory-probe.cjs",
+    "rawEvidence": "/private/tmp/gnom-wasm-memory-probe/result.json",
+    "screenshot": "/private/tmp/gnom-wasm-memory-probe/loaded-idle.png"
+  },
+  "notes": ["Proposed limits are not achieved production results and remain pending user approval", "JS heap, WASM buffer capacity, process RSS and GPU allocations are different metrics, not an additive total", "performance.memory reported different values from CDP in the diagnostic and is not substituted for the declared CDP JS-heap metric", "No desktop tier beyond this local M4 or mobile performance support claimed", "Unavailable or unmeasured metrics are not zero and cannot silently pass the final gate", "The model sheet and final hero production remain pending user approval"]
+}

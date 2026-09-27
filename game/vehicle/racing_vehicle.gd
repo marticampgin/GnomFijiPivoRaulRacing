@@ -2,7 +2,7 @@ class_name RacingVehicle
 extends CharacterBody3D
 
 const STATE_VERSION: int = 1
-const BALANCE_VERSION: String = "vehicle-prototype-v1"
+const BALANCE_VERSION: String = "vehicle-prototype-v2"
 const DEFAULT_STATS: Dictionary = {
 	"top_speed": 34.0,
 	"acceleration": 17.0,
@@ -71,6 +71,9 @@ func step(input: Dictionary, delta: float, gravity_up: Vector3 = Vector3.UP) -> 
 	var planar: Vector3 = velocity.slide(up_direction)
 	var forward_speed: float = planar.dot(forward)
 	var on_surface: bool = grounded and vertical_speed <= 0.5
+	# Godot's slope-stop correction can pin a powered box collider to a seam.
+	# Retain idle slope holding, but let active driving slide across triangles.
+	floor_stop_on_slope = throttle <= 0.01 and planar.length_squared() < 0.25
 	boost_remaining = maxf(0.0, boost_remaining - dt)
 
 	if _drift_was_pressed and not drift_pressed:

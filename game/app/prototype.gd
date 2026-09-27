@@ -1,12 +1,11 @@
 extends Node3D
 
 const Vehicle = preload("res://vehicle/racing_vehicle.gd")
-const Track = preload("res://track/prototype_track.gd")
-const Kart = preload("res://vehicle/prototype_kart.gd")
+const Track = preload("res://track/authored_track.gd")
 const Protocol = preload("res://net/prototype_protocol.gd")
 const Transport = preload("res://net/prototype_socket_server.gd")
 const Driver = preload("res://input/driver_input.gd")
-const COLORS: Array[Color] = [Color("63e5dc"), Color("ff826d"), Color("e5ff58"), Color("de93df"), Color("f4eff4")]
+const HERO_COLOR: Color = Color("2e9d99")
 const MAX_PLAYERS: int = 10
 const PHYSICS_DT: float = 1.0 / 60.0
 const INPUT_TIMEOUT_MS: int = 250
@@ -16,6 +15,7 @@ const RACE_LAPS: int = 3
 
 var _worker: bool = false
 var _track: Node3D
+var _kart_script: Script
 var _server: Node
 var _secret: String = ""
 var _players: Dictionary = {}
@@ -32,8 +32,13 @@ var _sequence: int = 0
 var _pending: Array[Dictionary] = []
 var _queued_snapshot: Dictionary = {}
 var _local: CharacterBody3D
+var _local_visual: Node3D
 var _remotes: Dictionary = {}
 var _camera: Camera3D
+var _race_camera: RefCounted
+var _sun: DirectionalLight3D
+var _quality: String = "standard"
+var _reduced_effects: bool = false
 var _bridge: JavaScriptObject
 var _bridge_callback: JavaScriptObject
 var _status: String = "ready"
@@ -55,6 +60,10 @@ func _ready() -> void:
 	_track = Track.new()
 	add_child(_track)
 	_track.build(not _worker)
+	if Protocol.track_identity(_track.identity()).is_empty():
+		push_error("Invalid authored track package")
+		get_tree().quit(1)
+		return
 	if _worker:
 		Engine.max_fps = 60
 		_secret = OS.get_environment("RACE_TICKET_SECRET")
@@ -71,7 +80,7 @@ func _ready() -> void:
 			push_error("Could not bind local race worker port")
 			get_tree().quit(1)
 			return
-		print("RACE_WORKER_READY ws://127.0.0.1:%d protocol=1 physics=60 snapshots=20" % port)
+		print("RACE_WORKER_READY ws://127.0.0.1:%d protocol=%d physics=60 snapshots=20 track=%s" % [port, Protocol.WIRE_VERSION, _track.identity()["track_id"]])
 		return
 	_setup_view()
 	if OS.has_feature("web"):
@@ -120,6 +129,8 @@ func _process(delta: float) -> void:
 		return
 	_poll_client()
 	_interpolate_remotes(delta)
+	if is_instance_valid(_local) and is_instance_valid(_local_visual):
+		_local_visual.update_visual(delta, _local.speed_mps, _local.steering_amount, _local.is_drifting, minf(1.0, _local.boost_remaining))
 	if _joined and Time.get_ticks_msec() - _last_ping_ms >= 1000:
 		_last_ping_ms = Time.get_ticks_msec()
 		_send({"type": "ping", "sent": _last_ping_ms})
@@ -127,7 +138,7 @@ func _process(delta: float) -> void:
 		_publish_hud()
 
 
-func _create_vehicle(slot: int, visuals: bool) -> CharacterBody3D:
+func _create_vehicle(_slot: int, visuals: bool) -> CharacterBody3D:
 	var vehicle: CharacterBody3D = Vehicle.new()
 	var collider: CollisionShape3D = CollisionShape3D.new()
 	var shape: BoxShape3D = BoxShape3D.new()
@@ -138,9 +149,19 @@ func _create_vehicle(slot: int, visuals: bool) -> CharacterBody3D:
 	vehicle.collision_layer = 2
 	vehicle.collision_mask = 1
 	if visuals:
-		vehicle.add_child(Kart.create(COLORS[slot % COLORS.size()]))
+		_local_visual = _create_kart_visual()
+		vehicle.add_child(_local_visual)
 	add_child(vehicle)
 	return vehicle
+
+
+func _create_kart_visual() -> Node3D:
+	if _kart_script == null:
+		_kart_script = load("res://vehicle/authored_kart.gd")
+	var visual: Node3D = _kart_script.create(HERO_COLOR)
+	if visual.has_method("set_reduced_effects"):
+		visual.set_reduced_effects(_reduced_effects)
+	return visual
 
 
 func _step_server(delta: float) -> void:
@@ -161,11 +182,12 @@ func _step_server(delta: float) -> void:
 		var command: Dictionary = player["input"]
 		if not player["connected"] or now - int(player["last_input_at"]) > INPUT_TIMEOUT_MS or _countdown > 0 or player["finished"]:
 			command = Protocol.NEUTRAL
+		player["previous_position"] = player["vehicle"].global_position
 		player["vehicle"].step(command, delta)
 		if _countdown == 0 and not player["finished"]:
 			player["elapsed"] += delta
 			_update_progress(player)
-		if player["vehicle"].global_position.y < -8.0:
+		if _track.needs_recovery(player["vehicle"].global_position) or not bool(player["progress"]["interval_valid"]):
 			_recover(player)
 	if _players.is_empty():
 		_countdown = -1
@@ -180,8 +202,11 @@ func _step_server(delta: float) -> void:
 
 func _on_packet(peer_id: int, data: Dictionary) -> void:
 	if not _peer_players.has(peer_id):
-		if data.get("type") != "join" or data.size() != 2 or not data.get("ticket") is String:
+		if data.get("type") != "join" or not data.get("ticket") is String:
 			_server.close_peer(peer_id, "join_required")
+			return
+		if not Protocol.validate_hello(data, _track.identity()):
+			_server.close_peer(peer_id, "update_required")
 			return
 		_join_server(peer_id, data["ticket"])
 		return
@@ -216,7 +241,7 @@ func _on_packet(peer_id: int, data: Dictionary) -> void:
 
 
 func _join_server(peer_id: int, ticket: String) -> void:
-	var claims: Dictionary = Protocol.verify_ticket(ticket, _secret, int(Time.get_unix_time_from_system()))
+	var claims: Dictionary = Protocol.verify_ticket(ticket, _secret, int(Time.get_unix_time_from_system()), _track.identity())
 	if claims.is_empty() or _used_tickets.has(claims.get("jti", "")):
 		_server.close_peer(peer_id, "invalid_ticket")
 		return
@@ -236,9 +261,10 @@ func _join_server(peer_id: int, ticket: String) -> void:
 		_players[id] = {"id": id, "name": claims["display_name"], "slot": slot, "vehicle": vehicle,
 			"peer_id": peer_id, "connected": true, "disconnected_at": 0, "last_input_at": 0,
 			"accepted": 0, "ack": 0, "queue": [], "input": Protocol.NEUTRAL.duplicate(),
-			"lap": 1, "next_sector": 1, "checkpoint": 0, "finished": false, "finish_order": 0,
+			"lap": 1, "progress": _track.initial_progress(), "previous_position": Vector3.ZERO, "finished": false, "finish_order": 0,
 			"elapsed": 0.0, "last_recover_at": -1000, "epoch": 0}
 		vehicle.reset_at(_track.spawn_transform(slot))
+		_players[id]["previous_position"] = vehicle.global_position
 		if _countdown < 0:
 			_countdown = 180
 	var player: Dictionary = _players[id]
@@ -254,7 +280,7 @@ func _join_server(peer_id: int, ticket: String) -> void:
 	player["last_input_at"] = Time.get_ticks_msec()
 	_peer_players[peer_id] = id
 	_server.authenticate(peer_id)
-	_server.send_to(peer_id, {"type": "welcome", "player_id": id, "protocol_version": Protocol.VERSION, "ack": player["ack"]})
+	_server.send_to(peer_id, {"type": "welcome", "player_id": id, "compatibility": Protocol.compatibility(_track.identity()), "ack": player["ack"]})
 	_broadcast_snapshot()
 
 
@@ -272,24 +298,19 @@ func _on_disconnect(peer_id: int) -> void:
 
 
 func _update_progress(player: Dictionary) -> void:
-	var sector: int = _track.sector_at(player["vehicle"].global_position)
-	if sector != int(player["next_sector"]):
-		return
-	player["checkpoint"] = sector
-	player["next_sector"] = (sector + 1) % Track.SECTORS
-	if sector == 0:
-		player["lap"] += 1
-		if int(player["lap"]) > RACE_LAPS:
+	var events: Array = _track.advance_progress(player["progress"], player["previous_position"], player["vehicle"].global_position)
+	player["lap"] = int(player["progress"]["lap"]) + 1
+	for event: Dictionary in events:
+		if event["type"] == "finish" and not player["finished"]:
 			_finish_count += 1
 			player["finished"] = true
 			player["finish_order"] = _finish_count
 
 
 func _recover(player: Dictionary) -> void:
-	var angle: float = (float(player["checkpoint"]) + 0.1) * TAU / Track.SECTORS
-	var tangent: Vector3 = Vector3(-Track.RADIUS_X * sin(angle), 0.0, Track.RADIUS_Z * cos(angle)).normalized()
-	var pose: Transform3D = Transform3D(Basis.looking_at(tangent, Vector3.UP), Vector3(Track.RADIUS_X * cos(angle), 0.65, Track.RADIUS_Z * sin(angle)))
-	player["vehicle"].reset_at(pose)
+	player["vehicle"].reset_at(_track.recovery_transform(player["progress"]))
+	_track.mark_recovered(player["progress"])
+	player["previous_position"] = player["vehicle"].global_position
 	player["queue"].clear()
 	player["input"] = Protocol.NEUTRAL.duplicate()
 	player["ack"] = player["accepted"]
@@ -298,8 +319,7 @@ func _recover(player: Dictionary) -> void:
 
 func _reset_race(player: Dictionary) -> void:
 	player["lap"] = 1
-	player["next_sector"] = 1
-	player["checkpoint"] = 0
+	player["progress"] = _track.initial_progress()
 	player["finished"] = false
 	player["finish_order"] = 0
 	player["elapsed"] = 0.0
@@ -326,35 +346,69 @@ func _broadcast_snapshot() -> void:
 
 
 func _race_progress(player: Dictionary) -> float:
-	var raw: float = _track.progress_at(player["vehicle"].global_position) * Track.SECTORS
-	var checkpoint: int = int(player["checkpoint"])
-	if checkpoint == 0 and raw > Track.SECTORS * 0.5:
-		raw -= Track.SECTORS
-	return float((int(player["lap"]) - 1) * Track.SECTORS + checkpoint) + clampf(raw - checkpoint, -1.0 if checkpoint == 0 else 0.0, 1.0)
+	return _track.standings_distance(player["progress"], player["vehicle"].global_position)
 
 
 func _setup_view() -> void:
+	# Warm client-only assets before networking clocks start; workers never load them.
+	_kart_script = load("res://vehicle/authored_kart.gd")
+	_kart_script.warm()
+	get_viewport().msaa_3d = Viewport.MSAA_2X
 	var environment: WorldEnvironment = WorldEnvironment.new()
 	var settings: Environment = Environment.new()
-	settings.background_mode = Environment.BG_COLOR
-	settings.background_color = Color("98d5dc")
+	var sky: Sky = Sky.new()
+	var sky_material: PanoramaSkyMaterial = PanoramaSkyMaterial.new()
+	sky_material.panorama = load("res://art/summer-sky.png")
+	sky.sky_material = sky_material
+	settings.background_mode = Environment.BG_SKY
+	settings.sky = sky
 	settings.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	settings.ambient_light_color = Color("ddf4f1")
-	settings.ambient_light_energy = 0.35
+	settings.ambient_light_color = Color("c1d9ec")
+	settings.ambient_light_energy = 0.5
+	settings.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	environment.environment = settings
 	add_child(environment)
 	var sun: DirectionalLight3D = DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-55.0, -30.0, 0.0)
-	sun.light_energy = 0.65
+	sun.rotation_degrees = Vector3(-42.0, -38.0, 0.0)
+	sun.light_color = Color("fff1d8")
+	sun.light_energy = 0.78
 	sun.shadow_enabled = true
+	sun.directional_shadow_max_distance = 120.0
 	add_child(sun)
+	_sun = sun
 	_camera = Camera3D.new()
-	_camera.fov = 65.0
+	_camera.fov = 58.0
 	_camera.far = 1200.0
 	_camera.position = Vector3(95.0, 65.0, 65.0)
 	add_child(_camera)
 	_camera.look_at(Vector3(10.0, 0.0, 0.0))
 	_camera.current = true
+	_race_camera = load("res://view/race_camera.gd").new()
+	_race_camera.configure(_camera)
+	_apply_graphics_settings(_quality, _reduced_effects)
+
+
+func _apply_graphics_settings(quality: String, reduced_effects: bool) -> void:
+	if _worker or quality not in ["standard", "low"]:
+		return
+	_quality = quality
+	_reduced_effects = reduced_effects
+	var low: bool = quality == "low"
+	get_viewport().scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+	get_viewport().scaling_3d_scale = 0.75 if low else 1.0
+	get_viewport().msaa_3d = Viewport.MSAA_DISABLED if low else Viewport.MSAA_2X
+	if _sun != null:
+		_sun.directional_shadow_max_distance = 45.0 if low else 120.0
+	if _track != null:
+		if _track.has_method("set_quality"):
+			_track.set_quality(low)
+		if _track.has_method("set_reduced_effects"):
+			_track.set_reduced_effects(reduced_effects)
+	if is_instance_valid(_local_visual) and _local_visual.has_method("set_reduced_effects"):
+		_local_visual.set_reduced_effects(reduced_effects)
+	for remote: Dictionary in _remotes.values():
+		if remote["node"].has_method("set_reduced_effects"):
+			remote["node"].set_reduced_effects(reduced_effects)
 
 
 func _sample_input() -> Dictionary:
@@ -374,8 +428,13 @@ func _on_host_message(arguments: Array) -> void:
 		return
 	var data: Dictionary = parsed
 	match data.get("type"):
+		"graphics":
+			if data.get("quality") is String and data.get("reduced_effects") is bool:
+				_apply_graphics_settings(data["quality"], data["reduced_effects"])
 		"join":
-			if data.get("url") is String and data.get("ticket") is String:
+			if not data.get("compatibility") is Dictionary or not Protocol.compatible(data["compatibility"], _track.identity()):
+				_leave("update_required")
+			elif data.get("url") is String and data.get("ticket") is String:
 				_connect_client(data["url"], data["ticket"])
 		"leave":
 			_leave("ready")
@@ -404,7 +463,7 @@ func _connect_client(url: String, ticket: String) -> void:
 
 
 func _release_inputs() -> void:
-	for action: String in ["drive_left", "drive_right", "drive_accelerate", "drive_brake", "drive_drift"]:
+	for action: String in ["drive_left", "drive_right", "drive_accelerate", "drive_brake", "drive_drift", "look_back"]:
 		Input.action_release(action)
 
 
@@ -414,14 +473,14 @@ func _poll_client() -> void:
 	_socket.poll()
 	var state: int = _socket.get_ready_state()
 	if state == WebSocketPeer.STATE_CLOSED:
-		_leave("disconnected")
+		_leave("update_required" if _socket.get_close_reason() == "update_required" else "disconnected")
 		return
 	if state != WebSocketPeer.STATE_OPEN:
 		if Time.get_ticks_msec() - _last_server_ms > 6000:
 			_leave("connection_timeout")
 		return
 	if not _ticket.is_empty():
-		_send({"type": "join", "ticket": _ticket})
+		_send({"type": "join", "ticket": _ticket, "compatibility": Protocol.compatibility(_track.identity())})
 		_ticket = ""
 	while _socket != null and _socket.get_available_packet_count() > 0:
 		var parsed: Variant = JSON.parse_string(_socket.get_packet().get_string_from_utf8())
@@ -430,6 +489,9 @@ func _poll_client() -> void:
 		_last_server_ms = Time.get_ticks_msec()
 		match parsed.get("type"):
 			"welcome":
+				if not Protocol.validate_welcome(parsed, _track.identity()):
+					_leave("update_required")
+					return
 				_player_id = str(parsed.get("player_id", ""))
 				_sequence = int(parsed.get("ack", 0))
 				_joined = true
@@ -477,22 +539,27 @@ func _apply_snapshot(packet: Dictionary) -> void:
 			var ack: int = int(entry.get("ack", 0))
 			_pending = _pending.filter(func(command: Dictionary) -> bool: return int(command["sequence"]) > ack)
 			_local.restore_state(state)
-			if int(_hud.get("epoch", -1)) != int(entry.get("epoch", 0)):
+			var epoch_changed: bool = int(_hud.get("epoch", -1)) != int(entry.get("epoch", 0))
+			if epoch_changed:
 				_pending.clear()
 			for command: Dictionary in _pending:
 				_local.step(command if _client_countdown <= 0.0 and not entry.get("finished", false) else Protocol.NEUTRAL, PHYSICS_DT)
+			if epoch_changed and _race_camera != null:
+				_race_camera.reset(_local)
 			_correction = before.distance_to(_local.global_position)
 			_hud = entry.duplicate()
 			_hud.erase("state")
 			_status = "finished" if entry.get("finished", false) else ("countdown" if _client_countdown > 0.0 else "racing")
 		else:
 			if not _remotes.has(id):
-				var visual: Node3D = Kart.create(COLORS[int(entry.get("slot", 0)) % COLORS.size()])
+				var visual: Node3D = _create_kart_visual()
 				add_child(visual)
 				visual.global_transform = state["transform"]
 				_remotes[id] = {"node": visual, "samples": []}
 			var samples: Array = _remotes[id]["samples"]
-			samples.append({"at": Time.get_ticks_msec(), "transform": state["transform"]})
+			samples.append({"at": Time.get_ticks_msec(), "transform": state["transform"],
+				"speed": state["velocity"].slide(state["up_direction"]).length(), "steering": state["steering_amount"],
+				"drifting": state["is_drifting"], "boost": state["boost_remaining"]})
 			while samples.size() > 12:
 				samples.pop_front()
 	for id: String in _remotes.keys():
@@ -502,7 +569,7 @@ func _apply_snapshot(packet: Dictionary) -> void:
 	_hud["players"] = public_players
 
 
-func _interpolate_remotes(_delta: float) -> void:
+func _interpolate_remotes(delta: float) -> void:
 	var target: int = Time.get_ticks_msec() - INTERPOLATION_DELAY_MS
 	for remote: Dictionary in _remotes.values():
 		var samples: Array = remote["samples"]
@@ -515,15 +582,14 @@ func _interpolate_remotes(_delta: float) -> void:
 			var weight: float = clampf(float(target - int(samples[0]["at"])) / maxf(1.0, float(int(samples[1]["at"]) - int(samples[0]["at"]))), 0.0, 1.0)
 			result = result.interpolate_with(samples[1]["transform"], weight)
 		remote["node"].global_transform = result
+		var motion: Dictionary = samples[0]
+		remote["node"].update_visual(delta, motion["speed"], motion["steering"], motion["drifting"], minf(1.0, motion["boost"]))
 
 
 func _update_camera(delta: float) -> void:
-	if _camera == null or _local == null:
+	if _race_camera == null or _local == null:
 		return
-	var behind: Vector3 = _local.global_basis.z
-	var target: Vector3 = _local.global_position + behind * 8.0 + Vector3.UP * 4.5
-	_camera.global_position = _camera.global_position.lerp(target, 1.0 - exp(-6.0 * delta))
-	_camera.look_at(_local.global_position - behind * 6.0 + Vector3.UP)
+	_race_camera.update(_local, delta, _input_enabled and _focused and Input.is_action_pressed("look_back"))
 
 
 func _send(packet: Dictionary) -> void:
@@ -551,6 +617,7 @@ func _leave(status: String) -> void:
 	if _local != null:
 		_local.queue_free()
 		_local = null
+		_local_visual = null
 	for remote: Dictionary in _remotes.values():
 		remote["node"].queue_free()
 	_remotes.clear()
@@ -560,8 +627,12 @@ func _leave(status: String) -> void:
 func _publish_hud() -> void:
 	_last_hud_ms = Time.get_ticks_msec()
 	var location: Vector3 = Vector3.ZERO if _local == null else _local.global_position
+	var forward: Vector3 = Vector3.FORWARD if _local == null else -_local.global_basis.z
 	var data: Dictionary = {"status": _status, "playerId": _player_id, "players": _hud.get("players", []),
+		"graphics": {"quality": _quality, "reducedEffects": _reduced_effects, "renderScale": get_viewport().scaling_3d_scale},
+		"track": _track.descriptor() if _track != null else {},
 		"worldPosition": [location.x, location.y, location.z],
+		"forward": [forward.x, forward.y, forward.z],
 		"position": _hud.get("position", 1), "speed": 0.0 if _local == null else _local.speed_mps * 3.6,
 		"drift": 0.0 if _local == null else _local.drift_charge, "boost": 0.0 if _local == null else _local.boost_remaining,
 		"lap": _hud.get("lap", 1), "finished": _hud.get("finished", false), "elapsed": _hud.get("elapsed", 0.0),

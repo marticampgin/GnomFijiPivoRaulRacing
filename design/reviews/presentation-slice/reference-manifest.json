@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "change": "build-presentation-faithful-racing-slice",
+  "recordedOn": "2026-09-27",
+  "reviewStatus": "awaiting-user-approval",
+  "authority": [
+    {
+      "id": "original-presentation",
+      "figmaFileKey": "JK4YNN8zKqhuZonVbDZ8YB",
+      "nodeId": "2:291",
+      "slide": 57,
+      "url": "https://www.figma.com/design/JK4YNN8zKqhuZonVbDZ8YB?node-id=2-291",
+      "role": "World mood: fantasy forest, castle, bridges, waterfalls, crystal racing.",
+      "inspection": "Existing change records prior Figma MCP inspection; no source modifications in this task."
+    },
+    {
+      "id": "accepted-race-hud",
+      "figmaFileKey": "OejURNEY5ZRhWWOBicFNYP",
+      "nodeId": "3:101",
+      "url": "https://www.figma.com/design/OejURNEY5ZRhWWOBicFNYP?node-id=3-101",
+      "role": "Accepted gameplay hierarchy and rear race art."
+    },
+    {
+      "id": "accepted-garage",
+      "figmaFileKey": "OejURNEY5ZRhWWOBicFNYP",
+      "nodeId": "3:22",
+      "url": "https://www.figma.com/design/OejURNEY5ZRhWWOBicFNYP?node-id=3-22",
+      "role": "Accepted front design and material details."
+    }
+  ],
+  "localReferences": [
+    {
+      "path": "design/assets/race-concept.jpg",
+      "width": 1672,
+      "height": 941,
+      "sha256": "509963b0197689f49b98610401b1cc8e05dbe12af85b6f03f1cd6bcea8125df6",
+      "role": "Primary rear silhouette and compact engine authority."
+    },
+    {
+      "path": "design/assets/kart-concept.jpg",
+      "width": 1672,
+      "height": 941,
+      "sha256": "3cbe95e6742730515bac51d3bb2eb4986d8e22025d9db6759ff6b402b399c1e8",
+      "role": "Face, clothing, front and materials; oversized engine explicitly superseded by proposed rear arrangement."
+    }
+  ],
+  "reviewSheet": {
+    "path": "design/reviews/presentation-slice/hero-kart-review-01.png",
+    "width": 1536,
+    "height": 1024,
+    "bytes": 2166343,
+    "sha256": "942a42d4367fa03d537e0b655ce6ba25b549c4bc2f197f5c9c968f864aab80ef",
+    "source": "Built-in image_gen, new reference-derived generation plus one targeted engine correction. No paid external asset/service used.",
+    "sourceImageName": "exec-64443b13-8d9f-40db-8a8f-8261daf98cd9.png",
+    "promptRecord": "design/reviews/presentation-slice/generation-prompts.md",
+    "dimensionsAndDecisions": "design/reviews/presentation-slice/model-sheet-review.md",
+    "approved": false,
+    "runtimeAsset": false,
+    "exactGeometricBlueprint": false
+  },
+  "baseline": {
+    "capturedOn": "2026-09-27",
+    "preservedOn": "2026-09-27",
+    "source": "Prior actual Playwright Web QA at http://127.0.0.1:8787/, copied without image edits from /private/tmp/gnom-art-qa",
+    "buildIdentity": "Pre-authored-route intermediate visual pass, dirty worktree based on e3273f052a0fb3c7712b69984fb1eaa32ed3f469; exact export digest was not in source QA report.",
+    "preciseBuildDigest": null,
+    "media": [
+      {
+        "path": "design/reviews/presentation-slice/baseline/desktop-start.png",
+        "viewport": [
+          1600,
+          900
+        ],
+        "sha256": "ca22b97d72b7663c02c7a276eb1f8f4b2fee66b81b75b75d8001c944843bedae"
+      },
+      {
+        "path": "design/reviews/presentation-slice/baseline/desktop-driver.png",
+        "viewport": [
+          1600,
+          900
+        ],
+        "sha256": "2aa5aedcfb0e0e0c798162887156f571955b7d0ab9828275b7b65d34106b0b81"
+      },
+      {
+        "path": "design/reviews/presentation-slice/baseline/portrait-race.png",
+        "viewport": [
+          390,
+          844
+        ],
+        "sha256": "2ec11cd224589479d18254a49e46fa3aa77bb41e6c10a74b5b28204486bee1f2"
+      },
+      {
+        "path": "design/reviews/presentation-slice/baseline/landscape-race.png",
+        "viewport": [
+          844,
+          390
+        ],
+        "sha256": "d18814770aaf926042843cbf090510fbf943725848923b36f6b37037a53c517f"
+      }
+    ],
+    "qaResult": {
+      "path": "design/reviews/presentation-slice/baseline/result.json",
+      "sha256": "b09266b2596316d56c0724490ede0bb01f335bec55538a62ff066cd8fa995667"
+    },
+    "limitations": [
+      "Not an accepted visual result.",
+      "Not new performance measurements.",
+      "No three-lap percentile budget or full-loop video in this preserved report.",
+      "Red local preset is existing slot-color behavior, not approved hero color."
+    ]
+  }
+}

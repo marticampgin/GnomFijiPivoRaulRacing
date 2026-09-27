@@ -1,0 +1,12 @@
+{
+  "version": "4.5.13",
+  "channel": "LTS",
+  "buildHash": "daeeeca98fb0",
+  "platform": "macos-arm64",
+  "downloadUrl": "https://download.blender.org/release/Blender4.5/blender-4.5.13-macos-arm64.dmg",
+  "sha256": "663ce944257c61ff1d6aa09e15c8f57bbd8d59023adb2fa7edde33a9ed960b53",
+  "checksumSource": "https://download.blender.org/release/Blender4.5/blender-4.5.13.sha256",
+  "authoringOnly": true,
+  "runtimeFormat": "glb",
+  "installationApprovedOn": "2026-09-27"
+}

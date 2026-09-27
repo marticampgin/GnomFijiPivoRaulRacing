@@ -1,9 +1,13 @@
 class_name PrototypeProtocol
 extends RefCounted
 
-const VERSION: int = 1
+const Vehicle = preload("res://vehicle/racing_vehicle.gd")
+const WIRE_VERSION: int = 2
+const TICKET_VERSION: int = 2
+const VEHICLE_STATE_VERSION: int = Vehicle.STATE_VERSION
+const TRACK_SCHEMA_VERSION: int = 1
 const MATCH_ID: String = "prototype-1"
-const LOADOUT_HASH: String = "prototype-v1"
+const LOADOUT_HASH: String = "prototype-v2"
 const NEUTRAL: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false}
 
 
@@ -26,7 +30,62 @@ static func validate_input(data: Dictionary) -> Dictionary:
 	return data.duplicate()
 
 
-static func verify_ticket(ticket: String, secret: String, now: int) -> Dictionary:
+static func track_identity(manifest: Dictionary) -> Dictionary:
+	if not manifest.get("track_id") is String or manifest["track_id"].is_empty() or manifest["track_id"].length() > 64:
+		return {}
+	if manifest.get("schema_version") != TRACK_SCHEMA_VERSION:
+		return {}
+	for key: String in ["simulation_revision", "art_revision"]:
+		if not _integer(manifest.get(key), 1):
+			return {}
+	var hash_value: Variant = manifest.get("simulation_hash")
+	if not hash_value is String or hash_value.length() != 64:
+		return {}
+	for character: String in hash_value:
+		if not character in "0123456789abcdef":
+			return {}
+	var result: Dictionary = {}
+	for key: String in ["track_id", "schema_version", "simulation_revision", "simulation_hash", "art_revision"]:
+		result[key] = manifest[key]
+	return result
+
+
+static func compatibility(manifest: Dictionary) -> Dictionary:
+	var track: Dictionary = track_identity(manifest)
+	if track.is_empty():
+		return {}
+	return {"protocol_version": WIRE_VERSION, "vehicle_state_version": VEHICLE_STATE_VERSION, "loadout_hash": LOADOUT_HASH, "track": track}
+
+
+static func compatible(descriptor: Dictionary, expected_track: Dictionary) -> bool:
+	if descriptor.get("protocol_version") != WIRE_VERSION or descriptor.get("vehicle_state_version") != VEHICLE_STATE_VERSION:
+		return false
+	if descriptor.get("loadout_hash") != LOADOUT_HASH or not descriptor.get("track") is Dictionary:
+		return false
+	var actual: Dictionary = track_identity(descriptor["track"])
+	var expected: Dictionary = track_identity(expected_track)
+	if actual.is_empty() or expected.is_empty():
+		return false
+	# Art can change independently; every simulation field must still agree.
+	for key: String in ["track_id", "schema_version", "simulation_revision", "simulation_hash"]:
+		if actual[key] != expected[key]:
+			return false
+	return true
+
+
+static func validate_hello(data: Dictionary, expected_track: Dictionary) -> bool:
+	return (data.size() == 3 and data.get("type") == "join" and data.get("ticket") is String
+		and data.get("compatibility") is Dictionary and compatible(data["compatibility"], expected_track))
+
+
+static func validate_welcome(data: Dictionary, expected_track: Dictionary) -> bool:
+	return (data.get("type") == "welcome" and data.get("player_id") is String
+		and not data["player_id"].is_empty() and data["player_id"].length() <= 128
+		and _integer(data.get("ack"), 0) and data.get("compatibility") is Dictionary
+		and compatible(data["compatibility"], expected_track))
+
+
+static func verify_ticket(ticket: String, secret: String, now: int, expected_track: Dictionary) -> Dictionary:
 	if ticket.length() > 2048 or secret.length() < 32:
 		return {}
 	var parts: PackedStringArray = ticket.split(".")
@@ -53,7 +112,7 @@ static func verify_ticket(ticket: String, secret: String, now: int) -> Dictionar
 	if not parsed is Dictionary:
 		return {}
 	var claims: Dictionary = parsed
-	if claims.get("v") != VERSION or claims.get("protocol_version") != VERSION:
+	if claims.get("v") != TICKET_VERSION or not compatible(claims, expected_track):
 		return {}
 	if claims.get("match_id") != MATCH_ID or claims.get("loadout_hash") != LOADOUT_HASH:
 		return {}
@@ -80,9 +139,9 @@ static func pack_state(state: Dictionary) -> Dictionary:
 
 
 static func unpack_state(state: Dictionary) -> Dictionary:
-	if state.get("version") != VERSION or not _vector_valid(state.get("position")):
+	if state.get("version") != VEHICLE_STATE_VERSION or not _vector_valid(state.get("position")):
 		return {}
-	if state.get("balance_version") != "vehicle-prototype-v1":
+	if state.get("balance_version") != Vehicle.BALANCE_VERSION:
 		return {}
 	for key: String in ["grounded", "is_drifting", "drift_was_pressed"]:
 		if not state.get(key) is bool:
@@ -114,6 +173,10 @@ static func unpack_state(state: Dictionary) -> Dictionary:
 
 static func _number(value: Variant) -> bool:
 	return (value is int or value is float) and is_finite(float(value))
+
+
+static func _integer(value: Variant, minimum: int) -> bool:
+	return _number(value) and float(value) == floorf(float(value)) and float(value) >= minimum and float(value) <= 2147483647
 
 
 static func _pack_vector(vector: Vector3) -> Array:

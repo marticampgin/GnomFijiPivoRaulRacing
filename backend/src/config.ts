@@ -1,3 +1,6 @@
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 export type Environment = 'local' | 'test' | 'staging' | 'production';
 
 export interface Config {
@@ -12,6 +15,7 @@ export interface Config {
   cookieName: string;
   raceTicketSecret?: string;
   websocketUrl: string;
+  trackManifestPath: string;
 }
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -62,5 +66,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     secureCookie: origin.protocol === 'https:',
     cookieName: local ? `gnom_${environment}_session` : '__Host-gnom_session',
     raceTicketSecret: env.RACE_TICKET_SECRET, websocketUrl,
+    trackManifestPath: env.RACE_TRACK_MANIFEST_PATH ? resolve(env.RACE_TRACK_MANIFEST_PATH) : fileURLToPath(new URL('../../shared/track-manifest.json', import.meta.url)),
   };
 }

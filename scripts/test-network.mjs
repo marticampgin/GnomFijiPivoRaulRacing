@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHmac, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const manifest = JSON.parse(readFileSync(resolve(root, 'shared/track-manifest.json'), 'utf8'));
+const { track_id, schema_version, simulation_revision, simulation_hash, art_revision } = manifest;
+const compatibility = { protocol_version: 2, vehicle_state_version: 1, loadout_hash: 'prototype-v2', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
 const secret = 'network-probe-only-not-a-deployment-secret-2026';
 const port = Number(process.env.NETWORK_TEST_PORT || 19080);
 const url = `ws://127.0.0.1:${port}`;
@@ -22,7 +26,7 @@ worker.stderr.on('data', value => { output += value; });
 worker.on('error', error => { output += error.message; });
 
 function ticket(id, changes = {}) {
-  const payload = Buffer.from(JSON.stringify({ v: 1, protocol_version: 1, match_id: 'prototype-1', loadout_hash: 'prototype-v1', expires_at: Math.floor(Date.now() / 1000) + 60, player_id: id, display_name: `Probe ${id}`, jti: randomUUID(), ...changes })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({ v: 2, ...compatibility, match_id: 'prototype-1', expires_at: Math.floor(Date.now() / 1000) + 60, player_id: id, display_name: `Probe ${id}`, jti: randomUUID(), ...changes })).toString('base64url');
   return `${payload}.${createHmac('sha256', secret).update(payload).digest('base64url')}`;
 }
 
@@ -36,7 +40,7 @@ async function waitFor(predicate, label, timeout = 5000) {
   throw new Error(`Timed out: ${label}\n${output}`);
 }
 
-async function connect(signedTicket) {
+async function connect(signedTicket, descriptor = compatibility) {
   const socket = new WebSocket(url);
   const peer = { socket, messages: [], closed: false, reason: '', code: null };
   peers.push(peer);
@@ -47,7 +51,7 @@ async function connect(signedTicket) {
   socket.addEventListener('close', event => { peer.closed = true; peer.reason = event.reason; peer.code = event.code; });
   socket.addEventListener('error', () => {});
   await waitFor(() => socket.readyState === WebSocket.OPEN, 'socket open');
-  if (signedTicket !== undefined) socket.send(JSON.stringify({ type: 'join', ticket: signedTicket }));
+  if (signedTicket !== undefined) socket.send(JSON.stringify({ type: 'join', ticket: signedTicket, compatibility: descriptor }));
   return peer;
 }
 
@@ -67,6 +71,7 @@ async function joined(id, value = ticket(id)) {
   const peer = await connect(value);
   const welcome = await waitFor(() => peer.messages.find(message => message.type === 'welcome'), `welcome ${id}`);
   verify(welcome.player_id === id, `authoritative identity ${id}`);
+  assert.deepEqual(welcome.compatibility, compatibility, 'worker welcome binds authoritative simulation');
   peer.ack = welcome.ack;
   return peer;
 }
@@ -82,6 +87,20 @@ try {
   await rejectTicket(`${payload}.${signature.startsWith('A') ? 'B' : 'A'}${signature.slice(1)}`, 'tampered signature rejected');
   await rejectTicket(ticket('expired', { expires_at: Math.floor(Date.now() / 1000) - 1 }), 'expired ticket rejected');
   await rejectTicket(ticket('wrong-match', { match_id: 'other' }), 'wrong match rejected');
+  await rejectTicket(ticket('old-protocol', { protocol_version: 1 }), 'signed stale wire protocol rejected');
+  await rejectTicket(ticket('wrong-state', { vehicle_state_version: 999 }), 'signed unsupported vehicle state schema rejected');
+  await rejectTicket(ticket('old-vehicle', { loadout_hash: 'prototype-v1' }), 'signed old vehicle simulation rejected');
+  await rejectTicket(ticket('wrong-track', { track: { ...compatibility.track, simulation_hash: 'a'.repeat(64) } }), 'signed stale track hash rejected');
+  for (const [label, descriptor] of [
+    ['stale hello protocol', { ...compatibility, protocol_version: 1 }],
+    ['unsupported hello state schema', { ...compatibility, vehicle_state_version: 999 }],
+    ['old hello vehicle simulation', { ...compatibility, loadout_hash: 'prototype-v1' }],
+    ['stale hello track', { ...compatibility, track: { ...compatibility.track, simulation_hash: 'a'.repeat(64) } }],
+  ]) {
+    const peer = await connect(ticket('incompatible-client'), descriptor);
+    await waitFor(() => peer.closed, `${label} close`);
+    verify(peer.reason === 'update_required' && !peer.messages.some(message => message.type === 'welcome'), `${label} rejected before racer admission`);
+  }
   const first = await joined('driver-a', goodTicket);
   await rejectTicket(goodTicket, 'ticket replay rejected');
   const second = await joined('driver-b');

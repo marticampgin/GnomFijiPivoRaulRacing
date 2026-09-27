@@ -6,6 +6,8 @@
 !backend/src/**
 !backend/migrations/
 !backend/migrations/**
+!shared/
+!shared/track-manifest.json
 !web/
 !web/**
 !build/
