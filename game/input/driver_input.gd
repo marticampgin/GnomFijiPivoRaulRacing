@@ -9,10 +9,42 @@ var device: int = KEYBOARD
 var _previous: Dictionary = {}
 var _blocked: Dictionary = {}
 var _rearm: bool = true
+var _profile: Dictionary = default_profile()
 
 
 func _init(source: int = KEYBOARD) -> void:
 	device = source
+
+
+static func default_profile() -> Dictionary:
+	return {"keyboard": "both", "gamepad": "standard", "deadzone": 0.2, "steering": 1.0}
+
+
+static func validate_profile(value: Variant) -> Dictionary:
+	if not value is Dictionary or value.size() != 4:
+		return {}
+	if value.get("keyboard") not in ["both", "wasd", "arrows"] or value.get("gamepad") not in ["standard", "alternate"]:
+		return {}
+	for key: String in ["deadzone", "steering"]:
+		if typeof(value.get(key)) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(value[key])):
+			return {}
+	if float(value.deadzone) < 0.05 or float(value.deadzone) > 0.35 or float(value.steering) < 0.5 or float(value.steering) > 1.5:
+		return {}
+	return {"keyboard": value.keyboard, "gamepad": value.gamepad,
+		"deadzone": float(value.deadzone), "steering": float(value.steering)}
+
+
+func configure_profile(value: Variant) -> bool:
+	var validated: Dictionary = validate_profile(value)
+	if validated.is_empty():
+		return false
+	_profile = validated
+	reset()
+	return true
+
+
+func profile() -> Dictionary:
+	return _profile.duplicate()
 
 
 static func neutral() -> Dictionary:
@@ -40,7 +72,7 @@ static func read_device(source: int) -> Dictionary:
 	for axis: int in [JOY_AXIS_LEFT_X, JOY_AXIS_TRIGGER_LEFT, JOY_AXIS_TRIGGER_RIGHT]:
 		axes[axis] = Input.get_joy_axis(source, axis)
 	var buttons: Dictionary = {}
-	for button: int in [JOY_BUTTON_A, JOY_BUTTON_Y, JOY_BUTTON_LEFT_SHOULDER,
+	for button: int in [JOY_BUTTON_A, JOY_BUTTON_Y, JOY_BUTTON_X, JOY_BUTTON_B, JOY_BUTTON_LEFT_SHOULDER,
 		JOY_BUTTON_RIGHT_SHOULDER, JOY_BUTTON_START]:
 		buttons[button] = Input.is_joy_button_pressed(source, button)
 	return {"connected": true, "axes": axes, "buttons": buttons}
@@ -77,9 +109,9 @@ func _decode(raw: Dictionary) -> Dictionary:
 	var command: Dictionary = neutral()
 	if device == KEYBOARD:
 		var keys: Dictionary = raw.get("keys", {})
-		command.steering = float(_pressed(keys, KEY_D, KEY_RIGHT)) - float(_pressed(keys, KEY_A, KEY_LEFT))
-		command.throttle = float(_pressed(keys, KEY_W, KEY_UP))
-		command.brake = float(_pressed(keys, KEY_S, KEY_DOWN))
+		command.steering = float(_key_axis(keys, KEY_D, KEY_RIGHT)) - float(_key_axis(keys, KEY_A, KEY_LEFT))
+		command.throttle = float(_key_axis(keys, KEY_W, KEY_UP))
+		command.brake = float(_key_axis(keys, KEY_S, KEY_DOWN))
 		command.drift = bool(keys.get(KEY_SPACE, false))
 		command.use_item_1 = bool(keys.get(KEY_Q, false))
 		command.use_item_2 = bool(keys.get(KEY_E, false))
@@ -88,19 +120,20 @@ func _decode(raw: Dictionary) -> Dictionary:
 	else:
 		var axes: Dictionary = raw.get("axes", {})
 		var buttons: Dictionary = raw.get("buttons", {})
-		command.steering = _axis(float(axes.get(JOY_AXIS_LEFT_X, 0.0)), 0.2, true)
+		command.steering = _axis(float(axes.get(JOY_AXIS_LEFT_X, 0.0)), _profile.deadzone, true)
 		command.throttle = _axis(float(axes.get(JOY_AXIS_TRIGGER_RIGHT, 0.0)), 0.1, false)
 		command.brake = _axis(float(axes.get(JOY_AXIS_TRIGGER_LEFT, 0.0)), 0.1, false)
-		command.drift = bool(buttons.get(JOY_BUTTON_A, false))
+		command.drift = bool(buttons.get(JOY_BUTTON_X if _profile.gamepad == "alternate" else JOY_BUTTON_A, false))
 		command.use_item_1 = bool(buttons.get(JOY_BUTTON_LEFT_SHOULDER, false))
 		command.use_item_2 = bool(buttons.get(JOY_BUTTON_RIGHT_SHOULDER, false))
-		command.look_back = bool(buttons.get(JOY_BUTTON_Y, false))
+		command.look_back = bool(buttons.get(JOY_BUTTON_B if _profile.gamepad == "alternate" else JOY_BUTTON_Y, false))
 		command.pause = bool(buttons.get(JOY_BUTTON_START, false))
+	command.steering = clampf(command.steering * _profile.steering, -1.0, 1.0)
 	return command
 
 
-static func _pressed(keys: Dictionary, first: int, second: int) -> bool:
-	return bool(keys.get(first, false)) or bool(keys.get(second, false))
+func _key_axis(keys: Dictionary, first: int, second: int) -> bool:
+	return (_profile.keyboard != "arrows" and bool(keys.get(first, false))) or (_profile.keyboard != "wasd" and bool(keys.get(second, false)))
 
 
 static func _axis(value: float, deadzone: float, signed: bool) -> float:

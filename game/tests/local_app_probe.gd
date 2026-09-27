@@ -36,6 +36,12 @@ func _run() -> void:
 	_check(hud.seats[0].styleId == "speed" and hud.seats[0].device == -1, "seat style and device survive the bridge")
 	_check(hud.trackDescriptor.track_id == "castle-waterfalls", "local HUD uses authored route")
 	_check(hud.botDifficulty == "hard", "chosen bot difficulty reaches authority and HUD")
+	_check(hud.seats[0].controls.keyboard == "both", "default local controls reach HUD")
+	var controls: Dictionary = {"keyboard": "arrows", "gamepad": "alternate", "deadzone": 0.12, "steering": 0.8}
+	app._on_local_message({"type": "local_start", "seats": [{"device": -1, "controls": {"keyboard": "invalid"}}]})
+	_check(app._local_race == session, "invalid controls cannot replace active session")
+	app._on_local_message({"type": "local_controls", "seat": 0, "controls": controls})
+	_check(session.inputs.profiles()[0].keyboard == "both", "in-race control changes require pause")
 	app._on_local_message({"type": "local_start", "seats": [{"device": -1}], "botDifficulty": "cheat"})
 	_check(app._local_race == session, "invalid difficulty preserves active race")
 	app._on_local_message({"type": "local_start", "seats": [{"device": -1}, {"device": -1}]})
@@ -89,6 +95,8 @@ func _run() -> void:
 	var tick: int = session._tick
 	await _step(app)
 	_check(app._local_hud_state().paused and session._tick == tick, "pause bridge freezes authority")
+	app._on_local_message({"type": "local_controls", "seat": 0, "controls": controls})
+	_check(app._local_hud_state().seats[0].controls == controls, "paused profile changes reach input and HUD")
 	var epoch: int = player.epoch
 	app._on_local_message({"type": "local_recover", "seat": 0})
 	_check(not session.is_paused_local() and player.epoch == epoch + 1, "pause recovery explicitly resumes then recovers")
@@ -99,12 +107,21 @@ func _run() -> void:
 	await _step(app)
 	_check(session._race_id == race_id + 1 and session._phase == "countdown", "local result button starts one rematch")
 	_check(app._local_hud_state().botDifficulty == "hard", "rematch keeps chosen difficulty")
+	_check(app._local_hud_state().seats[0].controls == controls, "rematch preserves local control profile")
 	_check(app._local_hud_state().seats[0].items == ["", ""], "rematch clears projected inventory")
 	_check(app._local_hud_state().seats[0].shards == 0 and app._local_hud_state().seats[0].driving.slipstream_charge == 0.0, "rematch clears shards and technique HUD")
 	_check(not visual._shield_aura.visible and session._items.world_state().projectiles.is_empty() and app._local_hud_state().seats[0].attackWarning == "", "rematch clears shield visuals, traps and attack warning")
 	app._on_local_message({"type": "local_leave"})
 	_check(not is_instance_valid(app._local_race) and not is_instance_valid(app._local_view), "leave removes local authority and views")
 	_check(not root.disable_3d and app._camera.current, "leave restores network/practice rendering")
+	app._on_local_message({"type": "local_start", "tutorial": true, "seats": [{"device": -1, "controls": controls}]})
+	await _step(app)
+	_check(app._local_hud_state().players.size() == 1 and app._local_hud_state().tutorial.step == "drive", "tutorial bridge starts one human without bots")
+	_check(app._local_hud_state().seats[0].controls == controls, "tutorial uses selected controls")
+	var tutorial_id: int = app._local_race._race_id
+	app._on_local_message({"type": "local_tutorial_retry"})
+	_check(app._local_race._race_id == tutorial_id + 1 and app._local_hud_state().tutorial.stage == 0, "tutorial retry resets through shared lifecycle")
+	app._on_local_message({"type": "local_leave"})
 	app.free()
 	await process_frame
 	print("LOCAL_APP_PROBE %d/%d passed" % [_checks - _failures, _checks])

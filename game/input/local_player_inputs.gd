@@ -20,7 +20,9 @@ func assign(seat: int, device: int, available_pads: Variant = null) -> bool:
 	for other: int in _drivers:
 		if other != seat and _drivers[other].device == device:
 			return false
+	var profile: Dictionary = _drivers[seat].profile() if _drivers.has(seat) else Driver.default_profile()
 	_drivers[seat] = Driver.new(device)
+	_drivers[seat].configure_profile(profile)
 	_connected[seat] = true
 	return true
 
@@ -34,6 +36,17 @@ func assignments() -> Dictionary:
 	var result: Dictionary = {}
 	for seat: int in _drivers:
 		result[seat] = _drivers[seat].device
+	return result
+
+
+func configure_profile(seat: int, profile: Variant) -> bool:
+	return _drivers.has(seat) and _drivers[seat].configure_profile(profile)
+
+
+func profiles() -> Dictionary:
+	var result: Dictionary = {}
+	for seat: int in _drivers:
+		result[seat] = _drivers[seat].profile()
 	return result
 
 

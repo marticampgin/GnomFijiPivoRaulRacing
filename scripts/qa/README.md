@@ -7,6 +7,23 @@ is `http://127.0.0.1:8788/`.
 
 ## Prerequisites
 
+Short control/tutorial checks (no full laps):
+
+```sh
+godot --headless --path game --script res://tests/control_profile_probe.gd
+godot --headless --path game --script res://tests/tutorial_probe.gd
+node scripts/test-control-settings.cjs
+```
+
+Browser tutorial flow: change a seat's keyboard scheme/sensitivity, reload and
+verify persistence, start `Обучение P1`, complete drive, stop, continuous brake
+into reverse, actual level-I drift and release, then use Q/E (or LB/RB).
+Wait for the actual drift level, not a nearly full lesson progress bar. Hold
+test key presses across at least one physics tick. Verify retry and keyboard
+input after changing settings on pause, reset to defaults, and HUD bounds at
+1600x900/390x844. No API/WebSocket requests are expected in local training.
+This does not validate physical controllers or a four-camera performance budget.
+
 Short native checks for the v8/v9 driving/items milestones (no full laps):
 
 ```sh

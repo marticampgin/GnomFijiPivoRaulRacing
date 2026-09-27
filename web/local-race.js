@@ -20,8 +20,16 @@
     }
     return '';
   }
-  function create({send, onStart, onExit, onGraphics}) {
+  function create({send, onStart, onExit, onGraphics, onResume}) {
     let state = null, pads = [], panes = [], setupSeats = [{device:-1,style_id:'drift',name:'P1'}], chosenLayout = 'side-by-side';
+    const controls = root.GnomControlSettings;
+    let savedProfiles = Array.from({length:4},()=>controls.defaultProfile());
+    try {const saved=JSON.parse(localStorage.getItem('gnom.local-controls.v1'));if(saved?.version===1&&Array.isArray(saved.profiles))savedProfiles=savedProfiles.map((profile,i)=>controls.normalize(saved.profiles[i])||profile);} catch { /* Storage is optional. */ }
+    function saveProfile(index,profile) {savedProfiles[index]={...profile};try{localStorage.setItem('gnom.local-controls.v1',JSON.stringify({version:1,profiles:savedProfiles}));}catch{/* Storage is optional. */}}
+    function profileEditor(index,profile,live) {
+      const details=element('details','local-controls'),summary=element('summary','',`Управление P${index+1}`);details.append(summary);
+      const editor=controls.create({profile,onChange:value=>{saveProfile(index,value);if(live)send({type:'local_controls',seat:index,controls:value});}});details.append(editor.node);return details;
+    }
     const layer = element('section','local-race'); layer.hidden = true; layer.id = 'local-race';
     const grid = element('div','local-grid'); layer.append(grid); document.body.append(layer);
     const setup = element('dialog','local-dialog'); setup.id = 'local-setup';
@@ -34,10 +42,14 @@
       const error = validateSeats(setupSeats,pads); setupError.textContent = error;
       if (error) return;
       start.disabled = true;
-      const payload = {type:'local_start',seats:setupSeats.map(seat => ({...seat})),layout:chosenLayout,botDifficulty:difficulty.value};
+      const payload = {type:'local_start',seats:setupSeats.map((seat,index) => ({...seat,controls:savedProfiles[index]})),layout:chosenLayout,botDifficulty:difficulty.value};
       (onStart || send)(payload);
     },'arrow-up-right'); start.id = 'local-start';
-    const setupActions = element('div','local-actions'); setupActions.append(button('Назад',()=>setup.close(),'x'),start);
+    const training = button('Обучение P1',()=>{
+      const error=validateSeats(setupSeats.slice(0,1),pads);setupError.textContent=error;if(error)return;
+      (onStart||send)({type:'local_start',tutorial:true,seats:[{...setupSeats[0],controls:savedProfiles[0]}],layout:'side-by-side',botDifficulty:'easy'});
+    },'arrow-up-right');training.id='local-tutorial-start';
+    const setupActions = element('div','local-actions'); setupActions.append(button('Назад',()=>setup.close(),'x'),training,start);
     setup.append(setupHeading,count,layout,difficulty,setupRows,setupError,setupActions); document.body.append(setup);
     const pause = element('dialog','local-dialog'); pause.id = 'local-pause';
     const pauseTitle = element('h2','','Пауза'), pauseRows = element('div','local-setup-rows'), pauseError = element('p','local-error'); pauseError.setAttribute('role','alert');
@@ -56,6 +68,10 @@
     pause.append(pauseTitle,pauseRows,graphics,pauseError,pauseActions); document.body.append(pause);
     pause.addEventListener('cancel',event=>{event.preventDefault(); if(!resume.disabled)send({type:'local_resume'});});
     const pauseButton = button('',()=>send({type:'local_pause'}),'pause'); pauseButton.title='Пауза'; pauseButton.setAttribute('aria-label','Пауза'); pauseButton.className='local-pause-button'; layer.append(pauseButton);
+    const lesson=element('section','local-lesson');lesson.hidden=true;
+    const lessonCount=element('span','local-lesson-count'),lessonTitle=element('strong'),lessonProgress=element('progress'),lessonKeys=element('div','local-lesson-keys'),lessonActions=element('div','local-actions');lessonProgress.max=1;lessonProgress.setAttribute('aria-label','Прогресс упражнения');
+    lessonActions.append(button('Повторить',()=>send({type:'local_tutorial_retry'}),'rotate-ccw'),button('В меню',()=>{hide();onExit?.();},'x'));
+    lesson.append(lessonCount,lessonTitle,lessonKeys,lessonProgress,lessonActions);layer.append(lesson);
     function deviceOptions() { return [[-2,'Выберите контроллер'],[-1,'Клавиатура'],...pads.map(pad=>[pad.id,`${pad.name || 'Геймпад'} (${pad.id+1})`])]; }
     function renderSetup() {
       layout.hidden = setupSeats.length !== 2;
@@ -64,7 +80,7 @@
         const device = select(deviceOptions(),seat.device,`Контроллер P${index+1}`);
         device.addEventListener('change',()=>{seat.device=Number(device.value);setupError.textContent='';});
         const style = select(Object.entries(styles),seat.style_id,`Стиль P${index+1}`); style.addEventListener('change',()=>seat.style_id=style.value);
-        row.append(element('strong','',`P${index+1}`),device,style); return row;
+        row.append(element('strong','',`P${index+1}`),device,style,profileEditor(index,savedProfiles[index],false)); return row;
       }));
     }
     count.addEventListener('change',()=> {
@@ -114,7 +130,7 @@
           pauseError.textContent='';send({type:'local_assign',seat:index,device});
         });
         const recover=button('На трассу',()=>send({type:'local_recover',seat:index}),'rotate-ccw'); recover.disabled=Boolean(seat.finished);
-        row.append(element('strong','',`P${index+1}`),devices,recover);return row;
+        row.append(element('strong','',`P${index+1}`),devices,recover,profileEditor(index,seat.controls||savedProfiles[index],true));return row;
       }));
     }
     let pauseSignature='', overview=null;
@@ -122,6 +138,15 @@
       if(next.error) { setupError.textContent=next.error;pauseError.textContent=next.error;start.disabled=false;return; }
       if(!Array.isArray(next.seats)||!next.seats.length)return;
       state=next;start.disabled=false;if(setup.open)setup.close();layer.hidden=false;
+      const tutorial=next.tutorial||{};lesson.hidden=!tutorial.step;layer.classList.toggle('tutorial-active',!lesson.hidden);
+      if(!lesson.hidden){
+        const titles={drive:'Разгон',brake:'Остановка',reverse:'Задний ход',drift:'Дрифт I',items:'Два предмета'};
+        lessonCount.textContent=`ОБУЧЕНИЕ ${Math.min(tutorial.stage+1,tutorial.total)} / ${tutorial.total}`;lessonTitle.textContent=tutorial.complete?'Готово к гонке':titles[tutorial.step]||'';
+        lessonProgress.value=clamp(tutorial.progress,0,1);lessonProgress.hidden=Boolean(tutorial.complete);lessonKeys.hidden=Boolean(tutorial.complete);
+        const first=next.seats[0],profile=first.controls||savedProfiles[0],keyboard=first.device===-1,arrows=profile.keyboard==='arrows';
+        const bindings=keyboard?{drive:[arrows?'↑':'W'],brake:[arrows?'↓':'S'],reverse:[arrows?'↓':'S'],drift:[arrows?'↑':'W',arrows?'← / →':'A / D','Space'],items:['Q','E']}:{drive:['RT'],brake:['LT'],reverse:['LT'],drift:['RT','LS',profile.gamepad==='alternate'?'X':'A'],items:['LB','RB']};
+        lessonKeys.replaceChildren(...(bindings[tutorial.step]||[]).map(key=>element('kbd','',key)));
+      }
       const signature=`${next.seats.length}:${next.layout}`;
       if(grid.dataset.layout!==signature) {
         grid.dataset.layout=signature;grid.className=`local-grid players-${next.seats.length} ${next.layout==='stacked'?'stacked':''}`;
@@ -156,7 +181,7 @@
         if(local>=0)row.style.color=colors[local];return row;
       }));}
       qualityInputs.forEach(input=>input.checked=input.value===(next.graphics?.quality || 'standard'));reduced.checked=Boolean(next.graphics?.reducedEffects);
-      if(next.paused) {const key=JSON.stringify([next.seats.map(s=>s.device),next.disconnected,pads]);if(key!==pauseSignature){renderPause();pauseSignature=key;}if(!pause.open)pause.showModal();} else {if(pause.open)pause.close();pauseSignature='';pauseError.textContent='';}
+      if(next.paused) {const key=JSON.stringify([next.seats.map(s=>s.device),next.disconnected,pads]);if(key!==pauseSignature){renderPause();pauseSignature=key;}if(!pause.open)pause.showModal();} else {if(pause.open){pause.close();onResume?.();}pauseSignature='';pauseError.textContent='';}
     }
     function updateDevices(devices) {const next=(devices || []).filter(pad=>Number.isInteger(pad.id)&&pad.id>=0);if(JSON.stringify(pads)===JSON.stringify(next))return;pads=next;if(setup.open)renderSetup();if(pause.open){renderPause();pauseSignature='';}}
     function hide() {layer.hidden=true;setup.close();pause.close();state=null;}

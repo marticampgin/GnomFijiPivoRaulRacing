@@ -11,10 +11,11 @@
   const localUI = window.GnomLocalUI.create({
     send(message) {
       send(message);
-      if (['local_resume','local_use_item','local_recover'].includes(message.type)) ui.canvas.focus();
+      if (['local_resume','local_use_item','local_recover','local_tutorial_retry'].includes(message.type)) ui.canvas.focus();
     },
     onStart(payload) { send(payload); },
     onExit() { leave(); },
+    onResume() { ui.canvas.focus(); },
     onGraphics(value) { graphics = value; saveGraphics(); },
   });
   const itemLabels = {fanta:'Fanta', mermaid_rum:'Mermaid Rum', ice_rum:'Ice Rum', stroh80:'Stroh 80', lays_crab:'Lay’s Crab', bfg10k:'BFG 10K', crystal_shield:'Кристальный щит', seeker:'Кристальная ракета', rear_trap:'Рунная ловушка'};

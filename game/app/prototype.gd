@@ -907,6 +907,7 @@ func _local_hud_state() -> Dictionary:
 		var combat: Dictionary = entry.combat
 		var seat: Dictionary = row.duplicate()
 		seat.merge({"device": snapshot.devices[entry.slot], "styleId": entry.style_id,
+			"controls": snapshot.controls[entry.slot],
 			"attackWarning": _attack_warning(snapshot.items_world, entry.id, vehicle) if not entry.finished and float(combat.destroyed_remaining) <= 0.0 else "",
 			"shards": combat.shards, "shardCap": _items.Catalog.SHARD_CAP, "driving": entry.driving,
 			"speed": vehicle.speed_mps * 3.6, "lap": entry.lap, "laps": RACE_LAPS,
@@ -922,6 +923,7 @@ func _local_hud_state() -> Dictionary:
 		seats.append(seat)
 	seats.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.seat) < int(b.seat))
 	return {"seats": seats, "players": players, "paused": snapshot.paused, "botDifficulty": snapshot.bot_difficulty,
+		"tutorial": snapshot.get("tutorial", {}),
 		"disconnected": snapshot.disconnected_seats, "pauseReason": snapshot.pause_reason,
 		"countdown": snapshot.countdown, "status": snapshot.phase, "phase": snapshot.phase,
 		"raceId": snapshot.race_id, "tick": snapshot.tick, "trackDescriptor": _track.descriptor()}
@@ -936,7 +938,9 @@ func _on_local_message(data: Dictionary) -> void:
 	if action == "local_start":
 		if not data.get("seats") is Array or data.get("layout", "side-by-side") not in ["side-by-side", "stacked"]:
 			return
-		var candidate: Node3D = load("res://race/local_race_session.gd").new()
+		if not data.get("tutorial", false) is bool:
+			return
+		var candidate: Node3D = load("res://race/driving_tutorial.gd" if data.get("tutorial", false) else "res://race/local_race_session.gd").new()
 		add_child(candidate)
 		candidate.configure(_track)
 		candidate.set_focused(_focused)
@@ -962,6 +966,12 @@ func _on_local_message(data: Dictionary) -> void:
 		return
 	var seat: int = int(data.get("seat", -1))
 	match action:
+		"local_controls":
+			if _local_race.is_paused_local():
+				_local_race.inputs.configure_profile(seat, data.get("controls", {}))
+		"local_tutorial_retry":
+			if _local_race.has_method("restart_lesson"):
+				_local_race.restart_lesson()
 		"local_pause":
 			_local_race.pause_local()
 		"local_resume":
