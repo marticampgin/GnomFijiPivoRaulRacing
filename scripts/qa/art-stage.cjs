@@ -6,6 +6,34 @@ const out = process.env.GNOM_QA_OUT || '/tmp/gnom-art-stage-qa';
 const url = process.env.GNOM_QA_URL || 'http://127.0.0.1:8788/';
 const profileFirst = Number(process.env.GNOM_QA_PROFILE_FIRST ?? 1);
 const scope = process.env.GNOM_QA_SCOPE || 'full';
+const raceObservations = new WeakMap();
+
+function observeRecovery(page) {
+  const observation = { playerId:null, current:null, requests:0, recovery:null };
+  raceObservations.set(page, observation);
+  page.on('websocket', socket => {
+    socket.on('framesent', frame => {
+      try {
+        if (JSON.parse(frame.payload).type === 'recover') {
+          observation.requests++;
+          observation.recovery = { before:observation.current, sentAt:Date.now(), after:null };
+        }
+      } catch { /* Non-JSON frame. */ }
+    });
+    socket.on('framereceived', frame => {
+      try {
+        const packet = JSON.parse(frame.payload);
+        if (packet.type === 'welcome') observation.playerId = packet.player_id;
+        if (packet.type !== 'snapshot') return;
+        const player = packet.players.find(entry => entry.id === observation.playerId);
+        if (player) {
+          observation.current = { epoch:player.epoch, lap:player.lap, raceId:packet.race_id };
+          if (observation.recovery?.before && player.epoch > observation.recovery.before.epoch && !observation.recovery.after) observation.recovery.after = observation.current;
+        }
+      } catch { /* Ignore unrelated frames; never retain tickets or identities. */ }
+    });
+  });
+}
 
 async function pixels(buffer) {
   const { data, info } = await sharp(buffer).resize(160, 90).removeAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -33,10 +61,21 @@ async function graphics(page, quality, reducedEffects) {
 }
 
 async function recover(page) {
+  const observation = raceObservations.get(page);
+  assert.ok(observation?.current, 'Recovery requires an authoritative player snapshot');
+  if (observation.recovery) await page.waitForTimeout(Math.max(0, 1100 - (Date.now() - observation.recovery.sentAt)));
+  const requests = observation.requests;
   await page.locator('#menu-button').click();
   await page.locator('#recover-button').click();
-  await page.waitForFunction(() => window.GnomHost.state.speed < 2);
-  await page.waitForTimeout(500);
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline && !(observation.requests > requests && observation.recovery?.after)) await page.waitForTimeout(25);
+  assert.ok(observation.requests > requests, 'UI sends a recovery command');
+  const {before, after} = observation.recovery;
+  assert.ok(after && after.epoch > before.epoch, 'Server confirms a new recovery epoch');
+  assert.equal(after.raceId, before.raceId, 'Recovery must not restart the race');
+  assert.equal(after.lap, before.lap, 'Recovery must not skip a lap');
+  // Bots can transfer momentum immediately after recovery; speed at +1s is not a reset acknowledgment.
+  return { beforeEpoch:before.epoch, ...after };
 }
 
 async function heroSmoke(page, report) {
@@ -228,6 +267,7 @@ async function menuAccessibility(page, width, height) {
   const open = async profile => {
     const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, reducedMotion: 'no-preference' }); contexts.push(context);
     const page = await context.newPage();
+    observeRecovery(page);
     page.on('pageerror', error => errors.push(error.message));
     page.on('console', entry => { if (entry.type() === 'error') errors.push(entry.text()); });
     await page.goto(url); await ready(page);
@@ -271,10 +311,7 @@ async function menuAccessibility(page, width, height) {
     const changed = before.data.reduce((n, value, i) => n + (Math.abs(value - after.data[i]) > 10 ? 1 : 0), 0) / before.data.length;
     assert.ok(changed > 0.005, 'Canvas unchanged after driving');
     report.checks.canvas = { colors: before.colors, changedPixelChannelRatio: changed, speed: moved.speed };
-    await page.locator('#menu-button').click(); await page.locator('#recover-button').click();
-    await page.waitForTimeout(1000);
-    report.checks.recover = await page.evaluate(() => ({ speed: window.GnomHost.state.speed, lap: window.GnomHost.state.lap }));
-    assert.ok(report.checks.recover.speed < 2);
+    report.checks.recover = await recover(page);
     if (scope === 'hero') {
       await heroSmoke(page, report);
       assert.equal(await page.locator('vite-error-overlay, nextjs-portal, #webpack-dev-server-client-overlay').count(), 0);

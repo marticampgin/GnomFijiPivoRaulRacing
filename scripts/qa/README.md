@@ -68,6 +68,15 @@ short smoke below, not the full race. Route/physics/progress/network changes
 still require their relevant integration checks and, when affected, a full finish.
 Do not run three laps solely to validate a face, clothing or texture adjustment.
 
+The shared local-session foundation has short `race_session_probe.gd` and
+`local_input_probe.gd` checks. They exercise 1-4 humans with bots in one world and
+device-isolated command snapshots; they do not prove physical gamepad compatibility
+or completed split-screen UI. Existing worker/contact/item probes cover extraction
+regressions. Browser recovery smoke observes the outgoing command and the next
+server recovery epoch with the same race/lap, respecting the manual cooldown.
+It does not require speed below 2 km/h one second later: another racer can legally
+transfer momentum after recovery. Native probes cover the physical reset itself.
+
 ```sh
 GNOM_QA_SCOPE=hero GNOM_QA_URL=http://127.0.0.1:8787/ GNOM_QA_OUT=/tmp/gnom-hero-qa node scripts/qa/art-stage.cjs
 ```
