@@ -61,7 +61,7 @@ func _run() -> void:
 		return
 	_check(is_equal_approx(client._local.global_position.x, 12.0), "authoritative transform restored")
 	_check(client._queued_snapshot.is_empty(), "snapshot consumed once")
-	client._pending = [{"type": "input", "sequence": 1, "steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false}, {"type": "input", "sequence": 2, "steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false}]
+	client._pending = [{"type": "input", "sequence": 1, "steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift_left": false, "drift_right": false}, {"type": "input", "sequence": 2, "steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift_left": false, "drift_right": false}]
 	client._sequence = 2
 	client._queue_snapshot({"type": "snapshot", "track_event": {"phase": "idle", "remaining": 0.0, "active": [false, false], "trigger_tick": 0}, "items_world": {"pickups": [], "projectiles": [], "events": [], "shards": []}, "tick": 12, "countdown": 0.0, "players": [{"id": "probe", "slot": 0, "ack": 1, "epoch": 0, "style_id": "handling", "driving": {"start_boost_remaining": 0.0, "slipstream_charge": 0.0, "slipstream_boost_remaining": 0.0, "slipstream_target": ""}, "combat": {"health": 100.0, "max_health": 100.0, "slots": ["", ""], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0, "shards": 0}, "state": state}]})
 	await physics_frame
@@ -92,13 +92,20 @@ func _run() -> void:
 	client._queue_snapshot({"type": "snapshot", "track_event": {"phase": "idle", "remaining": 0.0, "active": [false, false], "trigger_tick": 0}, "items_world": {"pickups": [], "projectiles": [], "events": [], "shards": []}, "tick": 8, "players": []})
 	_check(client._queued_snapshot.is_empty(), "stale snapshot ignored after application")
 	client._queue_snapshot({"type": "snapshot", "track_event": {"phase": "idle", "remaining": 0.0, "active": [false, false], "trigger_tick": 0}, "items_world": {"pickups": [], "projectiles": [], "events": [], "shards": []}, "tick": 18, "players": []})
+	client._drift_transitions = [{"drift_left": true, "drift_right": true}]
+	client._last_drift_sample = {"drift_left": true, "drift_right": true}
 	client._leave("ready")
 	_check(client._input_ack == 0 and client._sequence == 0, "leave resets flow control together with sequence")
 	_check(client._queued_snapshot.is_empty(), "leave clears pending snapshot")
+	_check(client._drift_transitions.is_empty() and client._last_drift_sample == {"drift_left": false, "drift_right": false}, "leave clears pending shoulder transitions and sampled state")
 	Input.action_press("look_back")
+	Input.action_press("drive_drift_left")
+	Input.action_press("drive_drift_right")
+	client._drift_transitions = [{"drift_left": true, "drift_right": true}]
 	client._on_host_message([JSON.stringify({"type": "focus", "visible": false})])
 	client._on_host_message([JSON.stringify({"type": "focus", "visible": true})])
 	_check(not Input.is_action_pressed("look_back"), "focus loss releases rear view before returning")
+	_check(not Input.is_action_pressed("drive_drift_left") and not Input.is_action_pressed("drive_drift_right") and client._drift_transitions.is_empty(), "focus loss releases both shoulders and clears pending boost taps")
 	Input.action_press("look_back")
 	client._on_host_message([JSON.stringify({"type": "input_enabled", "enabled": false})])
 	client._on_host_message([JSON.stringify({"type": "input_enabled", "enabled": true})])

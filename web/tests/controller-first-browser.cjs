@@ -1,0 +1,102 @@
+'use strict';
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const {chromium} = require('playwright');
+
+(async () => {
+  const browser = await chromium.launch({headless:true});
+  let checks = 0;
+  const errors = [];
+  try {
+    const page = await browser.newPage({viewport:{width:1280,height:800}});
+    page.on('pageerror', error => errors.push(error.message));
+    await page.setContent('<!doctype html><html lang="ru"><head><base href="http://127.0.0.1:8788/"></head><body><main id="hub"><button id="play" data-menu-default>Гонка</button><button id="settings">Настройки</button></main></body></html>');
+    for (const file of ['app.css','local-race.css','control-settings.css']) await page.addStyleTag({path:path.resolve(__dirname,'..',file)});
+    for (const file of ['control-settings.js','local-race.js','menu-navigation.js']) await page.addScriptTag({path:path.resolve(__dirname,'..',file)});
+    await page.addStyleTag({content:'#hub{display:grid;gap:16px;width:320px;padding:20px}#hub>button{height:48px}'});
+    await page.evaluate(() => {
+      window.messages=[];window.pads=[{index:3,mapping:'standard',connected:true,axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false}))}];
+      Object.defineProperty(navigator,'getGamepads',{value:()=>window.pads});
+      window.fixture=GnomLocalUI.create({send:message=>window.messages.push(message),onStart:message=>window.messages.push(message),onExit:()=>window.messages.push({type:'exit'})});
+      fixture.updateDevices([{id:3,name:'Xbox'}]);
+      document.querySelector('#play').onclick=()=>fixture.showSetup();
+      window.navigation=GnomMenuNavigation.create({scope:()=>Array.from(document.querySelectorAll('dialog[open]')).at(-1)||fixture.menuScope()||document.querySelector('#hub'),onAction:value=>fixture.handleMenuAction(value)});
+    });
+    async function pad(button, index=3) {
+      await page.evaluate(({button,index})=>{window.pads.find(pad=>pad.index===index).buttons[button].pressed=true;},{button,index});
+      await page.waitForTimeout(80);
+      await page.evaluate(({button,index})=>{window.pads.find(pad=>pad.index===index).buttons[button].pressed=false;},{button,index});
+      await page.waitForTimeout(80);
+    }
+    await page.waitForFunction(()=>document.activeElement.id==='play');
+    await pad(0);
+    await page.waitForFunction(()=>document.activeElement.id==='local-start');
+    assert.equal(await page.locator('[aria-label="Контроллер P1"]').inputValue(),'3');checks++;
+    await page.screenshot({path:'/tmp/gnom-controller-first-default-1280.png'});
+    assert.match(await page.locator('#local-setup .menu-hints').innerText(),/A/);checks++;
+    await pad(0);
+    assert.equal(await page.evaluate(()=>messages.at(-1).seats[0].device),3);checks++;
+    // A was released before opening the next screen; a held press cannot bleed across screens.
+    await page.evaluate(()=>{document.querySelector('#local-start').disabled=false;pads[0].buttons[0].pressed=true;});
+    await page.waitForTimeout(45);
+    await page.evaluate(()=>document.querySelector('#local-setup').close());
+    await page.waitForTimeout(45);
+    await page.evaluate(()=>{pads[0].buttons[0].pressed=false;});
+    await page.waitForTimeout(45);
+    assert.equal(await page.locator('#local-setup').evaluate(node=>node.open),false);checks++;
+    await pad(0);
+    await page.selectOption('[aria-label="Контроллер P1"]','-1');
+    await page.evaluate(()=>fixture.updateDevices([{id:3,name:'Xbox'},{id:6,name:'Second pad'}]));
+    assert.equal(await page.locator('[aria-label="Контроллер P1"]').inputValue(),'-1');checks++;
+    await page.locator('#local-setup details summary').click();
+    await page.locator('[data-focus-key="control-0-steering"]').focus();
+    await page.evaluate(()=>fixture.updateDevices([{id:3,name:'Xbox'},{id:6,name:'Second pad'},{id:8,name:'Third pad'}]));
+    assert.equal(await page.evaluate(()=>document.activeElement.dataset.focusKey),'control-0-steering');checks++;
+    assert.equal(await page.locator('#local-setup details').evaluate(node=>node.open),true);checks++;
+    assert.ok((await page.locator('#local-setup .control-bindings').innerText()).includes('Q'));checks++;
+    assert.ok(!(await page.locator('#local-setup .control-bindings').innerText()).includes('LB'));checks++;
+    await page.selectOption('[aria-label="Количество игроков"]','3');
+    assert.deepEqual(await page.locator('#local-setup [aria-label^="Контроллер"]').evaluateAll(nodes=>nodes.map(node=>node.value)),['-1','3','6']);checks++;
+    assert.equal(await page.locator('[aria-label="Контроллер P2"] option[value="-1"]').isDisabled(),true);checks++;
+    for(const viewport of [{width:1280,height:800},{width:390,height:844}]) {
+      await page.setViewportSize(viewport);
+      const bounds=await page.locator('#local-setup').evaluate(node=>({width:node.clientWidth,scrollWidth:node.scrollWidth,left:node.getBoundingClientRect().left,right:node.getBoundingClientRect().right}));
+      assert.ok(bounds.scrollWidth<=bounds.width+1&&bounds.left>=0&&bounds.right<=viewport.width);checks++;
+      await page.screenshot({path:`/tmp/gnom-controller-first-setup-${viewport.width}.png`});
+    }
+    await page.setViewportSize({width:1280,height:800});
+    await page.evaluate(()=>{
+      window.result={mode:'local',phase:'results',paused:false,seats:[{id:1,device:3,styleId:'drift',rank:1,finished:true,items:['fanta','seeker'],canUseItems:true},{id:2,device:6,styleId:'speed',rank:2,finished:true,items:[]}],players:[],layout:'side-by-side'};
+      pads.push({index:6,mapping:'standard',connected:true,axes:[0,0],buttons:Array.from({length:16},()=>({pressed:false}))});
+      fixture.update(result);
+    });
+    await page.waitForTimeout(90);
+    await pad(0,6);
+    assert.deepEqual(await page.evaluate(()=>messages.at(-1)),{type:'local_ready',seat:1});checks++;
+    await pad(0,3);
+    assert.deepEqual(await page.evaluate(()=>messages.at(-1)),{type:'local_ready',seat:0});checks++;
+    const before=await page.evaluate(()=>messages.length);
+    await pad(1,6);
+    assert.equal(await page.evaluate(()=>messages.length),before);checks++;
+    await page.evaluate(()=>fixture.update({...result,phase:'racing',paused:true,seats:result.seats.map(seat=>({...seat,finished:false}))}));
+    await page.waitForFunction(()=>document.activeElement.id==='local-resume');
+    await pad(13);await pad(0);
+    assert.equal(await page.locator('#local-settings').evaluate(node=>node.open),true);checks++;
+    await pad(1);
+    assert.equal(await page.locator('#local-settings').evaluate(node=>node.open),false,JSON.stringify(await page.evaluate(()=>({dialogs:Array.from(document.querySelectorAll('dialog[open]')).map(node=>node.id),active:document.activeElement.outerHTML,messages,pads}))));checks++;
+    assert.equal(await page.locator('#local-pause').evaluate(node=>node.open),true);checks++;
+    await pad(12);await pad(0);
+    assert.deepEqual(await page.evaluate(()=>messages.at(-1)),{type:'local_resume'});checks++;
+    await page.evaluate(()=>fixture.update({...result,phase:'racing',paused:false,tutorial:{step:'drift',stage:3,total:5,complete:true,progress:1},seats:result.seats.slice(0,1).map(seat=>({...seat,finished:false}))}));
+    await page.waitForFunction(()=>document.activeElement.textContent==='Повторить');
+    await pad(0);assert.deepEqual(await page.evaluate(()=>messages.at(-1)),{type:'local_tutorial_retry'});checks++;
+    await pad(1);assert.deepEqual(await page.evaluate(()=>messages.at(-1)),{type:'exit'});checks++;
+    await page.evaluate(()=>{navigation.destroy();fixture.destroy();document.querySelector('#hub').innerHTML='<div id="spatial"><button id="a">A</button><button id="b">B</button><button id="c">C</button><button id="d">D</button></div>';document.querySelector('#spatial').style.cssText='display:grid;grid-template-columns:120px 120px;gap:20px';window.navigation=GnomMenuNavigation.create({scope:()=>document.querySelector('#spatial')});});
+    await page.waitForFunction(()=>document.activeElement.id==='a');
+    await page.keyboard.press('ArrowDown');assert.equal(await page.evaluate(()=>document.activeElement.id),'c');checks++;
+    await page.focus('#b');await page.keyboard.press('ArrowRight');assert.equal(await page.evaluate(()=>document.activeElement.id),'b');checks++;
+    await page.keyboard.press('ArrowDown');assert.equal(await page.evaluate(()=>document.activeElement.id),'d');checks++;
+    assert.deepEqual(errors,[]);checks++;
+    console.log(`controller-first DOM: ${checks}/${checks} passed (synthetic controllers, no physical Bluetooth claim)`);
+  } finally {await browser.close();}
+})().catch(error=>{console.error(error);process.exitCode=1;});

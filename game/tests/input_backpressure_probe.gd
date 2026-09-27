@@ -7,6 +7,7 @@ class TestApp extends "res://app/prototype.gd":
 	var samples: int = 0
 	var predicted: int = 0
 	var leave_reason: String = ""
+	var held: Dictionary = {"drift_left": false, "drift_right": false}
 
 	func _ready() -> void:
 		pass
@@ -19,7 +20,9 @@ class TestApp extends "res://app/prototype.gd":
 
 	func _sample_input() -> Dictionary:
 		samples += 1
-		return Protocol.NEUTRAL.duplicate()
+		var command: Dictionary = Protocol.NEUTRAL.duplicate()
+		command.merge(held, true)
+		return command
 
 	func _send(packet: Dictionary) -> void:
 		sent.append(packet.duplicate(true))
@@ -79,6 +82,32 @@ func _run() -> void:
 		for index: int in app.sent.size():
 			valid_sequence = valid_sequence and app.sent[index].get("type") == "input" and app.sent[index].get("sequence") == index + 1
 		_check(valid_sequence, "flow-control pauses do not duplicate or skip wire sequences")
+	app.held = {"drift_left": true, "drift_right": false}
+	_step(app, 1)
+	app.held.drift_right = true
+	_step(app, 1)
+	app.held.drift_right = false
+	_step(app, 1)
+	_check(app.sent.size() == 60, "brief shoulder press waits behind full input window")
+	app._input_ack = 60
+	_step(app, 3)
+	_check(app.sent[60].drift_left and not app.sent[60].drift_right, "initiating shoulder transition preserved")
+	_check(app.sent[61].drift_left and app.sent[61].drift_right, "short opposite tap preserved under backpressure")
+	_check(app.sent[62].drift_left and not app.sent[62].drift_right, "opposite release follows preserved tap")
+	_step(app, 1)
+	_check(not app.sent[63].drift_right, "tap is not repeatedly replayed")
+	app._capture_drift_transition({"drift_left": true, "drift_right": true})
+	app._release_inputs()
+	_check(app._drift_transitions == [{"drift_left": false, "drift_right": false}], "focus cancellation replaces deferred taps with neutral boundary")
+	app._input_ack = app._sequence - 24
+	app.held = {"drift_left": true, "drift_right": false}
+	_step(app, 1)
+	_check(app._drift_transitions.size() == 2, "new shoulder after interruption queues after neutral while window full")
+	var before_cancel_send: int = app.sent.size()
+	app._input_ack = app._sequence
+	_step(app, 2)
+	_check(not app.sent[before_cancel_send].drift_left and not app.sent[before_cancel_send].drift_right, "first resumed input cancels old authoritative drift")
+	_check(app.sent[before_cancel_send + 1].drift_left, "fresh drift follows authoritative cancellation boundary")
 	app._last_server_ms = Time.get_ticks_msec() - 3001
 	_step(app, 1)
 	_check(app.leave_reason == "connection_lost", "flow control preserves stale-connection timeout")

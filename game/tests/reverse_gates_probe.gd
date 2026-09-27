@@ -3,7 +3,7 @@ extends SceneTree
 const Track = preload("res://track/authored_track.gd")
 const Protocol = preload("res://net/prototype_protocol.gd")
 const DT: float = 1.0 / 60.0
-const BRAKE: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false}
+const BRAKE: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift_left": false, "drift_right": false}
 
 class TestApp extends "res://app/prototype.gd":
 	func _ready() -> void:

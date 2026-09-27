@@ -9,6 +9,7 @@ const {chromium} = require('playwright');
   try {
     const page = await browser.newPage({viewport:{width:1280,height:800}});
     await page.setContent(`<main id="hub"><button id="play" data-menu-default>Play</button><button disabled>Unavailable</button><button id="next">Next</button></main><dialog id="dialog"><button id="close">Close</button><select id="select"><option value="a">A</option><option value="b">B</option></select><input id="range" type="range" min="0" max="10" value="5"><details><summary id="details">Controls</summary><button id="inside">Reset</button></details><button id="ready" data-menu-device="1">P2 Ready</button></dialog><canvas id="canvas" tabindex="0"></canvas>`);
+    await page.addStyleTag({content:'#hub{display:grid;width:300px;gap:12px}#dialog[open]{display:grid;width:320px;gap:12px}#dialog details{display:block}#dialog details>button{display:block;margin-top:12px}button,select,input,summary{min-height:32px}'});
     await page.addScriptTag({path:path.resolve(__dirname,'../menu-navigation.js')});
     await page.addScriptTag({path:path.resolve(__dirname,'../control-settings.js')});
     await page.evaluate(() => {
@@ -47,7 +48,8 @@ const {chromium} = require('playwright');
     await pad(0);assert.equal(await page.evaluate(()=>window.clicks),0);checks++;
     await pad(1);assert.equal(await page.$eval('#dialog',n=>n.open),false);checks++;
     await focus('play');
-    await page.keyboard.press('Enter');await focus('close');
+    await page.keyboard.press('Enter');await focus('ready');
+    await page.focus('#close');
     await page.keyboard.press('ArrowDown');await focus('select');
     await page.keyboard.press('ArrowLeft');assert.equal(await page.$eval('#select',n=>n.value),'a');checks++;
     await page.keyboard.press('Escape');await focus('play');

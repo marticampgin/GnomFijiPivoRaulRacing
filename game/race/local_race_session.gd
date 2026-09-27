@@ -69,14 +69,14 @@ func step_local(delta: float, snapshots: Variant = null) -> void:
 				pause_local()
 			return
 	if inputs.is_suspended() or not _focused:
+		_cancel_drifts()
 		return
 	for seat: int in _seats:
 		var player: Dictionary = _players[_seats[seat]]
 		var command: Dictionary = _last_commands.get(seat, Driver.neutral())
 		player.input = command
-		for slot: int in 2:
-			if bool(command.get("use_item_%d" % (slot + 1), false)):
-				use_item_seat(seat, slot)
+		if bool(command.get("use_item", false)):
+			use_item_seat(seat)
 	_step_session(delta)
 
 
@@ -88,23 +88,28 @@ func command_for_seat(seat: int) -> Dictionary:
 	return _last_commands.get(seat, Driver.neutral()).duplicate()
 
 
-func use_item_seat(seat: int, slot: int) -> bool:
-	if not _seats.has(seat) or slot < 0 or slot > 1 or _phase != "racing" or inputs.is_suspended() or not _focused:
+func use_item_seat(seat: int) -> bool:
+	if not _seats.has(seat) or _phase != "racing" or inputs.is_suspended() or not _focused:
 		return false
 	var player: Dictionary = _players[_seats[seat]]
 	if player.finished:
 		return false
-	for pending: Dictionary in player.item_queue:
-		if int(pending.slot) == slot:
-			return false
+	if player.item_queue.size() >= 16:
+		return false
 	player.item_accepted += 1
-	player.item_queue.append({"sequence": player.item_accepted, "slot": slot, "epoch": player.epoch})
+	player.item_queue.append({"sequence": player.item_accepted, "epoch": player.epoch})
 	return true
 
 
 func pause_local() -> void:
 	inputs.set_suspended(true)
 	_last_commands.clear()
+	_cancel_drifts()
+
+
+func _cancel_drifts() -> void:
+	for player: Dictionary in _players.values():
+		player.vehicle.cancel_drift()
 
 
 func resume_local() -> bool:

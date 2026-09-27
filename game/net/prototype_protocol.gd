@@ -4,19 +4,19 @@ extends RefCounted
 const Vehicle = preload("res://vehicle/racing_vehicle.gd")
 const Styles = preload("res://vehicle/driving_styles.gd")
 const Catalog = preload("res://items/item_catalog.gd")
-const WIRE_VERSION: int = 8
+const WIRE_VERSION: int = 9
 const TICKET_VERSION: int = 3
 const VEHICLE_STATE_VERSION: int = Vehicle.STATE_VERSION
 const TRACK_SCHEMA_VERSION: int = 1
 const MATCH_ID: String = "prototype-1"
-const LOADOUT_HASH: String = "prototype-v12"
-const NEUTRAL: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 0.0, "drift": false}
+const LOADOUT_HASH: String = "prototype-v13"
+const NEUTRAL: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 0.0, "drift_left": false, "drift_right": false}
 # Simulation-only parking command; never serialized as a player input packet.
-const BLOCKED: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false, "drive_blocked": true}
+const BLOCKED: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift_left": false, "drift_right": false, "drive_blocked": true}
 
 
 static func validate_input(data: Dictionary) -> Dictionary:
-	if data.size() != 6 or data.get("type") != "input":
+	if data.size() != 7 or data.get("type") != "input":
 		return {}
 	var sequence: Variant = data.get("sequence")
 	if not _number(sequence) or float(sequence) != floorf(float(sequence)):
@@ -29,17 +29,17 @@ static func validate_input(data: Dictionary) -> Dictionary:
 		var minimum: float = -1.0 if key == "steering" else 0.0
 		if float(data[key]) < minimum or float(data[key]) > 1.0:
 			return {}
-	if not data.get("drift") is bool:
+	if not data.get("drift_left") is bool or not data.get("drift_right") is bool:
 		return {}
 	return data.duplicate()
 
 
 static func validate_item_command(data: Dictionary) -> Dictionary:
-	if data.size() != 5 or data.get("type") != "use_item":
+	if data.size() != 4 or data.get("type") != "use_item":
 		return {}
 	if not _integer(data.get("sequence"), 1) or not _integer(data.get("race_id"), 1):
 		return {}
-	if not _integer(data.get("epoch"), 0) or not _integer(data.get("slot"), 0) or int(data["slot"]) > 1:
+	if not _integer(data.get("epoch"), 0):
 		return {}
 	return data.duplicate()
 
@@ -61,6 +61,8 @@ static func validate_combat(data: Variant) -> Dictionary:
 	for slot: Variant in slots:
 		if not slot is String or not slot in ["", "fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k", "crystal_shield", "seeker", "rear_trap"]:
 			return {}
+	if slots[0] == "" and slots[1] != "":
+		return {}
 	var effects: Variant = data.get("effects")
 	if not effects is Dictionary or effects.size() > 7:
 		return {}
@@ -246,7 +248,7 @@ static func unpack_state(state: Dictionary) -> Dictionary:
 		return {}
 	if state.get("balance_version") != Vehicle.BALANCE_VERSION:
 		return {}
-	for key: String in ["grounded", "is_drifting", "drift_was_pressed"]:
+	for key: String in ["grounded", "is_drifting", "drift_left_was_pressed", "drift_right_was_pressed", "drift_armed", "drift_failed"]:
 		if not state.get(key) is bool:
 			return {}
 	for key: String in ["drift_charge", "boost_remaining", "steering_amount"]:
@@ -255,6 +257,14 @@ static func unpack_state(state: Dictionary) -> Dictionary:
 	if float(state["drift_charge"]) < 0.0 or float(state["drift_charge"]) > 1.0:
 		return {}
 	if float(state["boost_remaining"]) < 0.0 or float(state["boost_remaining"]) > 2.0 or absf(float(state["steering_amount"])) > 1.0:
+		return {}
+	if not _integer(state.get("drift_chain"), 0) or int(state.drift_chain) > 3:
+		return {}
+	if not _integer(state.get("drift_owner"), -1) or int(state.drift_owner) > 1:
+		return {}
+	if not state.get("drift_feedback") in ["", "ready", "early", "late", "success", "complete"]:
+		return {}
+	if not _bounded(state.get("drift_feedback_remaining"), 0.0, Vehicle.DRIFT_FEEDBACK_SECONDS):
 		return {}
 	if not _vector_valid(state.get("velocity")) or not _vector_valid(state.get("up_direction")):
 		return {}

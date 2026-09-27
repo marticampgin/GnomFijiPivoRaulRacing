@@ -97,7 +97,7 @@ func _fixture_state(car: CharacterBody3D, fixture: Dictionary) -> Dictionary:
 func _command(fixture: Dictionary, tick: int) -> Dictionary:
 	return {"type": "input", "sequence": int(fixture.ack) + tick + 1,
 		"throttle": fixture.throttle, "steering": float(fixture.steering[tick]),
-		"brake": 0.0, "drift": false}
+		"brake": 0.0, "drift_left": false, "drift_right": false}
 
 
 func _wire_roundtrip(state: Dictionary) -> Dictionary:

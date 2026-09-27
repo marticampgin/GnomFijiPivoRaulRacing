@@ -121,20 +121,23 @@ func _drift_and_control() -> void:
 	root.add_child(kart)
 	for style: String in Styles.IDS:
 		kart.configure(Styles.stats_for(style))
-		for level: int in 3:
+		for chain: int in 3:
 			kart.reset_at(Transform3D(Basis.IDENTITY, Vector3(0.0, 0.35, 0.0)))
 			kart.velocity = Vector3.FORWARD * 16.0
 			kart.grounded = true
-			kart.is_drifting = true
-			kart._drift_was_pressed = true
-			kart.drift_charge = Vehicle.DRIFT_LEVEL_THRESHOLDS[level]
-			_check(kart.drift_level() == level + 1, style + " derives drift level from charge")
+			kart._step_drift(false, false, true, 0.2, DT)
+			kart._step_drift(true, false, true, 0.2, DT)
+			kart.drift_chain = chain
+			kart.drift_charge = 0.75
+			await physics_frame
+			kart.step({"throttle": 1.0, "steering": 0.6, "drift_left": true, "drift_right": true}, DT)
+			_check(kart.drift_level() == chain + 1, style + " records successful timed turbo")
+			_check(is_equal_approx(kart.boost_remaining, Vehicle.DRIFT_BOOST_SECONDS[chain]), style + " earns corresponding drift duration")
+			_check(not kart.global_basis.is_equal_approx(Basis.IDENTITY), "steering remains active during boost")
+			kart.boost_remaining = 0.0
 			await physics_frame
 			kart.step({"throttle": 1.0, "steering": 0.6}, DT)
-			_check(is_equal_approx(kart.boost_remaining, Vehicle.DRIFT_BOOST_SECONDS[level]), style + " earns corresponding drift duration")
-			_check(not kart.global_basis.is_equal_approx(Basis.IDENTITY), "steering remains active during boost")
-		kart.drift_charge = 0.24
-		_check(kart.drift_level() == 0, "sub-threshold drift has no level")
+			_check(kart.boost_remaining == 0.0 and kart.drift_level() == 0, "release resets chain without awarding turbo")
 	kart.free()
 	floor_body.free()
 	await physics_frame

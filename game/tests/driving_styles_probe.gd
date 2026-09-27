@@ -62,19 +62,33 @@ func _run() -> void:
 	await _steps(60, {})
 	for vehicle in vehicles.values():
 		vehicle.velocity = Vector3.FORWARD * 24.0
-	await _steps(50, {"throttle": 1.0, "steering": 0.6, "drift": true})
+	await _steps(50, {"throttle": 1.0, "steering": 0.6, "drift_left": true})
 	var charges: Dictionary = {}
 	for id: String in Styles.IDS:
 		charges[id] = vehicles[id].drift_charge
-		_check(charges[id] > Vehicle.BOOST_MIN_CHARGE, id + " earns drift charge")
+		_check(charges[id] > 0.25, id + " earns drift charge")
 	measurements["drift_charge"] = charges
 	_check(_strongest(charges) == "drift", "drift style charges fastest under the same controls")
-	await _steps(1, {"throttle": 1.0})
 	var boosts: Dictionary = {}
+	var ready_at: Dictionary = {}
+	for tick: int in 100:
+		await physics_frame
+		for id: String in Styles.IDS:
+			var vehicle = vehicles[id]
+			var command: Dictionary = {"throttle": 1.0, "steering": 0.6, "drift_left": true}
+			if ready_at.has(id):
+				command.drift_left = false
+			elif vehicle.drift_ready():
+				command.drift_right = true
+				ready_at[id] = tick
+			vehicle.step(command, DT)
+			if ready_at.get(id, -1) == tick:
+				boosts[id] = vehicle.boost_remaining
+		if ready_at.size() == Styles.IDS.size():
+			break
 	for id: String in Styles.IDS:
 		var vehicle = vehicles[id]
-		boosts[id] = vehicle.boost_remaining
-		_check(vehicle.boost_remaining > 0.5 and vehicle.drift_charge == 0.0, id + " releases charge into boost")
+		_check(boosts.get(id, 0.0) == Vehicle.DRIFT_BOOST_SECONDS[0], id + " gets same first turbo through manual timing")
 		var configured: Dictionary = vehicle.stats.duplicate(true)
 		var state: Dictionary = vehicle.capture_state()
 		vehicle.reset_at(Transform3D.IDENTITY)
@@ -82,7 +96,10 @@ func _run() -> void:
 		vehicle.restore_state(state)
 		_check(vehicle.stats == configured, id + " reconciliation preserves profile")
 	measurements["boost_duration"] = boosts
-	_check(_strongest(boosts) == "drift", "drift style converts its higher charge into longer boost")
+	measurements["ticks_to_ready_after_charge_sample"] = ready_at
+	for id: String in Styles.IDS:
+		if id != "drift":
+			_check(int(ready_at.get("drift", 999)) < int(ready_at.get(id, 0)), "drift specialization reaches timing window before " + id)
 	print("DRIVING_STYLES_PROBE ", JSON.stringify({"checks": checks, "failures": failures, "measurements": measurements}))
 	world.queue_free()
 	await process_frame

@@ -76,10 +76,10 @@ func _step_session(delta: float) -> void:
 			var use_command: Dictionary = player["item_queue"].pop_front()
 			player["combat"]["item_ack"] = int(use_command["sequence"])
 			if _phase == "racing" and player["connected"] and use_command["epoch"] == player["epoch"]:
-				_items.use(player, int(use_command["slot"]), _players)
+				_items.use_next(player, _players)
 		if player["is_bot"] and _phase == "racing":
-			for item_slot: int in player["driver"].item_slots(player, _players, _tick):
-				_items.use(player, item_slot, _players)
+			if player["driver"].should_use_item(player, _players, _tick):
+				_items.use_next(player, _players)
 		if not queue.is_empty():
 			player["input"] = queue.pop_front()
 			player["ack"] = int(player["input"]["sequence"])

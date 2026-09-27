@@ -91,7 +91,7 @@ func _run() -> void:
 	rear["vehicle"].reset_at(spawn)
 	rear["vehicle"].grounded = true
 	rear["vehicle"].velocity = forward * 20.0
-	rear["input"] = {"steering": 0.0, "throttle": 1.0, "brake": 0.0, "drift": false}
+	rear["input"] = {"steering": 0.0, "throttle": 1.0, "brake": 0.0, "drift_left": false, "drift_right": false}
 	rear["last_input_at"] = Time.get_ticks_msec() - 1000
 	await physics_frame
 	await process_frame

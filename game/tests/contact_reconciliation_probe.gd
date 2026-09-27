@@ -68,7 +68,7 @@ func _run() -> void:
 	_check(client._queued_snapshot.is_empty() and client._tick == 3, "duplicate and stale collision snapshots are ignored")
 	_check(client._local.velocity.is_equal_approx(source.velocity) and client._local.global_transform.is_equal_approx(restored), "ignored snapshots do not apply impact twice")
 
-	var command: Dictionary = {"type": "input", "sequence": 2, "steering": 0.2, "throttle": 1.0, "brake": 0.0, "drift": false}
+	var command: Dictionary = {"type": "input", "sequence": 2, "steering": 0.2, "throttle": 1.0, "brake": 0.0, "drift_left": false, "drift_right": false}
 	client._pending = [command.duplicate(), command.duplicate()]
 	client._pending[0]["sequence"] = 1
 	client._sequence = 2

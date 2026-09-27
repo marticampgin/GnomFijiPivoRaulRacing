@@ -37,8 +37,8 @@ func _step(worker: TestWorker, count: int = 1) -> void:
 		await physics_frame
 		await process_frame
 
-func _command(worker: TestWorker, player: Dictionary, sequence: int, slot: int) -> Dictionary:
-	return {"type": "use_item", "sequence": sequence, "race_id": worker._race_id, "epoch": player.epoch, "slot": slot}
+func _command(worker: TestWorker, player: Dictionary, sequence: int) -> Dictionary:
+	return {"type": "use_item", "sequence": sequence, "race_id": worker._race_id, "epoch": player.epoch}
 
 func _run() -> void:
 	var worker := TestWorker.new()
@@ -61,26 +61,31 @@ func _run() -> void:
 	await process_frame
 	player.combat.slots = ["fanta", "mermaid_rum"]
 	player.combat.health = 40.0
-	var first: Dictionary = _command(worker, player, 1, 0)
+	var first: Dictionary = _command(worker, player, 1)
 	worker._on_packet(1, first)
-	worker._on_packet(1, _command(worker, player, 2, 1))
 	_check(player.combat.slots == ["fanta", "mermaid_rum"], "socket does not mutate inventory outside physics")
 	await _step(worker)
-	_check(player.combat.slots == ["", ""] and player.combat.item_ack == 2, "both independent slots execute within one physics tick")
+	_check(player.combat.slots == ["mermaid_rum", ""] and player.combat.item_ack == 1, "single command consumes only oldest item")
+	worker._on_packet(1, first)
+	await _step(worker)
+	_check(player.combat.slots == ["mermaid_rum", ""] and player.combat.health == 40.0, "repeated first command cannot consume shifted reserve")
+	worker._on_packet(1, _command(worker, player, 2))
+	await _step(worker)
+	_check(player.combat.slots == ["", ""] and player.combat.item_ack == 2, "second distinct command consumes reserve after advancement")
 	_check(player.combat.effects.has("fanta") and player.combat.effects.has("mermaid_rum") and player.combat.health > 40.0, "boost and repair effects coexist")
 	player.combat.slots[0] = "lays_crab"
 	worker._on_packet(1, first)
 	await _step(worker)
 	_check(player.combat.slots[0] == "lays_crab" and not player.combat.effects.has("lays_crab"), "duplicate cannot spend subsequently refilled slot")
 	for key: String in ["race_id", "epoch"]:
-		var stale: Dictionary = _command(worker, player, 3, 0)
+		var stale: Dictionary = _command(worker, player, 3)
 		stale[key] += 1
 		worker._on_packet(1, stale)
 	await _step(worker)
 	_check(player.combat.item_ack == 2 and player.combat.slots[0] == "lays_crab", "stale race and recovery commands cannot spend inventory")
 	worker._phase = "countdown"
 	worker._countdown = 1
-	worker._on_packet(1, _command(worker, player, 3, 0))
+	worker._on_packet(1, _command(worker, player, 3))
 	await _step(worker)
 	_check(worker._phase == "racing" and player.combat.item_ack == 3 and player.combat.slots[0] == "lays_crab", "prestart command cannot cross countdown boundary and activate")
 	var preserved: Dictionary = player.combat.duplicate(true)
@@ -106,8 +111,8 @@ func _run() -> void:
 	_check(player.progress.expected_gate == gate and player.lap == lap and not player.finished and worker._finish_count == 0, "destruction recovery preserves checkpoint progress without fabricated finish")
 	_check(player.combat.slots == ["", ""] and player.combat.effects.is_empty() and player.combat.item_ack == 3, "destruction clears inventory/effects without rewinding sequence")
 	player.combat.slots = ["stroh80", "fanta"]
-	worker._items.use(player, 0, worker._players)
-	worker._items.use(player, 1, worker._players)
+	worker._items.use_next(player, worker._players)
+	worker._items.use_next(player, worker._players)
 	_check(not worker._items.world_state().projectiles.is_empty(), "repeat fixture contains active projectile")
 	worker._start_race()
 	_check(worker._race_id == 2 and worker._phase == "countdown" and worker._players.size() == 10, "repeat resets generation and refills ten racers")
@@ -115,6 +120,15 @@ func _run() -> void:
 	_check(player.combat.item_ack == 3 and player.item_accepted == 3 and player.item_queue.is_empty(), "repeat preserves item sequence monotonicity and clears queue")
 	var world: Dictionary = worker._items.world_state()
 	_check(world.projectiles.is_empty() and world.events.is_empty() and world.pickups.size() == 24, "repeat removes prior projectiles/events and rebuilds pickups")
+	worker._phase = "racing"
+	worker._countdown = 0
+	player.combat.slots = ["fanta", "ice_rum"]
+	worker._on_packet(2, _command(worker, player, 4))
+	worker._on_packet(2, _command(worker, player, 5))
+	await _step(worker)
+	var use_events: Array = worker._items.world_state().events.filter(func(event: Dictionary) -> bool: return str(event.kind).begins_with("use_"))
+	_check(player.combat.slots == ["", ""] and player.combat.item_ack == 5, "two distinct buffered presses consume two items")
+	_check(use_events.size() == 2 and use_events[0].kind == "use_fanta" and use_events[1].kind == "use_ice_rum", "buffered commands preserve oldest first activation order")
 	worker.free()
 	print("ITEMS_WORKER_PROBE %d/%d passed" % [_checks - _failures, _checks])
 	quit(0 if _failures == 0 else 1)

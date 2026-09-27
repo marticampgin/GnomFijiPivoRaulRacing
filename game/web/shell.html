@@ -24,21 +24,13 @@
       <h1>GNOM FIJI</h1>
       <p class="subtitle">P.I.V.O RAUL RACING</p>
       <div class="race-choice"><span class="eyebrow">ТВОЯ СЛЕДУЮЩАЯ ГОНКА</span><h2>Тестовый заезд</h2><p>Трасса 01 <span>·</span> 3 круга <span>·</span> Без рейтинга</p></div>
-      <fieldset id="driving-style" class="style-settings">
-        <legend>Стиль вождения</legend>
-        <div class="style-options">
-          <label><input type="radio" name="driving-style" value="handling" checked><span>Управляемость</span></label>
-          <label><input type="radio" name="driving-style" value="acceleration"><span>Ускорение</span></label>
-          <label><input type="radio" name="driving-style" value="speed"><span>Скорость</span></label>
-          <label><input type="radio" name="driving-style" value="drift"><span>Дрифт</span></label>
-        </div>
-      </fieldset>
       <button id="local-button" class="primary" data-menu-default disabled><span>ЛОКАЛЬНАЯ ГОНКА</span><img src="/assets/icons/arrow-up-right.svg" alt=""></button>
-      <button id="join-button" class="text-button" disabled>Сетевой полигон</button>
+      <button id="training-button" class="secondary-button" disabled>Обучение</button>
+      <button id="settings-button" class="secondary-button">Настройки</button>
+      <button id="online-button" class="text-button" disabled>Сетевой полигон</button>
       <div id="load-state" class="load-state" role="status"><span id="load-label">Загрузка игры</span><progress id="load-progress" max="100" value="0"></progress></div>
       <p id="hub-error" class="error" role="alert" hidden></p>
     </section>
-    <aside class="selected-car"><span class="mode-tag secondary">ВЫБРАНО</span><h3>Машина 01</h3><p>Сборка: <span id="selected-style">Управляемость</span></p></aside>
     <footer class="hub-footer"><span>GNOM FIJI / P.I.V.O RAUL RACING</span><span id="connection-label">Подключение</span></footer>
   </main>
   <section id="hud" class="hud" aria-label="Гоночные показатели" hidden>
@@ -49,14 +41,14 @@
     <div class="minimap hud-panel"><small>ТРАССА 01</small><canvas id="minimap" width="240" height="150" aria-label="Положение участников на трассе"></canvas></div>
     <div class="race-tools"><button id="fullscreen-button" class="icon-button" aria-label="Полный экран" title="Полный экран"><img src="/assets/icons/maximize.svg" alt=""></button><button id="menu-button" class="icon-button" aria-label="Меню гонки" title="Меню гонки"><img src="/assets/icons/pause.svg" alt=""></button></div>
     <div class="connection hud-panel"><small>СОЕДИНЕНИЕ</small><strong id="network-status">Подключение</strong><span id="ping">0 мс</span></div>
-    <div class="drift hud-panel"><div><strong>ДРИФТ <span id="drift-level"></span></strong><span id="boost-label">ЗАРЯД</span></div><div class="network-drift-segments"><progress max="1" value="0" aria-label="Дрифт I"></progress><progress max="1" value="0" aria-label="Дрифт II"></progress><progress max="1" value="0" aria-label="Дрифт III"></progress></div></div>
+    <div class="drift hud-panel"><div><strong>ДРИФТ <span id="drift-level"></span></strong><span id="boost-label">ТАЙМИНГ</span></div><div class="drift-timing"><progress id="drift-timing" max="1" value="0" aria-label="Тайминг турбо"></progress></div><span id="drift-cue"></span><div class="network-drift-segments"><progress max="1" value="0" aria-label="Турбо I"></progress><progress max="1" value="0" aria-label="Турбо II"></progress><progress max="1" value="0" aria-label="Турбо III"></progress></div></div>
     <div class="speed hud-panel"><b id="reverse" hidden aria-label="Задний ход">R</b><strong id="speed">0</strong><span>км/ч</span></div>
     <div class="combat-hud">
       <div class="network-crystals"><img src="/assets/icons/crystal-shard.svg" alt="Осколки"><strong id="shards">0</strong></div>
       <div class="health-meter" role="meter" aria-label="Прочность" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="health-fill"></span><strong id="health-value">100</strong></div>
       <div class="item-slots" aria-label="Предметы">
-        <button id="item-slot-0" class="item-slot" disabled aria-label="Пустой слот 1"><img alt="" hidden><span class="empty-slot" aria-hidden="true">+</span></button>
-        <button id="item-slot-1" class="item-slot" disabled aria-label="Пустой слот 2"><img alt="" hidden><span class="empty-slot" aria-hidden="true">+</span></button>
+        <button id="item-slot-0" class="item-slot" disabled aria-label="Текущий предмет: пусто"><img alt="" hidden><span class="empty-slot" aria-hidden="true">+</span><span class="item-key">Y</span></button>
+        <div id="item-slot-1" class="item-slot next-item" aria-label="Следующий предмет: пусто"><img alt="" hidden><span class="empty-slot" aria-hidden="true">+</span><span class="item-key">ДАЛЕЕ</span></div>
       </div>
       <div id="item-effects" class="item-effects" aria-label="Активные эффекты"></div>
     </div>
@@ -65,6 +57,24 @@
     <div id="countdown" class="countdown" role="status" hidden></div>
     <div id="disconnect" class="disconnect hud-panel" hidden><h2 id="disconnect-title">Соединение прервано</h2><button id="reconnect-button" class="primary">ПЕРЕПОДКЛЮЧИТЬСЯ</button><button id="disconnect-exit" class="text-button">Вернуться в меню</button></div>
   </section>
+  <dialog id="online-setup" aria-labelledby="online-title">
+    <div class="dialog-heading"><h2 id="online-title">Сетевой полигон</h2><button class="icon-button close-dialog" aria-label="Назад"><img src="/assets/icons/x.svg" alt=""></button></div>
+    <fieldset id="driving-style" class="style-settings">
+      <legend>Стиль вождения</legend>
+      <div class="style-options">
+        <label><input type="radio" name="driving-style" value="handling" checked><span>Управляемость</span></label>
+        <label><input type="radio" name="driving-style" value="acceleration"><span>Ускорение</span></label>
+        <label><input type="radio" name="driving-style" value="speed"><span>Скорость</span></label>
+        <label><input type="radio" name="driving-style" value="drift"><span>Дрифт</span></label>
+      </div>
+    </fieldset>
+    <p class="active-style">Сборка: <span id="selected-style">Управляемость</span></p>
+    <button id="join-button" class="primary" data-menu-default disabled>НА ТРАССУ</button>
+  </dialog>
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <div class="dialog-heading"><h2 id="settings-title">Настройки</h2><button class="icon-button close-dialog" aria-label="Назад"><img src="/assets/icons/x.svg" alt=""></button></div>
+    <div id="settings-content"></div>
+  </dialog>
   <dialog id="profile-dialog">
     <div class="dialog-heading"><h2>Профиль</h2><button class="icon-button close-dialog" aria-label="Закрыть"><img src="/assets/icons/x.svg" alt=""></button></div>
     <p id="account-name" class="account-name">Гость</p>

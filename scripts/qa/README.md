@@ -44,15 +44,18 @@ physical controller compatibility remain separate checks.
 Short control/tutorial checks (no full laps):
 
 ```sh
-godot --headless --path game --script res://tests/control_profile_probe.gd
+node scripts/test-input.mjs
 godot --headless --path game --script res://tests/tutorial_probe.gd
 node scripts/test-control-settings.cjs
 ```
 
 Browser tutorial flow: change a seat's keyboard scheme/sensitivity, reload and
 verify persistence, start `Обучение P1`, complete drive, stop, continuous brake
-into reverse, actual level-I drift and release, then use Q/T (or LB/Y) in Arcade.
-Wait for the actual drift level, not a nearly full lesson progress bar. Hold
+into reverse, charge a real drift into the timing window while holding Shift/E
+(LB/RB), press the opposite button for turbo, then use Q twice (or Y twice).
+Release between item presses; hold the initiating drift button through the turbo.
+Releasing drift alone must not give boost. Wait for the actual timing window,
+not a nearly full lesson progress bar. Hold
 test key presses across at least one physics tick. Verify retry and keyboard
 input after changing settings on pause, reset to defaults, and HUD bounds at
 1600x900/390x844. No API/WebSocket requests are expected in local training.
@@ -84,7 +87,7 @@ laps to test these rules. Baseline values are in `docs/playtest-balance.md`.
 
 For v9, press throttle during the final 0.65–0.15 seconds of countdown and hold it
 to verify a real start boost; collect road crystals and check the owning HUD.
-Native probes cover slipstream awards, all three drift tiers, stacking and loss/reset
+Native probes cover slipstream awards, the v13 three-turbo chain, stacking and loss/reset
 rules. Separate HUD-only fixtures may supply rare combinations of these states to
 check layout/icon loading at 1600x900 and 390x844; label them as presentation tests,
 not evidence of gameplay awards. Four-camera checks share one pickup world and
@@ -150,7 +153,7 @@ for catalog effects, command deduplication, destruction/recovery and asset event
 `items_race_probe.gd` runs the actual worker with ten bots and combat enabled;
 destruction recovery is expected, while checkpoint bypass and missing finishes
 remain failures. `GNOM_DRIVER_ITEMS=1 GNOM_DRIVER_LAPS=1` adds natural pickup and
-keyboard Q/T use to the browser driver, requiring a server acknowledgment.
+sequential keyboard Q use to the browser driver, requiring a server acknowledgment.
 Health loss/destruction is excluded from the road-seam speed-loss heuristic,
 not from the independent collision and item assertions.
 

@@ -8,6 +8,9 @@
   let raceId = null, musicContext = null, musicTimer = null, musicStep = 0;
   let musicEnabled = true;
   let localMode = false;
+  let activeControlDevice = -1;
+  let controlEditor = null;
+  let menuUsedBeforeReady = false;
   const localUI = window.GnomLocalUI.create({
     send(message) {
       send(message);
@@ -32,6 +35,8 @@
       // Local pause is already edge-triggered by Godot for each assigned device.
       if (inRace && !localMode) openDialog(ui['menu-dialog']);
     },
+    onDevice(source,device) {activeControlDevice=source==='gamepad'?device:-1;controlEditor?.setDevice(activeControlDevice);},
+    onAction:action=>{if(!engineReady)menuUsedBeforeReady=true;return localUI.handleMenuAction(action);},
     onBack(container) {
       if (container.id === 'result-dialog' || container.id === 'disconnect' || container.dataset.phase === 'results') { leave(); return true; }
       return false;
@@ -45,8 +50,11 @@
       if (label) icon.src = `/assets/items/${id}.png`;
       else icon.removeAttribute('src');
       icon.hidden = !label; button.querySelector('.empty-slot').hidden = !!label;
-      button.disabled = !label || !state.canUseItems;
-      button.title = label ? `${label} · ${slot === 0 ? 'Q / LB' : 'T / Y'}` : `Пустой слот ${slot + 1}`;
+      if(slot===0)button.disabled = !label || !state.canUseItems;
+      else {button.tabIndex=-1;if(button.tagName==='BUTTON')button.disabled=true;}
+      const key=activeControlDevice>=0?'Y':'Q';
+      button.querySelector('.item-key')?.replaceChildren(document.createTextNode(slot?'ДАЛЕЕ':key));
+      button.title = label ? `${slot?'Следующий: ':''}${label}${slot?'':` · ${key}`}` : slot?'Следующий предмет':'Текущий предмет';
       button.setAttribute('aria-label', button.title);
     }
     const maximum = Math.max(1, Number(state.maxHealth) || 100);
@@ -74,8 +82,8 @@
     const blur = Math.max(0, Math.min(1, Number(state.blurIntensity) || 0));
     ui.canvas.style.filter = blur > 0 && inRace ? `blur(${blur * (graphics.reducedEffects ? .6 : 3)}px)` : '';
   }
-  for (let slot = 0; slot < 2; slot++) $(`item-slot-${slot}`).addEventListener('click', () => {
-    if (inRace && lastState?.canUseItems && itemLabels[lastState.items?.[slot]] && !document.querySelector('dialog[open]')) send({type:'use_item', slot});
+  $('item-slot-0').addEventListener('click', () => {
+    if (inRace && lastState?.canUseItems && itemLabels[lastState.items?.[0]] && !document.querySelector('dialog[open]')) send({type:'use_item'});
     ui.canvas.focus();
   });
   const styleLabels = {handling:'Управляемость', acceleration:'Ускорение', speed:'Скорость', drift:'Дрифт'};
@@ -163,6 +171,8 @@
     ui['join-button'].disabled = !engineReady || busy;
     ui['profile-button'].disabled = busy;
     $('local-button').disabled = !engineReady || busy;
+    if($('training-button'))$('training-button').disabled=!engineReady||busy;
+    if($('online-button'))$('online-button').disabled=!engineReady||busy;
     $('driving-style').disabled = busy || inRace;
   }
   function messageFor(error) {
@@ -225,6 +235,7 @@
       $('next-style').hidden = true;
       inRace = true; lastFinish = false; restarting = false; raceId = null;
       ui.hub.hidden = true; ui.hud.hidden = false;
+      $('online-setup')?.close();
       $('disconnect').hidden = true;
       send({type:'join', url:connection.websocketUrl, ticket:connection.ticket, compatibility:connection.compatibility});
       send({type:'input_enabled', enabled:!document.querySelector('dialog[open]')});
@@ -241,7 +252,7 @@
     ui.canvas.style.filter = '';
     for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
     ui.hub.hidden = false; ui.hud.hidden = true;
-    ui['join-button'].focus();
+    $('local-button').focus();
   }
   function openDialog(dialog) {
     if (dialog.open) return;
@@ -259,6 +270,13 @@
   ui['result-dialog'].addEventListener('cancel', event => event.preventDefault());
   ui['join-button'].addEventListener('click', join);
   $('local-button').addEventListener('click', () => { send({type:'local_devices'}); localUI.showSetup(); });
+  $('training-button')?.addEventListener('click',()=>{send({type:'local_devices'});localUI.showSetup({tutorial:true});});
+  $('online-button')?.addEventListener('click',()=>openDialog($('online-setup')));
+  if($('settings-content')) {
+    controlEditor=window.GnomControlSettings.create({profile:localUI.getDefaultProfile(),device:activeControlDevice,onChange:profile=>localUI.setDefaultProfile(profile)});
+    $('settings-content').append(controlEditor.node);
+    $('settings-button')?.addEventListener('click',()=>{controlEditor.update(localUI.getDefaultProfile());controlEditor.setDevice(activeControlDevice);openDialog($('settings-dialog'));});
+  }
   ui['profile-button'].addEventListener('click', async () => {
     if (busy) return;
     busy = true; updateReady(); setError('');
@@ -372,6 +390,13 @@
     $('shards').textContent=String(state.shards||0);
     $('drift-level').textContent=['','I','II','III'][Math.max(0,Math.min(3,state.driftLevel||0))];
     document.querySelectorAll('.network-drift-segments progress').forEach((bar,index)=>bar.value=state.driftSegments?.[index]||0);
+    if($('drift-timing')) {
+      $('drift-timing').value=Math.max(0,Math.min(1,state.drift||0));
+      $('drift-timing').parentElement.style.setProperty('--timing-start',`${Math.max(0,Math.min(1,state.driftWindowStart??.65))*100}%`);
+      $('drift-timing').parentElement.dataset.feedback=state.driftFeedback||'';
+      const opposite=activeControlDevice>=0?(state.driftOwner===-1?'RB':'LB'):(state.driftOwner===-1?'E':'Shift');
+      $('drift-cue').textContent=({early:'РАНО',late:'ПОЗДНО',success:'ТУРБО',complete:'3 / 3'})[state.driftFeedback]||(state.driftActive?`${opposite}${state.driftFeedback==='ready'?' · СЕЙЧАС':''}`:'');
+    }
     document.querySelector('.drift').classList.toggle('boost', state.boost > 0);
     const driving=state.driving||{};
     $('boost-label').textContent = driving.start_boost_remaining>0?'СТАРТ':driving.slipstream_boost_remaining>0?'ПОТОК':state.boost>0?'УСКОРЕНИЕ':driving.slipstream_charge>0?`ПОТОК ${Math.round(driving.slipstream_charge*100)}%`:'ЗАРЯД';
@@ -412,7 +437,7 @@
     updateMusic();
   }
   window.GnomHost = {
-    register(callback) { receiver = callback; engineReady = true; applyGraphics(); $('load-state').hidden = true; updateReady(); },
+    register(callback) { receiver = callback; engineReady = true; applyGraphics(); $('load-state').hidden = true; updateReady(); if(!menuUsedBeforeReady&&!ui.hub.hidden&&!document.querySelector('dialog[open]'))$('local-button').focus(); },
     update(json) {
       const state = JSON.parse(json);
       if (state.mode === 'local_devices') { localUI.updateDevices(state.devices); return; }

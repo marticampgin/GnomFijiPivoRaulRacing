@@ -50,11 +50,17 @@ func _run() -> void:
 	session._countdown = 0
 	var player: Dictionary = session._players["local:0"]
 	player.combat.shards = 7
-	player.vehicle.drift_charge = 0.6
+	player.vehicle.drift_charge = 0.75
+	player.vehicle.drift_chain = 2
+	player.vehicle.drift_owner = -1
+	player.vehicle.is_drifting = true
+	player.vehicle.drift_feedback = "ready"
 	player.driving.slipstream_charge = 0.5
 	hud = app._local_hud_state()
 	_check(hud.seats[0].shards == 7 and hud.seats[0].shardCap == 20, "race-only shard reserve reaches owning HUD")
-	_check(hud.seats[0].driftLevel == 2 and hud.seats[0].driftSegments == [1.0, 1.0, 0.0], "HUD derives three drift segments from simulation thresholds")
+	_check(hud.seats[0].driftLevel == 2 and hud.seats[0].driftSegments == [1.0, 1.0, 0.0], "HUD shows successful chain boosts independently of current charge")
+	_check(hud.seats[0].drift == 0.75 and hud.seats[0].driftOwner == -1 and hud.seats[0].driftActive and hud.seats[0].driftFeedback == "ready", "HUD carries timing meter and opposite shoulder ownership")
+	_check(hud.seats[0].driftWindowStart == app.Vehicle.DRIFT_READY_CHARGE, "HUD window matches shared simulation balance")
 	_check(hud.seats[0].driving.slipstream_charge == 0.5, "authoritative technique state reaches owning HUD")
 	var projectile_position: Vector3 = player.vehicle.global_position + player.vehicle.global_basis.z * 8.0
 	var warning_world: Dictionary = {"projectiles": [{"kind": "seeker", "target": player.id, "position": [projectile_position.x, projectile_position.y, projectile_position.z]}]}
@@ -65,13 +71,15 @@ func _run() -> void:
 	_check(app._attack_warning(warning_world, player.id, player.vehicle) == "right", "warning follows actual side instead of hardcoded rear")
 	player.combat.slots = ["crystal_shield", "rear_trap"]
 	player.combat.effects.burn = {"remaining": 3.0, "damage": 4.0}
-	app._on_local_message({"type": "local_use_item", "seat": 0, "slot": 0})
+	app._on_local_message({"type": "local_use_item", "seat": 0, "slot": 1})
+	_check(player.item_queue.is_empty(), "legacy reserve selection cannot bypass FIFO through host bridge")
+	app._on_local_message({"type": "local_use_item", "seat": 0})
 	await _step(app)
 	hud = app._local_hud_state()
-	_check(hud.seats[0].items == ["", "rear_trap"] and hud.seats[0].effects.has("crystal_shield") and hud.seats[0].effects.has("burn"), "shield activation uses own slot without clearing burn")
+	_check(hud.seats[0].items == ["rear_trap", ""] and hud.seats[0].effects.has("crystal_shield") and hud.seats[0].effects.has("burn"), "shield advances reserve without clearing incoming burn")
 	var visual: Node3D = app._local_view._visuals[player.vehicle.get_instance_id()]
 	_check(is_instance_valid(visual._shield_aura) and visual._shield_aura.visible, "shared view renders shield on the owning kart")
-	app._on_local_message({"type": "local_use_item", "seat": 0, "slot": 1})
+	app._on_local_message({"type": "local_use_item", "seat": 0})
 	await _step(app)
 	_check(session._items.world_state().projectiles.any(func(projectile: Dictionary) -> bool: return projectile.kind == "rear_trap"), "local item command deploys a real shared trap")
 	var shield_time: float = float(player.combat.effects.crystal_shield.remaining)
@@ -84,9 +92,9 @@ func _run() -> void:
 	_check(app._local_hud_state().seats[0].reverse, "reverse indicator follows actual signed motion")
 	player.vehicle.velocity = -player.vehicle.global_basis.z * 2.0
 	_check(not app._local_hud_state().seats[0].reverse, "forward motion clears R")
-	player.combat.slots = ["fanta", "mermaid_rum"]
+	player.combat.slots = ["mermaid_rum", "fanta"]
 	player.combat.health = 30.0
-	app._on_local_message({"type": "local_use_item", "seat": 0, "slot": 1})
+	app._on_local_message({"type": "local_use_item", "seat": 0})
 	await _step(app)
 	hud = app._local_hud_state()
 	_check(hud.seats[0].items == ["fanta", ""] and hud.seats[0].health > 30.0, "local item button reaches the shared simulation")

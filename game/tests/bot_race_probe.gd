@@ -98,4 +98,4 @@ func _valid(command: Dictionary) -> bool:
 		var value: float = command[key]
 		if not is_finite(value) or value > 1.0 or value < (-1.0 if key == "steering" else 0.0):
 			return false
-	return command.drift is bool
+	return command.drift_left is bool and command.drift_right is bool

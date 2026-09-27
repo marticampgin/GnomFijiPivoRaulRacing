@@ -50,7 +50,7 @@ func _run() -> void:
 		session._countdown = 0
 		var first: Dictionary = session._players["local:0"]
 		first.vehicle.grounded = true
-		first.input = {"steering": 0.0, "throttle": 1.0, "brake": 0.0, "drift": false}
+		first.input = {"steering": 0.0, "throttle": 1.0, "brake": 0.0, "drift_left": false, "drift_right": false}
 		first.combat.slots = ["fanta", "mermaid_rum"]
 		first.combat.health = 40.0
 		for slot: int in 2:

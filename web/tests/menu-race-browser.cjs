@@ -1,6 +1,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const {chromium} = require('playwright');
+const sharp = require('sharp');
 (async () => {
   const browser = await chromium.launch({headless:false});
   try {
@@ -12,25 +13,38 @@ const {chromium} = require('playwright');
       window.qaButton=(index,pressed)=>{pad.buttons[index]={value:pressed?1:0,pressed,touched:pressed};};
       window.qaConnect=()=>{const event=new Event('gamepadconnected');Object.defineProperty(event,'gamepad',{value:pad});window.dispatchEvent(event);};
     });
-    await page.goto('http://127.0.0.1:8788/');
+    const url = process.env.GNOM_QA_URL || 'http://127.0.0.1:8787/';
+    await page.goto(url);
+    assert.equal(new URL(page.url()).origin,new URL(url).origin);
+    assert.match(await page.title(),/GNOM FIJI/);
     await page.waitForFunction(()=>!document.querySelector('#local-button').disabled,{},{timeout:90000});
     await page.evaluate(()=>window.qaConnect());
     async function pad(button) {await page.evaluate(i=>qaButton(i,true),button);await page.waitForTimeout(100);await page.evaluate(i=>qaButton(i,false),button);await page.waitForTimeout(120);}
-    async function seek(id) {
-      const visited=[];
-      for(let i=0;i<35;i++){if(await page.evaluate(id=>document.activeElement.id===id,id))return;visited.push(await page.evaluate(()=>({id:document.activeElement.id,tag:document.activeElement.tagName,label:document.activeElement.getAttribute('aria-label')})));await pad(13);}
-      throw new Error(`Focus did not reach ${id}: ${JSON.stringify(visited)}`);
-    }
-    await seek('local-button');await pad(0);
+    await page.waitForFunction(()=>document.activeElement.id==='local-button');
+    await page.screenshot({path:'/tmp/gnom-controller-live-hub-1280.png'});
+    await page.setViewportSize({width:390,height:844});
+    await page.screenshot({path:'/tmp/gnom-controller-live-hub-390.png'});
+    await page.setViewportSize({width:1280,height:800});await pad(0);
     await page.waitForFunction(()=>document.querySelector('#local-setup').open);
-    // Controller selection is reached by the same sequential navigation a player uses.
-    for(let i=0;i<12;i++){
-      if(await page.evaluate(()=>document.activeElement.getAttribute('aria-label')==='Контроллер P1'))break;
-      await pad(13);
+    // Do not manually select the controller: this is the original auto-default regression.
+    await page.waitForFunction(()=>document.querySelector('[aria-label="Контроллер P1"]').value==='0');
+    await page.waitForFunction(()=>document.activeElement.id==='local-start');
+    await page.screenshot({path:'/tmp/gnom-controller-live-setup-1280.png'});
+    await page.setViewportSize({width:390,height:844});
+    await page.screenshot({path:'/tmp/gnom-controller-live-setup-390.png'});
+    assert.ok(await page.locator('#local-setup').evaluate(node=>node.scrollWidth<=node.clientWidth+1),'Setup horizontal overflow');
+    await page.setViewportSize({width:1280,height:800});
+    // Reach and change the style with directional input, not mouse or a native popup.
+    for(let i=0;i<12;i++) {
+      if(await page.evaluate(()=>document.activeElement.getAttribute('aria-label')==='Стиль P1'))break;
+      await pad(12);
     }
-    assert.equal(await page.evaluate(()=>document.activeElement.getAttribute('aria-label')),'Контроллер P1');
-    await pad(15);assert.equal(await page.evaluate(()=>document.activeElement.value),'0');
-    await seek('local-start');
+    assert.equal(await page.evaluate(()=>document.activeElement.getAttribute('aria-label')),'Стиль P1');
+    await pad(14);
+    assert.equal(await page.locator('[aria-label="Стиль P1"]').inputValue(),'speed');
+    for(let i=0;i<12;i++) {if(await page.evaluate(()=>['local-start','local-setup-back'].includes(document.activeElement.id)))break;await pad(13);}
+    if(await page.evaluate(()=>document.activeElement.id==='local-setup-back'))await pad(15);
+    assert.equal(await page.evaluate(()=>document.activeElement.id),'local-start');
     await page.evaluate(()=>qaButton(0,true));
     await page.waitForTimeout(500);
     assert.equal(await page.$eval('#local-setup',node=>node.open),true,'Held A must not activate before release');
@@ -42,17 +56,28 @@ const {chromium} = require('playwright');
     assert.equal(await page.evaluate(()=>navigator.getGamepads()[0].buttons[0].pressed),false);
     await page.waitForTimeout(160);
     await page.evaluate(()=>qaButton(0,true));await page.waitForTimeout(1200);
-    const speed=await page.evaluate(()=>GnomHost.state.seats[0].speed);assert.ok(speed>1,`Arcade A did not accelerate: ${speed}`);
+    const speed=await page.evaluate(()=>GnomHost.state.seats[0].speed);assert.ok(speed>coastSpeed+10,`Arcade A did not accelerate beyond initial coast: ${coastSpeed} -> ${speed}`);
+    await page.screenshot({path:'/tmp/gnom-controller-live-racing-1280.png'});
+    const pixels=await sharp(await page.screenshot({clip:{x:480,y:260,width:320,height:240}})).stats();
+    assert.ok(pixels.channels.slice(0,3).every(channel=>channel.stdev>8),'Rendered race pixels must contain nonblank scene detail');
     await page.evaluate(()=>qaButton(0,false));await pad(9);
     await page.waitForFunction(()=>document.querySelector('#local-pause').open&&GnomHost.state.paused);
     assert.equal(await page.evaluate(()=>document.activeElement.id),'local-resume');
     await page.screenshot({path:'/tmp/gnom-controller-pause.png'});
+    await page.setViewportSize({width:390,height:844});
+    await page.screenshot({path:'/tmp/gnom-controller-live-pause-390.png'});
+    assert.ok(await page.locator('#local-pause').evaluate(node=>node.scrollWidth<=node.clientWidth+1),'Pause horizontal overflow');
+    await page.setViewportSize({width:1280,height:800});
+    await pad(13);await pad(0);
+    await page.waitForFunction(()=>document.querySelector('#local-settings').open);
+    await pad(1);
+    await page.waitForFunction(()=>!document.querySelector('#local-settings').open&&document.querySelector('#local-pause').open);
     await pad(1);await page.waitForFunction(()=>!GnomHost.state.paused);
     await pad(9);await page.waitForFunction(()=>GnomHost.state.paused);
     await pad(9);await page.waitForFunction(()=>!GnomHost.state.paused);
     await pad(9);await page.waitForFunction(()=>GnomHost.state.paused);
     await page.keyboard.press('Escape');await page.waitForFunction(()=>!GnomHost.state.paused);
     assert.deepEqual(errors,[]);
-    console.log(JSON.stringify({result:'PASS',coastSpeed,speed,gamepad:'virtual standard mapping; physical Bluetooth not tested',screenshot:'/tmp/gnom-controller-pause.png'}));
+    console.log(JSON.stringify({result:'PASS',url,coastSpeed,speed,gamepad:'virtual standard mapping; physical Bluetooth not tested',screenshot:'/tmp/gnom-controller-pause.png'}));
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

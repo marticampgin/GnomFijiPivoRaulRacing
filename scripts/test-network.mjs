@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(resolve(root, 'shared/track-manifest.json'), 'utf8'));
 const { track_id, schema_version, simulation_revision, simulation_hash, art_revision } = manifest;
-const compatibility = { protocol_version: 8, vehicle_state_version: 1, loadout_hash: 'prototype-v12', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
+const compatibility = { protocol_version: 9, vehicle_state_version: 2, loadout_hash: 'prototype-v13', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
 const secret = 'network-probe-only-not-a-deployment-secret-2026';
 const port = Number(process.env.NETWORK_TEST_PORT || 19080);
 const url = `ws://127.0.0.1:${port}`;
@@ -100,6 +100,9 @@ try {
   await rejectTicket(ticket('pre-track-event-balance', { loadout_hash: 'prototype-v10' }), 'pre-track-event balance rejected');
   await rejectTicket(ticket('pre-playtest-fixes', { loadout_hash: 'prototype-v11' }), 'pre-playtest-fixes balance rejected');
   await rejectTicket(ticket('pre-track-event-wire', { protocol_version: 7 }), 'pre-track-event wire rejected');
+  await rejectTicket(ticket('pre-fifo-wire', { protocol_version: 8 }), 'pre-FIFO wire rejected');
+  await rejectTicket(ticket('release-drift-state', { vehicle_state_version: 1 }), 'release-to-boost vehicle state rejected');
+  await rejectTicket(ticket('release-drift-balance', { loadout_hash: 'prototype-v12' }), 'release-to-boost balance rejected');
   await rejectTicket(ticket('bad-style', { style_id: 'faster' }), 'unknown signed style rejected');
   await rejectTicket(ticket('missing-style', { style_id: undefined }), 'missing signed style rejected');
   await rejectTicket(ticket('bot:1'), 'reserved bot identity rejected');
@@ -121,6 +124,9 @@ try {
     ['pre-track-event hello balance', { ...compatibility, loadout_hash: 'prototype-v10' }],
     ['pre-playtest-fixes hello balance', { ...compatibility, loadout_hash: 'prototype-v11' }],
     ['pre-track-event hello wire', { ...compatibility, protocol_version: 7 }],
+    ['pre-FIFO hello wire', { ...compatibility, protocol_version: 8 }],
+    ['release-drift hello state', { ...compatibility, vehicle_state_version: 1 }],
+    ['release-drift hello balance', { ...compatibility, loadout_hash: 'prototype-v12' }],
     ['unsupported hello state schema', { ...compatibility, vehicle_state_version: 999 }],
     ['old hello vehicle simulation', { ...compatibility, loadout_hash: 'prototype-v1' }],
     ['sharp-box hello vehicle simulation', { ...compatibility, loadout_hash: 'prototype-v2' }],
@@ -144,7 +150,7 @@ try {
     && player.combat.slots.length === 2 && player.combat.item_ack === 0), 'every racer starts with authoritative durability and two slots');
   await waitFor(() => first.messages.find(message => message.type === 'snapshot' && message.countdown === 0), 'countdown complete', 8000);
   const initialItemState = ownState(first, 'driver-a');
-  const itemCommand = { type: 'use_item', sequence: 1, race_id: grid.race_id, epoch: initialItemState.epoch, slot: 0 };
+  const itemCommand = { type: 'use_item', sequence: 1, race_id: grid.race_id, epoch: initialItemState.epoch };
   first.socket.send(JSON.stringify(itemCommand));
   const acknowledgedItem = await waitFor(() => ownState(first, 'driver-a', player => player.combat.item_ack === 1), 'empty-slot item command acknowledged');
   first.socket.send(JSON.stringify(itemCommand));
@@ -161,7 +167,7 @@ try {
   const before = ownState(first, 'driver-a').state.position;
   let sequence = first.ack;
   for (let index = 0; index < 60; index++) {
-    first.socket.send(JSON.stringify({ type: 'input', sequence: ++sequence, steering: 0, throttle: 1, brake: 0, drift: false }));
+    first.socket.send(JSON.stringify({ type: 'input', sequence: ++sequence, steering: 0, throttle: 1, brake: 0, drift_left: false, drift_right: false }));
     await delay(1000 / 60);
   }
   const driven = await waitFor(() => ownState(first, 'driver-a', player => player.ack >= sequence), 'input acknowledgement');
@@ -183,18 +189,18 @@ try {
   const resumedState = await waitFor(() => ownState(resumed, 'driver-a'), 'resumed snapshot');
   verify(resumedState.style_id === 'handling' && resumedState.next_style_id === 'drift', 'reconnect locks current style and queues next race style');
   verify(Math.hypot(...resumedState.state.position.map((value, index) => value - stopped.state.position[index])) < 0.5, 'reconnect preserves server position');
-  resumed.socket.send(JSON.stringify({ type: 'input', sequence, steering: 0, throttle: 1, brake: 0, drift: false }));
+  resumed.socket.send(JSON.stringify({ type: 'input', sequence, steering: 0, throttle: 1, brake: 0, drift_left: false, drift_right: false }));
   await waitFor(() => resumed.closed, 'sequence replay close');
   verify(resumed.reason === 'invalid_input', 'replayed input sequence rejected');
   const malformed = await joined('driver-a');
-  malformed.socket.send(JSON.stringify({ type: 'input', sequence: sequence + 1, steering: null, throttle: 1, brake: 0, drift: false }));
+  malformed.socket.send(JSON.stringify({ type: 'input', sequence: sequence + 1, steering: null, throttle: 1, brake: 0, drift_left: false, drift_right: false }));
   await waitFor(() => malformed.closed, 'non-numeric input close');
   verify(malformed.reason === 'invalid_input', 'non-numeric input rejected over socket');
-  for (const mutation of [{ slot: 2 }, { sequence: 1.5 }, { extra: true }, { epoch: null }, { sequence: 122 }]) {
+  for (const mutation of [{ slot: 0 }, { slot: 1 }, { slot: 2 }, { sequence: 1.5 }, { extra: true }, { epoch: null }, { sequence: 122 }]) {
     const malformedItem = await joined('driver-a');
     const itemState = await waitFor(() => ownState(malformedItem, 'driver-a'), 'item validation snapshot');
     malformedItem.socket.send(JSON.stringify({ type: 'use_item', sequence: itemState.combat.item_ack + 1,
-      race_id: grid.race_id, epoch: itemState.epoch, slot: 0, ...mutation }));
+      race_id: grid.race_id, epoch: itemState.epoch, ...mutation }));
     await waitFor(() => malformedItem.closed, 'malformed item close');
     verify(malformedItem.reason === 'invalid_item', `malformed item rejected: ${JSON.stringify(mutation)}`);
   }

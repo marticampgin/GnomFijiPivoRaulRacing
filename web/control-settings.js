@@ -17,8 +17,9 @@
     return {keyboard:value.keyboard, gamepad:value.gamepad, deadzone:value.deadzone, steering:value.steering};
   }
 
-  function create({profile, onChange} = {}) {
+  function create({profile, onChange, device = -1} = {}) {
     let current = normalize(profile) || defaultProfile();
+    let activeDevice = device;
     const prefix = `control-settings-${++nextId}`;
     const fields = {};
     function element(tag, className, text) {
@@ -40,7 +41,7 @@
       input.dataset.control = key;
       wrapper.append(label, input);
       grid.append(wrapper);
-      fields[key] = {input};
+      fields[key] = {input, wrapper};
       return wrapper;
     }
 
@@ -88,14 +89,14 @@
     }
 
     select('keyboard', 'Клавиатура', [['arcade', 'Аркада · Space / C'], ['both', 'WASD + стрелки'], ['wasd', 'WASD'], ['arrows', 'Стрелки']]);
-    select('gamepad', 'Геймпад', [['arcade', 'Аркада · A / B'], ['standard', 'Курки · дрифт A'], ['alternate', 'Курки · дрифт X']]);
+    select('gamepad', 'Геймпад', [['arcade', 'Аркада · A / B'], ['standard', 'Курки · RT / LT'], ['alternate', 'Курки · задний вид B']]);
     const bindings=element('dl','control-bindings');node.append(bindings);
     function showBindings() {
-      const keyboard=current.keyboard==='arcade'?[['Газ / тормоз','Space / C'],['Поворот','A / D'],['Дрифт','Shift / E'],['Предметы','Q / T'],['Вид назад','F'],['Пауза','Tab / Esc']]
-        :[['Газ / тормоз',current.keyboard==='arrows'?'↑ / ↓':'W / S'],['Поворот',current.keyboard==='arrows'?'← / →':'A / D'],['Дрифт','Space'],['Предметы','Q / E'],['Вид назад','C'],['Пауза','Esc']];
-      const gamepad=current.gamepad==='arcade'?['A / B','LS','RT / RB','LB (LT) / Y','X','Menu']
-        :['RT / LT','LS',current.gamepad==='alternate'?'X':'A','LB / RB',current.gamepad==='alternate'?'B':'Y','Menu'];
-      bindings.replaceChildren(...keyboard.flatMap(([label,key],i)=>[element('dt','',label),element('dd','',`${key} · ${gamepad[i]}`)]));
+      const keyboard=current.keyboard==='arcade'?[['Газ / тормоз','Space / C'],['Поворот','A / D'],['Дрифт','Shift / E'],['Турбо','Противоположная Shift / E'],['Предмет','Q'],['Вид назад','F'],['Пауза','Tab / Esc']]
+        :[['Газ / тормоз',current.keyboard==='arrows'?'↑ / ↓':'W / S'],['Поворот',current.keyboard==='arrows'?'← / →':'A / D'],['Дрифт','Shift / E'],['Турбо','Противоположная Shift / E'],['Предмет','Q'],['Вид назад','C'],['Пауза','Esc']];
+      const gamepad=current.gamepad==='arcade'?['A / B','LS','LB / RB','Противоположная LB / RB','Y','X','Menu']
+        :['RT / LT','LS','LB / RB','Противоположная LB / RB','Y',current.gamepad==='alternate'?'B':'X','Menu'];
+      bindings.replaceChildren(...keyboard.flatMap(([label,key],i)=>[element('dt','',label),element('dd','',activeDevice >= 0 ? gamepad[i] : key)]));
     }
     range('deadzone', 'Мёртвая зона', 0.05, 0.35, 0.01, value => `${Math.round(value * 100)}%`);
     range('steering', 'Чувствительность', 0.5, 1.5, 0.05, value => `${value.toFixed(2)}×`);
@@ -132,7 +133,17 @@
     }
 
     update(current);
-    return {node, update, destroy:() => node.remove()};
+    function setDevice(value) {
+      const focused=Object.keys(fields).find(key=>fields[key].input===document.activeElement);
+      activeDevice = Number(value);
+      fields.keyboard.wrapper.hidden = activeDevice >= 0;
+      fields.gamepad.wrapper.hidden = activeDevice < 0;
+      fields.deadzone.wrapper.hidden = activeDevice < 0;
+      showBindings();
+      if(focused&&fields[focused].wrapper.hidden)fields[activeDevice>=0?'gamepad':focused==='deadzone'?'steering':'keyboard'].input.focus({preventScroll:true});
+    }
+    setDevice(device);
+    return {node, update, setDevice, destroy:() => node.remove()};
   }
 
   root.GnomControlSettings = {defaultProfile, normalize, create};
