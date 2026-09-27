@@ -165,7 +165,7 @@ async function main() {
           if (!current.items?.[slot]) continue;
           if (itemUses.length === 0) await page.screenshot({ path: path.join(output, 'item-pickup.png') });
           itemUses.push({ slot, id: current.items[slot], tick: current.serverTick });
-          await page.keyboard.press(slot === 0 ? 'q' : 'e', { delay: 40 });
+          await page.keyboard.press(slot === 0 ? 'q' : 't', { delay: 40 });
           itemReadyAfter = Date.now() + 350;
         }
       }
@@ -194,8 +194,8 @@ async function main() {
           anchorsCaptured.add(anchor.id);
         }
       }
-      await key('w', controls.throttle && !controls.brake);
-      await key('s', controls.brake);
+      await key('Space', controls.throttle && !controls.brake);
+      await key('c', controls.brake);
       const steerKey = controls.steering < 0 ? 'a' : 'd';
       await key(steerKey === 'a' ? 'd' : 'a', false);
       const pulse = Math.abs(controls.steering) < 0.025 ? 0 : Math.round(Math.abs(controls.steering) * 90);

@@ -67,28 +67,38 @@ func _run() -> void:
 	player.combat.slots = ["mermaid_rum", "bfg10k"]
 	player.combat.health = 80.0
 	var isolated: Dictionary = {player.id: player}
-	_check(easy.item_slots(player, isolated, 120).is_empty(), "easy slower item decision")
-	_check(normal.item_slots(player, isolated, 120) == [0, 1], "normal retains baseline item timing")
-	_check(hard.item_slots(player, isolated, 180).is_empty(), "hard saves wasted heal and unaimed weapon")
+	_check(not easy.should_use_item(player, isolated, 120), "easy slower item decision")
+	_check(normal.should_use_item(player, isolated, 120), "normal retains baseline item timing")
+	_check(not hard.should_use_item(player, isolated, 180), "hard saves head heal without skipping to reserve weapon")
 	player.combat.health = 45.0
 	opponent.vehicle.global_position = player.vehicle.global_position - player.vehicle.global_basis.z * 15.0
 	isolated[opponent.id] = opponent
-	_check(hard.item_slots(player, isolated, 180) == [0, 1], "hard heals and fires at target ahead")
+	_check(hard.should_use_item(player, isolated, 180), "hard requests oldest heal only")
 	opponent.vehicle.global_position = player.vehicle.global_position + player.vehicle.global_basis.z * 15.0
-	_check(hard.item_slots(player, isolated, 180) == [0], "hard does not shoot backwards")
+	_check(hard.should_use_item(player, isolated, 180), "head heal independent of reserve target")
 	player.combat.slots = ["seeker", "crystal_shield"]
-	_check(hard.item_slots(player, isolated, 180) == [1], "hard saves seeker without a forward target")
+	_check(not hard.should_use_item(player, isolated, 180), "hard cannot skip unaimed seeker to use reserve shield")
 	opponent.vehicle.global_position = player.vehicle.global_position - player.vehicle.global_basis.z * 15.0
-	_check(hard.item_slots(player, isolated, 180) == [0, 1], "hard uses seeker and shield through ordinary slots")
+	_check(hard.should_use_item(player, isolated, 180), "hard uses head seeker with forward target")
 	player.combat.effects.crystal_shield = {"remaining": 3.0}
-	_check(hard.item_slots(player, isolated, 180) == [0], "hard does not waste an already active shield")
-	player.combat.slots = ["fanta", ""]
+	_check(hard.should_use_item(player, isolated, 180), "reserve effect cannot change decision about head item")
+	player.combat.slots = ["crystal_shield", "fanta"]
+	_check(not hard.should_use_item(player, isolated, 180), "hard does not skip already active head shield")
+	player.combat.slots = ["fanta", "lays_crab"]
 	player.combat.effects = {"fanta": {"remaining": 2.0}}
-	_check(hard.item_slots(player, isolated, 180).is_empty(), "hard avoids redundant active effect")
+	_check(not hard.should_use_item(player, isolated, 180), "hard avoids redundant head effect without consuming reserve")
 	player.combat.effects.clear()
 	player.finished = true
-	_check(normal.item_slots(player, isolated, 120).is_empty(), "finished bots keep inventory")
+	_check(not normal.should_use_item(player, isolated, 120), "finished bots keep inventory")
 	player.finished = false
+	player.driver = normal
+	session._tick = 119
+	session._items._pickups.clear()
+	session.steps = 1
+	while session.steps > 0:
+		await physics_frame
+		await process_frame
+	_check(player.combat.slots == ["lays_crab", ""] and player.combat.effects.has("fanta") and not player.combat.effects.has("lays_crab"), "one bot decision consumes only queue head per physics tick")
 	var original_stats: Dictionary = player.vehicle.stats.duplicate(true)
 	var original_pose: Transform3D = player.vehicle.global_transform
 	player.vehicle.speed_mps = 20.0

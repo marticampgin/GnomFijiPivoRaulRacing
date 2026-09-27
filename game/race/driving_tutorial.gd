@@ -6,7 +6,7 @@ var _lesson_stage: int = 0
 var _lesson_progress: float = 0.0
 var _lesson_complete: bool = false
 var _drift_charged: bool = false
-var _used_slots: Array[bool] = [false, false]
+var _used_items: int = 0
 
 
 func start_local(seats: Array, available_pads: Variant = null, bot_difficulty: String = "normal") -> bool:
@@ -27,7 +27,7 @@ func _start_race() -> void:
 	_lesson_progress = 0.0
 	_lesson_complete = false
 	_drift_charged = false
-	_used_slots = [false, false]
+	_used_items = 0
 	_phase = "racing"
 	_countdown = 0
 	_reset_lesson_pose()
@@ -91,19 +91,21 @@ func step_local(delta: float, snapshots: Variant = null) -> void:
 			if forward_speed < -1.0 and float(command.brake) > 0.5:
 				_advance_lesson(true)
 		"drift":
-			if kart.is_drifting and kart.drift_charge >= Vehicle.DRIFT_LEVEL_THRESHOLDS[0]:
+			if kart.is_drifting and kart.drift_charge >= Vehicle.DRIFT_READY_CHARGE:
 				_drift_charged = true
-			_lesson_progress = 0.9 if _drift_charged else clampf(kart.drift_charge / Vehicle.DRIFT_LEVEL_THRESHOLDS[0], 0.0, 0.9)
-			if _drift_charged and not bool(command.drift) and kart.boost_remaining > 0.0:
+			_lesson_progress = 0.9 if _drift_charged else clampf(kart.drift_charge / Vehicle.DRIFT_READY_CHARGE, 0.0, 0.9)
+			if kart.drift_chain > 0 and kart.boost_remaining > 0.0:
 				_advance_lesson(true)
 		"items":
-			for slot: int in 2:
-				if before_slots[slot] == TRAINING_ITEMS[slot] and player.combat.slots[slot] == "" and int(player.combat.item_ack) > before_ack and player.combat.effects.has(TRAINING_ITEMS[slot]):
-					_used_slots[slot] = true
-				if not _used_slots[slot] and player.combat.slots[slot] == "" and float(player.combat.destroyed_remaining) <= 0.0:
-					player.combat.slots[slot] = TRAINING_ITEMS[slot]
-			_lesson_progress = float(int(_used_slots[0]) + int(_used_slots[1])) / 2.0
-			if _used_slots[0] and _used_slots[1]:
+			if int(player.combat.item_ack) > before_ack:
+				var consumed: int = player.combat.slots.count("") - before_slots.count("")
+				for index: int in consumed:
+					if _used_items < 2 and before_slots[index] == TRAINING_ITEMS[_used_items] and player.combat.effects.has(before_slots[index]):
+						_used_items += 1
+			if player.combat.slots[0] == "" and _used_items < 2 and float(player.combat.destroyed_remaining) <= 0.0:
+				player.combat.slots = [TRAINING_ITEMS[_used_items], TRAINING_ITEMS[1] if _used_items == 0 else ""]
+			_lesson_progress = float(_used_items) / 2.0
+			if _used_items == 2:
 				_lesson_complete = true
 
 

@@ -8,6 +8,7 @@ const PHYSICS_DT: float = 1.0 / 60.0
 const INPUT_TIMEOUT_MS: int = 250
 const RECONNECT_MS: int = 30000
 const INTERPOLATION_DELAY_MS: int = 100
+const MAX_UNACKED_INPUTS: int = 24
 
 var _worker: bool = false
 var _kart_script: Script
@@ -23,7 +24,10 @@ var _socket: WebSocketPeer
 var _ticket: String = ""
 var _player_id: String = ""
 var _sequence: int = 0
+var _input_ack: int = 0
 var _pending: Array[Dictionary] = []
+var _drift_transitions: Array[Dictionary] = []
+var _last_drift_sample: Dictionary = {"drift_left": false, "drift_right": false}
 var _queued_snapshot: Dictionary = {}
 var _local: CharacterBody3D
 var _local_visual: Node3D
@@ -116,10 +120,17 @@ func _physics_process(delta: float) -> void:
 		_apply_snapshot(snapshot)
 	if _local != null and (_joined or _status == "practice"):
 		var command: Dictionary = _sample_input()
+		_capture_drift_transition(command)
 		if _joined:
 			if Time.get_ticks_msec() - _last_server_ms > 3000 or _pending.size() >= 120:
 				_leave("connection_lost")
 				return
+			# Bound in-flight inputs below the server's 30-command queue, even after a batched delivery.
+			# Item edges are sampled above; prediction must not invent unsent driving steps.
+			if _sequence - _input_ack >= MAX_UNACKED_INPUTS:
+				_update_camera(delta)
+				return
+			_apply_drift_transition(command)
 			_sequence += 1
 			command["type"] = "input"
 			command["sequence"] = _sequence
@@ -437,20 +448,37 @@ func _sample_input() -> Dictionary:
 	if not _focused or not _input_enabled:
 		return Protocol.NEUTRAL.duplicate()
 	var command: Dictionary = Driver.sample()
-	if command["use_item_1"]:
-		_use_item(0)
-	if command["use_item_2"]:
-		_use_item(1)
-	for key: String in ["use_item_1", "use_item_2", "look_back"]:
+	if command["use_item"]:
+		_use_item()
+	for key: String in ["use_item", "look_back"]:
 		command.erase(key)
 	return command
 
 
-func _use_item(slot: int) -> void:
-	if not _joined or not _can_drive() or not _focused or not _input_enabled or slot not in [0, 1]:
+func _capture_drift_transition(command: Dictionary) -> void:
+	if not _joined:
+		return
+	var held: Dictionary = {"drift_left": bool(command.get("drift_left", false)), "drift_right": bool(command.get("drift_right", false))}
+	if held == _last_drift_sample:
+		return
+	_last_drift_sample = held
+	# Preserve brief shoulder taps while the 24-frame network window is full.
+	if _drift_transitions.size() >= 32:
+		_drift_transitions.clear()
+		_drift_transitions.append({"drift_left": false, "drift_right": false})
+	_drift_transitions.append(held)
+
+
+func _apply_drift_transition(command: Dictionary) -> void:
+	if not _drift_transitions.is_empty():
+		command.merge(_drift_transitions.pop_front(), true)
+
+
+func _use_item() -> void:
+	if not _joined or not _can_drive() or not _focused or not _input_enabled:
 		return
 	_item_sequence += 1
-	_send({"type": "use_item", "sequence": _item_sequence, "race_id": _race_id, "epoch": _hud.get("epoch", 0), "slot": slot})
+	_send({"type": "use_item", "sequence": _item_sequence, "race_id": _race_id, "epoch": _hud.get("epoch", 0)})
 
 
 func _step_local(command: Dictionary, delta: float) -> void:
@@ -487,8 +515,8 @@ func _on_host_message(arguments: Array) -> void:
 		return
 	match data.get("type"):
 		"use_item":
-			if Protocol._integer(data.get("slot"), 0) and int(data["slot"]) <= 1:
-				_use_item(int(data["slot"]))
+			if not data.has("slot"):
+				_use_item()
 		"graphics":
 			if data.get("quality") is String and data.get("reduced_effects") is bool:
 				_apply_graphics_settings(data["quality"], data["reduced_effects"])
@@ -529,7 +557,13 @@ func _connect_client(url: String, ticket: String) -> void:
 
 
 func _release_inputs() -> void:
-	for action: String in ["drive_left", "drive_right", "drive_accelerate", "drive_brake", "drive_drift", "look_back", "use_item_1", "use_item_2"]:
+	_drift_transitions.clear()
+	_last_drift_sample = {"drift_left": false, "drift_right": false}
+	if _joined:
+		_drift_transitions.append(_last_drift_sample.duplicate())
+	if is_instance_valid(_local) and _local.has_method("cancel_drift"):
+		_local.cancel_drift()
+	for action: String in ["drive_left", "drive_right", "drive_accelerate", "drive_brake", "drive_drift_left", "drive_drift_right", "look_back", "use_item"]:
 		Input.action_release(action)
 
 
@@ -560,6 +594,7 @@ func _poll_client() -> void:
 					return
 				_player_id = str(parsed.get("player_id", ""))
 				_sequence = int(parsed.get("ack", 0))
+				_input_ack = _sequence
 				_item_sequence = int(parsed.get("item_ack", 0))
 				_joined = true
 				_status = "connected"
@@ -637,11 +672,13 @@ func _apply_snapshot(packet: Dictionary) -> void:
 			_item_sequence = maxi(_item_sequence, int(_client_combat["item_ack"]))
 			var before: Vector3 = _local.global_position
 			var ack: int = int(entry.get("ack", 0))
+			_input_ack = maxi(_input_ack, mini(ack, _sequence))
 			_pending = _pending.filter(func(command: Dictionary) -> bool: return int(command["sequence"]) > ack)
 			_local.restore_state(state)
 			var epoch_changed: bool = int(_hud.get("epoch", -1)) != int(entry.get("epoch", 0))
 			if epoch_changed or generation_changed:
 				_pending.clear()
+				_drift_transitions.clear()
 			_hud = entry.duplicate(true)
 			_hud.erase("state")
 			for command: Dictionary in _pending:
@@ -792,9 +829,12 @@ func _leave(status: String) -> void:
 	_ticket = ""
 	_joined = false
 	_pending.clear()
+	_drift_transitions.clear()
+	_last_drift_sample = {"drift_left": false, "drift_right": false}
 	_queued_snapshot.clear()
 	_player_id = ""
 	_sequence = 0
+	_input_ack = 0
 	_item_sequence = 0
 	_client_combat.clear()
 	if is_instance_valid(_item_visuals):
@@ -853,7 +893,11 @@ func _publish_hud() -> void:
 		"reverse": _local != null and _local.velocity.dot(-_local.global_basis.z) < -0.1,
 		"drift": 0.0 if _local == null else _local.drift_charge, "boost": 0.0 if _local == null else _local.boost_remaining,
 		"driftLevel": 0 if _local == null else _local.drift_level(),
-		"driftSegments": _drift_segments(0.0 if _local == null else _local.drift_charge),
+		"driftSegments": _drift_segments(0 if _local == null else _local.drift_level()),
+		"driftOwner": 0 if _local == null else _local.drift_owner,
+		"driftActive": _local != null and _local.is_drifting,
+		"driftFeedback": "" if _local == null else _local.drift_feedback,
+		"driftWindowStart": Vehicle.DRIFT_READY_CHARGE,
 		"lap": _hud.get("lap", 1), "finished": _hud.get("finished", false), "elapsed": _hud.get("elapsed", 0.0),
 		"countdown": _client_countdown, "ping": _ping, "correction": _correction, "serverTick": _tick,
 		"pendingInputs": _pending.size(), "fps": Engine.get_frames_per_second()}
@@ -865,12 +909,10 @@ func _blur_intensity() -> float:
 	return _items.blur_intensity(_client_combat)
 
 
-func _drift_segments(charge: float) -> Array:
+func _drift_segments(chain: int) -> Array:
 	var segments: Array = []
-	var previous: float = 0.0
-	for threshold: float in Vehicle.DRIFT_LEVEL_THRESHOLDS:
-		segments.append(clampf((charge - previous) / (threshold - previous), 0.0, 1.0))
-		previous = threshold
+	for index: int in 3:
+		segments.append(1.0 if index < chain else 0.0)
 	return segments
 
 
@@ -925,7 +967,9 @@ func _local_hud_state() -> Dictionary:
 			"health": combat.health, "maxHealth": combat.max_health, "items": combat.slots,
 			"effects": combat.effects, "drift": vehicle.drift_charge, "boost": vehicle.boost_remaining,
 			"driftLevel": vehicle.drift_level(),
-			"driftSegments": _drift_segments(vehicle.drift_charge),
+			"driftSegments": _drift_segments(vehicle.drift_level()),
+			"driftOwner": vehicle.drift_owner, "driftActive": vehicle.is_drifting,
+			"driftFeedback": vehicle.drift_feedback, "driftWindowStart": Vehicle.DRIFT_READY_CHARGE,
 			"epoch": entry.epoch, "lookBack": _local_race.command_for_seat(entry.slot).get("look_back", false),
 			"canUseItems": snapshot.phase == "racing" and not snapshot.paused and not entry.finished and float(combat.destroyed_remaining) <= 0.0,
 			"blurIntensity": _local_race._items.blur_intensity(combat),
@@ -995,5 +1039,6 @@ func _on_local_message(data: Dictionary) -> void:
 		"local_assign":
 			_local_race.assign_device(seat, int(data.get("device", -2)))
 		"local_use_item":
-			_local_race.use_item_seat(seat, int(data.get("slot", -1)))
+			if not data.has("slot"):
+				_local_race.use_item_seat(seat)
 	_publish_hud()

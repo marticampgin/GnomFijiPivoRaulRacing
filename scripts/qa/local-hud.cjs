@@ -17,13 +17,13 @@ const track = JSON.parse(fs.readFileSync(path.join(root, 'shared/track-manifest.
     page.on('pageerror', error => errors.push(error.message));
     await page.route('http://localhost/**', route => {
       const url = new URL(route.request().url());
-      if (url.pathname === '/') return route.fulfill({ contentType: 'text/html', body: '<link rel="stylesheet" href="/local-race.css"><link rel="stylesheet" href="/control-settings.css"><style>body{margin:0;background:#55665d}button{box-sizing:border-box}</style>' });
+      if (url.pathname === '/') return route.fulfill({ contentType: 'text/html', body: '<link rel="stylesheet" href="/app.css"><link rel="stylesheet" href="/local-race.css"><link rel="stylesheet" href="/race-lobby.css"><link rel="stylesheet" href="/control-settings.css"><link rel="stylesheet" href="/ui-theme.css"><link rel="stylesheet" href="/race-overlays.css"><style>body{margin:0;background:#55665d}button{box-sizing:border-box}</style>' });
       const file = path.join(root, 'web', url.pathname);
       if (fs.existsSync(file) && fs.statSync(file).isFile()) return route.fulfill({ path: file });
       return route.fulfill({ status: 404, body: '' });
     });
     await page.goto('http://localhost/');
-    for (const file of ['track-map.js', 'control-settings.js', 'local-race.js']) await page.addScriptTag({ path: path.join(root, 'web', file) });
+    for (const file of ['track-map.js', 'control-settings.js', 'race-lobby.js', 'local-race.js']) await page.addScriptTag({ path: path.join(root, 'web', file) });
     await page.evaluate(() => { window.commands = []; window.ui = GnomLocalUI.create({ send: value => commands.push(value) }); });
     const effects = Object.fromEntries(['fanta', 'mermaid_rum', 'ice_rum', 'stroh80', 'lays_crab', 'burn', 'crystal_shield', 'weapon_guard'].map(key => [key, { remaining: 9.9 }]));
     const players = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, rank: i + 1, name: 'ОченьДлинноеИмяСоперникаДляПроверкиГраниц', position: [0, 0] }));
@@ -77,10 +77,11 @@ const track = JSON.parse(fs.readFileSync(path.join(root, 'shared/track-manifest.
         check(await page.locator('.local-effect').evaluateAll(nodes => nodes.length > 0 && nodes.every(node => node.title && node.getAttribute('aria-label') === node.title && node.querySelector('img')?.naturalWidth > 0)), `${label}: compact effects retain names and art`);
         await page.evaluate(state => ui.update({ ...state, graphics: { reducedEffects: true } }), state);
         check(await page.locator('.local-sector-blur').first().evaluate(node => node.style.backdropFilter === 'blur(0.6px)'), `${label}: reduced effects preserved`);
-        await page.locator('.local-slot').nth((count - 1) * 2 + 1).click();
-        check(await page.evaluate(count => { const command = commands.at(-1); return command.type === 'local_use_item' && command.seat === count - 1 && command.slot === 1; }, count), `${label}: item routed to seat`);
+        await page.locator('button.local-slot').last().click();
+        check(await page.evaluate(count => { const command = commands.at(-1); return command.type === 'local_use_item' && command.seat === count - 1 && !Object.hasOwn(command, 'slot'); }, count), `${label}: FIFO item routed to seat`);
+        check(await page.locator('.local-slot-next').evaluateAll(nodes => nodes.length > 0 && nodes.every(node => node.tagName !== 'BUTTON' && node.tabIndex < 0)), `${label}: next item is a non-interactive preview`);
         await page.evaluate(state => ui.update({ ...state, countdown: 3, seats: state.seats.map(seat => ({ ...seat, canUseItems: false, effects: {}, attackWarning: '' })) }), state);
-        check(await page.locator('.local-slot:disabled').count() === count * 2 && await page.locator('.local-countdown').first().textContent() === '3', `${label}: countdown blocks items`);
+        check(await page.locator('button.local-slot:disabled').count() === count && await page.locator('.local-countdown').first().textContent() === '3', `${label}: countdown blocks items`);
         await page.evaluate(state => ui.update({ ...state, phase: 'results', seats: state.seats.map(seat => ({ ...seat, finished: true, canUseItems: false, dnf: seat.id === 1 })) }), state);
         check(await page.locator('.local-finish:not([hidden])').count() === count, `${label}: results for all seats`);
         check(await page.locator('.local-finish').first().locator('strong').textContent() === 'DNF', `${label}: DNF`);
@@ -94,7 +95,7 @@ const track = JSON.parse(fs.readFileSync(path.join(root, 'shared/track-manifest.
         await page.evaluate(state => ui.update({ ...state, phase: 'results', seats: state.seats.map(seat => ({ ...seat, finished: true, ready: true })) }), state);
         check(await page.locator('.local-finish button:disabled').count() === count, `${label}: ready cannot repeat`);
         await page.evaluate(state => ui.update({ ...state, trackEvent: { phase: 'idle' }, seats: state.seats.map(seat => ({ ...seat, effects: {}, attackWarning: '', health: 0, destroyedRemaining: 2, invulnerableRemaining: 1, items: ['', ''], canUseItems: false })) }), state);
-        check(await page.locator('.local-slot:disabled').count() === count * 2 && await page.locator('.local-health progress.critical').count() === count, `${label}: destruction empty inventory and critical health`);
+        check(await page.locator('button.local-slot:disabled').count() === count && await page.locator('.local-health progress.critical').count() === count, `${label}: destruction empty inventory and critical health`);
         check(await page.locator('.local-effect.recovery').count() === count && await page.locator('.local-effect.invulnerable').count() === count, `${label}: recovery and protection visible`);
         await page.evaluate(state => ui.update({ ...state, seats: state.seats.map(seat => ({ ...seat, driving: { slipstream_charge: .63 } })) }), state);
         check(await page.locator('.local-effect.slipstream b').evaluateAll(nodes => nodes.length > 0 && nodes.every(node => node.textContent === '63%' && node.getBoundingClientRect().width > 0)), `${label}: slipstream charge preserved`);

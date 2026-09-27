@@ -54,18 +54,34 @@ func _run() -> void:
 		var first: Dictionary = session._players["local:0"]
 		first.combat.slots = ["fanta", "mermaid_rum"]
 		first.combat.health = 40.0
-		raw[-1].keys = {KEY_Q: true, KEY_E: true}
+		raw[-1].keys = {KEY_Q: true}
 		await _step(session, raw)
-		_check(first.combat.slots == ["", ""], "item edges use both slots")
+		_check(first.combat.slots == ["mermaid_rum", ""] and first.combat.health == 40.0, "item press consumes only queue head")
+		await _step(session, raw, 3)
+		_check(first.combat.slots == ["mermaid_rum", ""] and first.combat.health == 40.0, "held item button never consumes reserve")
+		raw[-1].keys = {}
+		await _step(session, raw)
+		raw[-1].keys = {KEY_Q: true}
+		await _step(session, raw)
+		_check(first.combat.slots == ["", ""] and first.combat.health > 40.0, "next fresh item press consumes advanced reserve")
+		first.combat.slots = ["fanta", "ice_rum"]
+		var item_sequence: int = first.item_accepted
+		_check(session.use_item_seat(0) and session.use_item_seat(0), "distinct UI presses can queue before the next physics tick")
+		await _step(session, raw)
+		_check(first.combat.slots == ["", ""] and first.combat.item_ack == item_sequence + 2, "queued local presses execute once each without held-key duplication")
 		var frozen_tick: int = session._tick
 		var frozen_time: float = session._race_elapsed
 		var frozen_combat: Dictionary = first.combat.duplicate(true)
+		_prime_drift(first.vehicle)
 		session.pause_local()
+		_check(_drift_canceled(first.vehicle), "manual pause cancels stored drift without awarding turbo")
 		await _step(session, raw, 3)
 		_check(session._tick == frozen_tick and session._race_elapsed == frozen_time and first.combat == frozen_combat, "pause freezes all authority and effects")
 		_check(not session.recover_seat(0), "recovery cannot move a paused vehicle")
 		_check(session.resume_local(), "manual pause resumes")
+		_prime_drift(first.vehicle)
 		session.set_focused(false)
+		_check(_drift_canceled(first.vehicle), "focus loss immediately cancels stored drift without turbo")
 		_check(not session.resume_local(), "unfocused session cannot resume")
 		session.set_focused(true)
 		_check(session.presentation().paused, "focus return requires explicit resume")
@@ -73,10 +89,12 @@ func _run() -> void:
 		raw[-1].keys = {}
 		await _step(session, raw)
 		if count > 1:
+			_prime_drift(first.vehicle)
 			raw[0].connected = false
 			frozen_tick = session._tick
 			await _step(session, raw, 2)
 			_check(session._tick == frozen_tick and session.presentation().pause_reason == "device", "disconnect pauses before physics")
+			_check(_drift_canceled(first.vehicle), "another seat disconnect cancels all drift state without turbo")
 			_check(not session.resume_local() and session._human_count() == count, "disconnect keeps player and blocks resume")
 			_check(session.assign_device(1, 3, [3]), "replacement pad can claim disconnected seat")
 			raw[3] = {"connected": true, "axes": {}, "buttons": {}}
@@ -105,6 +123,18 @@ func _run() -> void:
 		await process_frame
 	print("LOCAL_RACE_PROBE %d/%d passed" % [_checks - _failures, _checks])
 	quit(0 if _failures == 0 else 1)
+
+
+func _prime_drift(vehicle: CharacterBody3D) -> void:
+	vehicle.is_drifting = true
+	vehicle.drift_owner = -1
+	vehicle.drift_chain = 2
+	vehicle.drift_charge = 0.8
+	vehicle.boost_remaining = 0.0
+
+
+func _drift_canceled(vehicle: CharacterBody3D) -> bool:
+	return not vehicle.is_drifting and vehicle.drift_owner == 0 and vehicle.drift_chain == 0 and vehicle.drift_charge == 0.0 and vehicle.boost_remaining == 0.0
 
 
 func _check(condition: bool, label: String) -> void:

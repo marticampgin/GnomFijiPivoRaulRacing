@@ -29,31 +29,31 @@ drive_right={
 }
 drive_accelerate={
 "deadzone": 0.1,
-"events": [Object(InputEventKey,"physical_keycode":87), Object(InputEventKey,"physical_keycode":4194320), Object(InputEventJoypadMotion,"axis":5,"axis_value":1.0)]
+"events": [Object(InputEventKey,"physical_keycode":32), Object(InputEventJoypadButton,"button_index":0)]
 }
 drive_brake={
 "deadzone": 0.1,
-"events": [Object(InputEventKey,"physical_keycode":83), Object(InputEventKey,"physical_keycode":4194322), Object(InputEventJoypadMotion,"axis":4,"axis_value":1.0)]
+"events": [Object(InputEventKey,"physical_keycode":67), Object(InputEventJoypadButton,"button_index":1)]
 }
-drive_drift={
+drive_drift_left={
 "deadzone": 0.5,
-"events": [Object(InputEventKey,"physical_keycode":32), Object(InputEventJoypadButton,"button_index":0)]
+"events": [Object(InputEventKey,"physical_keycode":4194325), Object(InputEventJoypadButton,"button_index":9)]
 }
-use_item_1={
-"deadzone": 0.5,
-"events": [Object(InputEventKey,"physical_keycode":81), Object(InputEventJoypadButton,"button_index":9)]
-}
-use_item_2={
+drive_drift_right={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"physical_keycode":69), Object(InputEventJoypadButton,"button_index":10)]
 }
+use_item={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":81), Object(InputEventJoypadButton,"button_index":3)]
+}
 look_back={
 "deadzone": 0.5,
-"events": [Object(InputEventKey,"physical_keycode":67), Object(InputEventJoypadButton,"button_index":3)]
+"events": [Object(InputEventKey,"physical_keycode":70), Object(InputEventJoypadButton,"button_index":2)]
 }
 pause_menu={
 "deadzone": 0.5,
-"events": [Object(InputEventKey,"physical_keycode":4194305), Object(InputEventJoypadButton,"button_index":6)]
+"events": [Object(InputEventKey,"physical_keycode":4194306), Object(InputEventKey,"physical_keycode":4194305), Object(InputEventJoypadButton,"button_index":6)]
 }
 
 [rendering]

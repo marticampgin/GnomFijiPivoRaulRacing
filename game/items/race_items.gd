@@ -51,11 +51,11 @@ func restore(player: Dictionary) -> void:
 	player.combat.invulnerable_remaining = 2.0
 
 
-func use(player: Dictionary, slot: int, players: Dictionary) -> bool:
-	if not _active(player) or slot < 0 or slot > 1:
+func use_next(player: Dictionary, players: Dictionary) -> bool:
+	if not _active(player):
 		return false
 	var state: Dictionary = player.combat
-	var id: String = state.slots[slot]
+	var id: String = state.slots[0]
 	if not Catalog.IDS.has(id):
 		return false
 	var trap_position: Vector3 = Vector3.ZERO
@@ -68,7 +68,9 @@ func use(player: Dictionary, slot: int, players: Dictionary) -> bool:
 		if ground.is_empty():
 			return false
 		trap_position = ground.position
-	state.slots[slot] = ""
+	# Only successful consumption advances the queue; failed placement keeps both items.
+	state.slots[0] = state.slots[1]
+	state.slots[1] = ""
 	var definition: Dictionary = Catalog.definition(id)
 	if definition.has("repair"):
 		state.health = minf(float(state.max_health), float(state.health) + float(definition.repair))

@@ -47,6 +47,18 @@ async function resume(page) {
   await page.waitForFunction(tick => !GnomHost.state.paused && GnomHost.state.tick > tick, before);
 }
 
+async function setLobbyChoice(page, label, index, text) {
+  const choice = page.locator('#local-setup').getByRole('spinbutton', { name: label, exact: true });
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const current = Number(await choice.getAttribute('aria-valuenow'));
+    if (current === index) break;
+    await choice.evaluate((node, amount) => node.dispatchEvent(new CustomEvent('menu-adjust', {
+      bubbles: true, detail: { amount },
+    })), current < index ? 1 : -1);
+  }
+  assert.equal(await choice.getAttribute('aria-valuetext'), text, `${label}: requested lobby choice was not selected`);
+}
+
 async function checkSectors(page, count, layout) {
   assert.equal(await page.locator('.local-pane').count(), count);
   const sectors = await page.evaluate(() => GnomHost.state.sectors);
@@ -164,21 +176,24 @@ async function measureBrowserCadence(page) {
     for (const [count, layout] of [[1, 'side-by-side'], [2, 'side-by-side'], [2, 'stacked'],
       [3, 'side-by-side'], [4, 'side-by-side']]) {
       await page.locator('#local-button').click();
-      await page.getByLabel('Количество игроков', { exact: true }).selectOption(String(count));
-      if (count === 2) await page.getByLabel('Разделение экрана', { exact: true }).selectOption(layout);
-      for (let index = 1; index < count; index++) {
-        await page.locator('#local-setup').getByLabel(`Контроллер P${index + 1}`, { exact: true })
-          .selectOption(String(index - 1));
-      }
+      await setLobbyChoice(page, 'Игроки', 0, '1');
+      await page.locator('[data-focus-key="lobby-seat-0"]').click();
+      // Connected pads are auto-preferred, but this fixture intentionally drives P1 by keyboard.
+      await setLobbyChoice(page, 'Контроллер P1', 0, 'Клавиатура');
+      await setLobbyChoice(page, 'Игроки', count - 1, String(count));
+      if (count === 2) await setLobbyChoice(page, 'Экран', layout === 'stacked' ? 1 : 0,
+        layout === 'stacked' ? 'Друг над другом' : 'Рядом');
       await page.locator('#local-start').click();
       await page.waitForFunction(players => GnomHost.state?.mode === 'local'
         && GnomHost.state.phase === 'racing' && GnomHost.state.seats.length === players,
       count, { timeout: 15000 });
+      assert.deepEqual(await page.evaluate(() => GnomHost.state.seats.map(seat => seat.device)),
+        Array.from({ length: count }, (_, index) => index - 1), 'P1 must remain keyboard; additional seats get pads 0, 1, 2');
       assert.equal(await page.evaluate(() => GnomHost.state.graphics?.quality), quality,
         'Godot graphics quality differs from requested quality');
-      await page.keyboard.down('w');
+      await page.keyboard.down('Space');
       await page.waitForFunction(() => GnomHost.state.seats[0].speed > 15);
-      await page.keyboard.up('w');
+      await page.keyboard.up('Space');
       const sectorColors = await checkSectors(page, count, layout);
       await page.screenshot({ path: path.join(output, `${count}-${layout}.png`) });
       if (count === 4 && sampleSeconds > 0) {
@@ -190,7 +205,8 @@ async function measureBrowserCadence(page) {
       await resume(page);
       const recoveryEpoch = await page.evaluate(() => GnomHost.state.seats[0].epoch);
       await page.locator('.local-pause-button').click();
-      await page.locator('#local-pause').getByRole('button', { name: 'На трассу', exact: true }).first().click();
+      await page.locator('#local-pause').getByRole('button', { name: 'Настройки', exact: true }).click();
+      await page.locator('#local-settings').getByRole('button', { name: 'На трассу', exact: true }).first().click();
       await page.waitForFunction(epoch => !GnomHost.state.paused
         && GnomHost.state.seats[0].epoch > epoch, recoveryEpoch);
       if (count > 1) {
@@ -205,7 +221,7 @@ async function measureBrowserCadence(page) {
       }
       await page.locator('.local-pause-button').click();
       await checkFrozen(page);
-      await page.locator('#local-pause').getByRole('button', { name: 'Выйти', exact: true }).click();
+      await page.locator('#local-pause').getByRole('button', { name: 'В меню', exact: true }).click();
       await page.waitForFunction(() => document.querySelector('#local-race').hidden);
       results.push({ count, layout, sectorColors, movement: true, pause: true, resume: true, recovery: true,
         disconnectReconnect: count > 1 ? true : 'not applicable', exit: true });

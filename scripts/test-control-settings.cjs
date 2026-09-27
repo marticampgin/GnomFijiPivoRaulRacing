@@ -9,10 +9,10 @@ const {defaultProfile, normalize} = context.GnomControlSettings;
 const plain = value => JSON.parse(JSON.stringify(value));
 let checks = 0;
 function check(condition, message) { assert.ok(condition, message); checks += 1; }
-assert.deepEqual(plain(defaultProfile()), {keyboard:'both', gamepad:'standard', deadzone:0.2, steering:1}); checks += 1;
+assert.deepEqual(plain(defaultProfile()), {keyboard:'arcade', gamepad:'arcade', deadzone:0.2, steering:1}); checks += 1;
 check(defaultProfile() !== defaultProfile(), 'defaults must be independent objects');
-for (const keyboard of ['both', 'wasd', 'arrows']) {
-  for (const gamepad of ['standard', 'alternate']) {
+for (const keyboard of ['arcade', 'both', 'wasd', 'arrows']) {
+  for (const gamepad of ['arcade', 'standard', 'alternate']) {
     for (const deadzone of [0.05, 0.2, 0.35]) {
       for (const steering of [0.5, 1, 1.5]) {
         const value = {keyboard, gamepad, deadzone, steering};

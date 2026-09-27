@@ -1,6 +1,6 @@
 # Prototype Meta API
 
-Fastify + TypeScript, Node.js 24 LTS and PostgreSQL. This implements the local/test identity adapter and real server-side sessions. Google verification is deliberately not implemented yet; `IdentityProvider` is the boundary for that later adapter. This is not a public deployment or a payment service.
+Fastify + TypeScript, Node.js 24 LTS and PostgreSQL. This implements the local/test identity adapter, real server-side sessions and the persistent catalog/inventory foundation. Google verification is deliberately not implemented yet; `IdentityProvider` is the boundary for that later adapter. This is not a public deployment or a payment service.
 
 ## Local Run
 
@@ -63,6 +63,21 @@ All mutating requests require the session cookie, exact `Origin`, `Content-Type:
 
 `user` is `{kind:"guest"|"account",id,displayName}`. `progress` currently contains only `practiceFinishes`; no browser endpoint awards progress, currency or inventory. Tests create verified progress fixtures directly in their isolated database. Future authoritative result handling must own actual rewards. Login never merges progress automatically; the browser must separately name and confirm the target account. Sending a guest ID is not ownership proof and is rejected.
 
+## Persistent Data Foundation
+
+`migrate(pool, config)` applies the checked-in SQL files in order under one advisory transaction lock. `schema_migration` records each filename and SHA-256 checksum; changed applied SQL or an unknown newer migration fails rather than silently rewriting history. Add a new migration for later changes. Existing local databases with only `001_auth.sql` are adopted in place: that idempotent migration runs once more before history is recorded. Accounts, sessions and guest progress are preserved. All migrations, the environment check and dev-profile seeding commit together or roll back together.
+
+`ProgressionService` is an internal backend module, not an HTTP API:
+
+- `publishCatalog({version, items: [{id, kind, definition}]})` publishes one immutable version atomically. Stable item IDs retain their kind across versions. Repeating identical content is harmless; changing an existing version is rejected. Definitions are bounded JSON metadata, not approved vehicle stats or a simulation contract.
+- `grantEntitlements({operationId, accountId, catalogVersion, source, items})` atomically records the operation, its grants and ownership. The operation ID must identify one trusted server event and be reused on delivery retries. A replay returns the original result, including the original `alreadyOwned` flags; changing its payload is a conflict. Concurrent grants to one account are serialized.
+- Inventory records durable, non-stackable rights to `vehicle`, `character`, `part` or `cosmetic` IDs across catalog versions. Another trusted event granting an already-owned right records that fact without creating a second ownership row. This is not a paid-drop duplicate/compensation policy. Currency, consumables, progression levels, purchases and revocation/compensation workflows are outside this stage.
+- Loadout tables pin a catalog version and one of the four styles. Composite foreign keys require every equipped item to exist in that version and belong to that same account. Slot IDs remain technical placeholders; compatibility rules, numeric balance, garage editing and signed personal assemblies are not implemented.
+
+No production catalog or starter grants are seeded. No route accepts browser rewards, local results, shard counts or arbitrary inventory writes. Race shards remain transient Godot state. The existing guest merge still transfers only the server-held `practiceFinishes` probe, not this inventory. The race ticket's global `prototype-v13` compatibility marker is unchanged and is not a personal loadout signature.
+
+The journal and published catalog reject ordinary SQL edits/deletions as well as service-level rewrites. This protects application invariants, not a database superuser: deployment roles, backup/recovery and audited compensation operations remain separate work. SQL uses foreign keys and explicit supporting indexes; see [PostgreSQL constraints](https://www.postgresql.org/docs/current/ddl-constraints.html).
+
 ## Isolation And Security
 
 - Dev authentication requires both `DEPLOYMENT_ENV=local|test` and `DEV_AUTH_ENABLED=true`. `NODE_ENV` does not enable it.
@@ -89,5 +104,7 @@ Tests use real temporary PostgreSQL clusters, ephemeral loopback ports and Fasti
 Verified on 2026-09-26 with Node.js 24.19.0 and PostgreSQL 18.4 on macOS: 22 tests passed (11 authentication integration tests and 11 lifecycle tests), with a clean TypeScript check and bundle build. Real database checks used the materialized bundle/SQL and `PG_BIN_DIR` workaround; default platform-package binary resolution was also verified. The runtime's reported build string was x86_64 Darwin, so this is not evidence of Linux ARM64 compatibility or capacity.
 
 Reverified on 2026-09-27 after authored-track compatibility: 27 tests passed (12 authentication, 11 lifecycle and 4 manifest tests). Manifest tests compare the API descriptor with the actual Godot bake; ticket tests verify the signed fields and launch descriptor agree. This does not replace the separate Godot/socket/Web integration checks or establish ARM capacity.
+
+Persistent-data stage, 2026-09-27: 45/45 backend tests passed (14 auth, 11 lifecycle, 4 compatibility, 16 progression), TypeScript and bundle build clean. New checks cover fresh/legacy/concurrent migration, checksum and environment rollback, immutable catalog/journal, concurrent idempotent grants, payload conflicts, ownership across versions, loadout ownership/version constraints, malformed JSON metadata and absent public reward routes. PostgreSQL 18.4 reported x86_64 Darwin; this is not an ARM capacity result. Browser tests were explicitly deferred for this stage.
 
 References: [Fastify testing](https://fastify.dev/docs/latest/Guides/Testing/), [static plugin compatibility](https://github.com/fastify/fastify-static), [embedded PostgreSQL runtime](https://github.com/leinelissen/embedded-postgres).

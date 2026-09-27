@@ -11,3 +11,5 @@
 .control-settings-reset:hover{background:#34483c}
 .control-settings :is(button,select,input):focus-visible{outline:2px solid #ffd36b;outline-offset:3px}
 @media(max-width:520px){.control-settings-grid{grid-template-columns:minmax(0,1fr);gap:16px;padding-right:0}.control-settings-row:first-child{padding-right:52px}}
+.control-bindings{display:grid;grid-template-columns:minmax(90px,1fr) minmax(0,2fr);gap:8px 16px;margin:16px 0;font-size:14px;line-height:1.5}.control-bindings dt{color:#a8b7af}.control-bindings dd{margin:0;overflow-wrap:anywhere}
+.control-settings-row[hidden]{display:none!important}.control-bindings dd{color:#f5f7f4}.control-settings-grid{grid-template-columns:minmax(0,1fr)}.control-settings-row>select{min-height:44px}.control-settings-row>input[type=range]{height:38px}

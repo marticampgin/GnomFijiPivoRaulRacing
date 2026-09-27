@@ -1,6 +1,11 @@
 extends SceneTree
 
 const Items = preload("res://items/race_items.gd")
+
+class FixedLootItems extends "res://items/race_items.gd":
+	func _draw_item(_weights: Dictionary) -> String:
+		return "lays_crab"
+
 var _checks: int = 0
 var _failures: int = 0
 
@@ -34,7 +39,7 @@ func _player(id: String, position: Vector3, world: Node3D, items: RefCounted) ->
 func _run() -> void:
 	var world := Node3D.new()
 	root.add_child(world)
-	var items := Items.new()
+	var items := FixedLootItems.new()
 	items.reset({}, world)
 	var a: Dictionary = _player("a", Vector3.ZERO, world, items)
 	var b: Dictionary = _player("b", Vector3(3, 0, 0), world, items)
@@ -42,26 +47,28 @@ func _run() -> void:
 	await physics_frame
 	a.combat.slots = ["fanta", "ice_rum"]
 	a.combat.health = 60.0
-	_check(items.use(a, 0, players) and items.use(a, 1, players), "two slots usable immediately")
-	_check(not items.use(a, 0, players), "empty slot cannot repeat")
+	_check(items.use_next(a, players), "oldest item usable immediately")
+	_check(a.combat.slots == ["ice_rum", ""] and a.combat.health == 60.0, "one use advances reserve without consuming it")
+	_check(items.use_next(a, players), "next distinct use consumes new head")
+	_check(not items.use_next(a, players), "empty queue cannot repeat")
 	_check(a.combat.health == 75.0, "ice repairs 15")
 	var base: Dictionary = {"top_speed": 30.0, "acceleration": 20.0}
 	_check(is_equal_approx(items.effects_stats(a, base).top_speed, 39.0), "speed buffs strongest wins")
 	_check(base.top_speed == 30.0, "base stats unchanged")
 	items.step(players, 2.0)
 	a.combat.slots[0] = "fanta"
-	items.use(a, 0, players)
+	items.use_next(a, players)
 	_check(a.combat.effects.fanta.remaining == 4.0, "same buff refreshes duration")
 	_check(is_equal_approx(items.effects_stats(a, base).top_speed, 39.0), "same buff does not stack")
 	a.combat.slots[0] = "mermaid_rum"
-	items.use(a, 0, players)
+	items.use_next(a, players)
 	_check(a.combat.health == 100.0, "repair clamps to max health")
 	_check(a.combat.effects.mermaid_rum.remaining == 4.0, "mermaid blur duration")
 	_check(Items.blur_intensity(a.combat) == 0.5, "strongest active blur wins")
 	_check(Items.blur_intensity({"effects": {"mermaid_rum": {"remaining": 1.0}}}) == 0.2, "mermaid blur from catalog")
 	_check(Items.blur_intensity({"effects": {"ice_rum": {"remaining": 0.0}}}) == 0.0, "expired blur is absent")
 	a.combat.slots[0] = "lays_crab"
-	items.use(a, 0, players)
+	items.use_next(a, players)
 	items.apply_damage(b, 20.0, a)
 	_check(is_equal_approx(b.combat.health, 77.0), "chips increases damage15percent")
 	items.apply_damage(b, -10.0)
@@ -87,6 +94,11 @@ func _run() -> void:
 	a.combat.slots = ["fanta", "ice_rum"]
 	items.step(players, 0.01)
 	_check(a.combat.slots == ["fanta", "ice_rum"], "full slots never replaced")
+	_check(items.world_state().pickups[0].available, "full inventory leaves gift available")
+	_check(items.use_next(a, players), "oldest item releases queue capacity")
+	items.step(players, 0.01)
+	_check(a.combat.slots == ["ice_rum", "lays_crab"], "A B use then pickup C keeps FIFO B C")
+	items._cooldowns.clear()
 	a.combat.slots = ["", ""]
 	items.step(players, 0.01)
 	_check(a.combat.slots[0] != "" and a.combat.slots[1] == "", "pickup fills first free slot")
@@ -143,9 +155,9 @@ func _run() -> void:
 	items._explode(explosion, players)
 	_check(b.combat.health == 100.0, "stacked road blocks blast within radius")
 	a.combat.slots = ["stroh80", "bfg10k"]
-	items.use(a, 0, players)
-	items.use(a, 1, players)
-	_check(items.world_state().projectiles.size() == 2, "both attack items launch projectiles")
+	items.use_next(a, players)
+	items.use_next(a, players)
+	_check(items.world_state().projectiles.size() == 2, "two separate uses launch queued attack items in order")
 	_check(JSON.stringify(items.world_state()).contains("projectiles"), "world snapshot JSON serializable")
 	items.reset(players, world)
 	_check(items.world_state().projectiles.is_empty() and items.world_state().events.is_empty(), "race reset clears world")
@@ -155,7 +167,7 @@ func _run() -> void:
 	await physics_frame
 	await physics_frame
 	a.combat.slots[0] = "bfg10k"
-	items.use(a, 0, players)
+	items.use_next(a, players)
 	for frame: int in range(12):
 		items.step(players, 1.0 / 60.0)
 	_check(b.combat.health == 45.0, "BFG swept ray actually strikes kart collider")
@@ -168,7 +180,7 @@ func _run() -> void:
 	a.finished = true
 	b.spectator = true
 	a.combat.slots[0] = "fanta"
-	_check(not items.use(a, 0, players), "finished racer cannot activate item")
+	_check(not items.use_next(a, players), "finished racer cannot activate item")
 	items._explode(explosion, players)
 	_check(a.combat.health == 100.0 and b.combat.health == 100.0, "finished and spectator immune to attacks")
 	print("ITEMS_PROBE checks=%d failures=%d" % [_checks, _failures])

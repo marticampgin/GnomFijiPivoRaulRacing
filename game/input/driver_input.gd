@@ -2,9 +2,9 @@ class_name DriverInput
 extends RefCounted
 
 const KEYBOARD: int = -1
-const BUTTON_ACTIONS: Array[String] = ["drift", "use_item_1", "use_item_2", "look_back", "pause"]
+const BUTTON_ACTIONS: Array[String] = ["drift_left", "drift_right", "use_item", "look_back", "pause"]
 const AXIS_ACTIONS: Array[String] = ["steering", "throttle", "brake"]
-const EDGE_ACTIONS: Array[String] = ["use_item_1", "use_item_2", "pause"]
+const EDGE_ACTIONS: Array[String] = ["use_item", "pause"]
 var device: int = KEYBOARD
 var _previous: Dictionary = {}
 var _blocked: Dictionary = {}
@@ -17,13 +17,13 @@ func _init(source: int = KEYBOARD) -> void:
 
 
 static func default_profile() -> Dictionary:
-	return {"keyboard": "both", "gamepad": "standard", "deadzone": 0.2, "steering": 1.0}
+	return {"keyboard": "arcade", "gamepad": "arcade", "deadzone": 0.2, "steering": 1.0}
 
 
 static func validate_profile(value: Variant) -> Dictionary:
 	if not value is Dictionary or value.size() != 4:
 		return {}
-	if value.get("keyboard") not in ["both", "wasd", "arrows"] or value.get("gamepad") not in ["standard", "alternate"]:
+	if value.get("keyboard") not in ["arcade", "both", "wasd", "arrows"] or value.get("gamepad") not in ["arcade", "standard", "alternate"]:
 		return {}
 	for key: String in ["deadzone", "steering"]:
 		if typeof(value.get(key)) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(value[key])):
@@ -48,8 +48,8 @@ func profile() -> Dictionary:
 
 
 static func neutral() -> Dictionary:
-	return {"steering": 0.0, "throttle": 0.0, "brake": 0.0, "drift": false,
-		"use_item_1": false, "use_item_2": false, "look_back": false, "pause": false}
+	return {"steering": 0.0, "throttle": 0.0, "brake": 0.0, "drift_left": false,
+		"drift_right": false, "use_item": false, "look_back": false, "pause": false}
 
 
 func reset() -> void:
@@ -63,7 +63,7 @@ static func read_device(source: int) -> Dictionary:
 	if source == KEYBOARD:
 		var keys: Dictionary = {}
 		for key: int in [KEY_A, KEY_D, KEY_W, KEY_S, KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN,
-			KEY_SPACE, KEY_Q, KEY_E, KEY_C, KEY_ESCAPE]:
+			KEY_SPACE, KEY_Q, KEY_E, KEY_C, KEY_ESCAPE, KEY_SHIFT, KEY_T, KEY_F, KEY_TAB]:
 			keys[key] = Input.is_physical_key_pressed(key)
 		return {"connected": true, "keys": keys}
 	if source not in Input.get_connected_joypads():
@@ -112,22 +112,31 @@ func _decode(raw: Dictionary) -> Dictionary:
 		command.steering = float(_key_axis(keys, KEY_D, KEY_RIGHT)) - float(_key_axis(keys, KEY_A, KEY_LEFT))
 		command.throttle = float(_key_axis(keys, KEY_W, KEY_UP))
 		command.brake = float(_key_axis(keys, KEY_S, KEY_DOWN))
-		command.drift = bool(keys.get(KEY_SPACE, false))
-		command.use_item_1 = bool(keys.get(KEY_Q, false))
-		command.use_item_2 = bool(keys.get(KEY_E, false))
+		command.drift_left = bool(keys.get(KEY_SHIFT, false))
+		command.drift_right = bool(keys.get(KEY_E, false))
+		command.use_item = bool(keys.get(KEY_Q, false))
 		command.look_back = bool(keys.get(KEY_C, false))
 		command.pause = bool(keys.get(KEY_ESCAPE, false))
+		if _profile.keyboard == "arcade":
+			command.throttle = float(bool(keys.get(KEY_SPACE, false)))
+			command.brake = float(bool(keys.get(KEY_C, false)))
+			command.look_back = bool(keys.get(KEY_F, false))
+			command.pause = command.pause or bool(keys.get(KEY_TAB, false))
 	else:
 		var axes: Dictionary = raw.get("axes", {})
 		var buttons: Dictionary = raw.get("buttons", {})
 		command.steering = _axis(float(axes.get(JOY_AXIS_LEFT_X, 0.0)), _profile.deadzone, true)
 		command.throttle = _axis(float(axes.get(JOY_AXIS_TRIGGER_RIGHT, 0.0)), 0.1, false)
 		command.brake = _axis(float(axes.get(JOY_AXIS_TRIGGER_LEFT, 0.0)), 0.1, false)
-		command.drift = bool(buttons.get(JOY_BUTTON_X if _profile.gamepad == "alternate" else JOY_BUTTON_A, false))
-		command.use_item_1 = bool(buttons.get(JOY_BUTTON_LEFT_SHOULDER, false))
-		command.use_item_2 = bool(buttons.get(JOY_BUTTON_RIGHT_SHOULDER, false))
-		command.look_back = bool(buttons.get(JOY_BUTTON_B if _profile.gamepad == "alternate" else JOY_BUTTON_Y, false))
+		command.drift_left = bool(buttons.get(JOY_BUTTON_LEFT_SHOULDER, false))
+		command.drift_right = bool(buttons.get(JOY_BUTTON_RIGHT_SHOULDER, false))
+		command.use_item = bool(buttons.get(JOY_BUTTON_Y, false))
+		command.look_back = bool(buttons.get(JOY_BUTTON_B if _profile.gamepad == "alternate" else JOY_BUTTON_X, false))
 		command.pause = bool(buttons.get(JOY_BUTTON_START, false))
+		if _profile.gamepad == "arcade":
+			command.throttle = float(bool(buttons.get(JOY_BUTTON_A, false)))
+			command.brake = float(bool(buttons.get(JOY_BUTTON_B, false)))
+			command.look_back = bool(buttons.get(JOY_BUTTON_X, false))
 	command.steering = clampf(command.steering * _profile.steering, -1.0, 1.0)
 	return command
 
@@ -150,8 +159,8 @@ static func sample() -> Dictionary:
 		"steering": Input.get_axis("drive_left", "drive_right"),
 		"throttle": Input.get_action_strength("drive_accelerate"),
 		"brake": Input.get_action_strength("drive_brake"),
-		"drift": Input.is_action_pressed("drive_drift"),
-		"use_item_1": Input.is_action_just_pressed("use_item_1"),
-		"use_item_2": Input.is_action_just_pressed("use_item_2"),
+		"drift_left": Input.is_action_pressed("drive_drift_left"),
+		"drift_right": Input.is_action_pressed("drive_drift_right"),
+		"use_item": Input.is_action_just_pressed("use_item"),
 		"look_back": Input.is_action_pressed("look_back"),
 	}

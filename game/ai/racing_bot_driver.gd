@@ -42,12 +42,12 @@ func needs_recovery() -> bool:
 func sample_countdown(seconds_left: float) -> Dictionary:
 	# Timing is a pedal decision; the shared countdown judge still grants or rejects it.
 	var press_at: float = 0.85 - float(_slot % 3) * 0.15 if difficulty == "easy" else (0.7 - float(_slot % 4) * 0.12 if difficulty == "normal" else 0.45 - float(_slot % 3) * 0.05)
-	return {"steering": 0.0, "throttle": 1.0 if seconds_left <= press_at else 0.0, "brake": 0.0, "drift": false}
+	return {"steering": 0.0, "throttle": 1.0 if seconds_left <= press_at else 0.0, "brake": 0.0, "drift_left": false, "drift_right": false}
 
 
 func sample(vehicle: CharacterBody3D, progress: Dictionary, delta: float) -> Dictionary:
 	if bool(progress.get("finished", false)):
-		return {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false, "drive_blocked": true}
+		return {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift_left": false, "drift_right": false, "drive_blocked": true}
 	var speed: float = vehicle.speed_mps
 	var profile: Dictionary = PROFILES[difficulty]
 	_driving_time += maxf(0.0, delta)
@@ -75,37 +75,48 @@ func sample(vehicle: CharacterBody3D, progress: Dictionary, delta: float) -> Dic
 	if absf(error) > 0.55:
 		target_speed = minf(target_speed, 14.0)
 	var steering: float = clampf(2.0 * maxf(speed, 5.0) * sin(error) / maxf(2.0, direction.length()) / turn_rate, -1.0, 1.0)
+	# Sliding needs a settled line and a broad bend; tight turns keep normal grip.
+	var drift: bool = speed > 14.0 and absf(steering) > 0.28 and absf(steering) < 0.5 and vehicle.grounded
+	drift = drift and curvature < 0.025 and absf(error) < 0.22 and speed < target_speed + 1.0
+	if vehicle.drift_owner == 0 and not vehicle._drift_armed:
+		drift = false
+	if vehicle.drift_feedback in ["early", "late", "complete"]:
+		drift = false
+	var owner: int = int(vehicle.drift_owner)
+	if owner == 0:
+		owner = -1 if steering < 0.0 else 1
+	var turbo: bool = drift and vehicle.drift_ready() and vehicle.drift_charge >= (0.9 if difficulty == "easy" else 0.78)
+	if drift:
+		steering /= 1.15 + 0.2 * float(vehicle.stats.drift)
 	_held_command = {"steering": steering, "throttle": 1.0 if speed < target_speed - 0.3 else 0.0,
-		"brake": 1.0 if speed > target_speed + 1.5 else 0.0, "drift": false}
+		"brake": 1.0 if speed > target_speed + 1.5 else 0.0,
+		"drift_left": drift and (owner == -1 or turbo), "drift_right": drift and (owner == 1 or turbo)}
 	return _held_command.duplicate()
 
 
-func item_slots(player: Dictionary, players: Dictionary, tick: int) -> Array[int]:
-	var result: Array[int] = []
+func should_use_item(player: Dictionary, players: Dictionary, tick: int) -> bool:
 	if (tick + int(player.slot) * 13) % int(PROFILES[difficulty].item_ticks) != 0:
-		return result
+		return false
 	if player.get("finished", false) or float(player.combat.health) <= 0.0:
-		return result
-	for slot: int in 2:
-		var item: String = player.combat.slots[slot]
-		if item.is_empty():
-			continue
-		var health: float = float(player.combat.health)
-		if item in ["mermaid_rum", "ice_rum"]:
-			var threshold: float = 85.0
-			if difficulty == "hard":
-				threshold = 50.0 if item == "mermaid_rum" else 85.0
-			if health > threshold:
-				continue
+		return false
+	var item: String = player.combat.slots[0]
+	if item.is_empty():
+		return false
+	var health: float = float(player.combat.health)
+	if item in ["mermaid_rum", "ice_rum"]:
+		var threshold: float = 85.0
 		if difficulty == "hard":
-			if player.combat.effects.has(item):
-				continue
-			if item in ["stroh80", "bfg10k", "seeker"] and not _target_ahead(player, players, 25.0 if item == "stroh80" else 50.0):
-				continue
-			if item == "fanta" and absf(float(_held_command.get("steering", 0.0))) > 0.4:
-				continue
-		result.append(slot)
-	return result
+			threshold = 50.0 if item == "mermaid_rum" else 85.0
+		if health > threshold:
+			return false
+	if difficulty == "hard":
+		if player.combat.effects.has(item):
+			return false
+		if item in ["stroh80", "bfg10k", "seeker"] and not _target_ahead(player, players, 25.0 if item == "stroh80" else 50.0):
+			return false
+		if item == "fanta" and absf(float(_held_command.get("steering", 0.0))) > 0.4:
+			return false
+	return true
 
 
 func _target_ahead(player: Dictionary, players: Dictionary, reach: float) -> bool:

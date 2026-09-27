@@ -1,0 +1,34 @@
+'use strict';
+const assert = require('node:assert/strict');
+const {createPadReader} = require('../menu-navigation.js');
+const read = createPadReader();
+const pad = (pressed = [], axes = [0,0], index = 0) => ({index, connected:true, mapping:'standard', axes, buttons:Array.from({length:16}, (_, i) => ({pressed:pressed.includes(i)}))});
+let checks = 0;
+function check(actual, expected) { assert.deepEqual(actual, expected); checks++; }
+check(read([pad([0])], 0), []); // Connecting with A held must not launch a race.
+check(read([pad()], 10), []);
+check(read([pad([0])], 20), []);
+check(read([pad([0])], 900), []);
+check(read([pad()], 905), ['confirm']);
+check(read([pad([1])], 910), []);
+check(read([pad()], 915), ['back']);
+check(read([pad([9])], 920), ['menu']);
+check(read([pad([13])], 930), ['down']);
+check(read([pad([13])], 1280), []);
+check(read([pad([13])], 1290), ['down']);
+check(read([pad([13])], 1420), ['down']);
+check(read([pad([14])], 1430), ['left']);
+check(read([pad([], [0.2, -0.3])], 1440), []);
+check(read([pad([], [0.1, -0.8])], 1450), ['up']);
+check(read([pad([], [0.9, -0.6])], 1460), ['right']);
+check(read([], 1470), []);
+check(read([pad([0])], 1480), []);
+check(read([pad(), pad([0], [0,0], 1)], 1490), []);
+check(read([pad([0]), pad([0], [0,0], 1)], 1500), []);
+check(read([pad(), pad([0], [0,0], 1)], 1505), ['confirm']);
+check(read([{...pad([1]), mapping:''}], 1510), []);
+check(read([{...pad([1]), connected:false}], 1520), []);
+check(read([pad([], [0,0], 2)], 1530, true), []);
+check(read([pad([0], [0,0], 2)], 1540, true), []);
+check(read([pad([], [0,0], 2)], 1550, true), [{action:'confirm',device:2}]);
+console.log(`menu navigation: ${checks}/${checks} passed`);

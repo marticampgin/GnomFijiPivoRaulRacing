@@ -1,8 +1,8 @@
 class_name RacingVehicle
 extends CharacterBody3D
 
-const STATE_VERSION: int = 1
-const BALANCE_VERSION: String = "vehicle-prototype-v12"
+const STATE_VERSION: int = 2
+const BALANCE_VERSION: String = "vehicle-prototype-v13"
 const COLLISION_SIZE: Vector3 = Vector3(2.18, 0.7, 2.696)
 const COLLISION_BEVEL: float = 0.1
 const DEFAULT_STATS: Dictionary = {
@@ -17,11 +17,12 @@ const DRIFT_MIN_SPEED: float = 8.0
 const DRIFT_MIN_STEERING: float = 0.18
 const DRIFT_MIN_SLIP: float = 0.05
 const DRIFT_MAX_SLIP: float = 1.2
-const BOOST_MIN_CHARGE: float = 0.25
 const REVERSE_MAX_SPEED: float = 8.0
 const REVERSE_ACCELERATION: float = 10.0
-const DRIFT_BALANCE_VERSION: int = 1
-const DRIFT_LEVEL_THRESHOLDS: Array[float] = [0.25, 0.6, 1.0]
+const DRIFT_BALANCE_VERSION: int = 2
+const DRIFT_READY_CHARGE: float = 0.65
+const DRIFT_CHARGE_RATE: float = 0.52
+const DRIFT_FEEDBACK_SECONDS: float = 0.65
 const DRIFT_BOOST_SECONDS: Array[float] = [1.1, 1.5, 2.0]
 
 var stats: Dictionary = DEFAULT_STATS.duplicate()
@@ -31,7 +32,14 @@ var drift_charge: float = 0.0
 var boost_remaining: float = 0.0
 var speed_mps: float = 0.0
 var steering_amount: float = 0.0
-var _drift_was_pressed: bool = false
+var drift_owner: int = 0
+var drift_chain: int = 0
+var drift_feedback: String = ""
+var drift_feedback_remaining: float = 0.0
+var _drift_left_was_pressed: bool = false
+var _drift_right_was_pressed: bool = false
+var _drift_armed: bool = true
+var _drift_failed: bool = false
 
 
 static func create_collision_shape() -> ConvexPolygonShape3D:
@@ -89,15 +97,13 @@ func step(input: Dictionary, delta: float, gravity_up: Vector3 = Vector3.UP) -> 
 	var steering: float = _axis(input, "steering", -1.0, 1.0)
 	var throttle: float = _axis(input, "throttle", 0.0, 1.0)
 	var brake: float = _axis(input, "brake", 0.0, 1.0)
-	var drift_pressed: bool = bool(input.get("drift", false))
+	var drift_left: bool = bool(input.get("drift_left", false))
+	var drift_right: bool = bool(input.get("drift_right", false))
 	var drive_blocked: bool = bool(input.get("drive_blocked", false))
 	if drive_blocked:
 		steering = 0.0
 		throttle = 0.0
 		brake = 1.0
-		drift_pressed = false
-		is_drifting = false
-		drift_charge = 0.0
 	var vertical_speed: float = velocity.dot(up_direction)
 	var planar: Vector3 = velocity.slide(up_direction)
 	var forward_speed: float = planar.dot(forward)
@@ -107,21 +113,10 @@ func step(input: Dictionary, delta: float, gravity_up: Vector3 = Vector3.UP) -> 
 	floor_stop_on_slope = (drive_blocked or (throttle <= 0.01 and brake <= 0.01)) and planar.length_squared() < 0.25
 	boost_remaining = maxf(0.0, boost_remaining - dt)
 
-	if _drift_was_pressed and not drift_pressed:
-		if on_surface and is_drifting and drift_level() > 0:
-			boost_remaining = maxf(boost_remaining, DRIFT_BOOST_SECONDS[drift_level() - 1])
-		drift_charge = 0.0
-	is_drifting = (drift_pressed and on_surface and forward_speed >= DRIFT_MIN_SPEED
-		and absf(steering) >= DRIFT_MIN_STEERING)
-	if is_drifting:
-		var slip_angle: float = absf(atan2(planar.dot(right), forward_speed))
-		if slip_angle >= DRIFT_MIN_SLIP and slip_angle <= DRIFT_MAX_SLIP:
-			drift_charge = minf(1.0, drift_charge + dt * 0.52 * float(stats["drift"]))
-		elif slip_angle > DRIFT_MAX_SLIP:
-			drift_charge = 0.0
-	elif drift_pressed or not on_surface:
-		drift_charge = 0.0
-	_drift_was_pressed = drift_pressed
+	var slip_angle: float = absf(atan2(planar.dot(right), forward_speed))
+	_step_drift(drift_left, drift_right, not drive_blocked and on_surface
+		and forward_speed >= DRIFT_MIN_SPEED and (drift_owner != 0 or absf(steering) >= DRIFT_MIN_STEERING),
+		slip_angle, dt)
 	steering_amount = steering
 
 	var speed_ratio: float = clampf(absf(forward_speed) / 8.0, 0.0, 1.0)
@@ -172,17 +167,84 @@ func step(input: Dictionary, delta: float, gravity_up: Vector3 = Vector3.UP) -> 
 	move_and_slide()
 	grounded = is_on_floor()
 	if not grounded:
-		is_drifting = false
-		drift_charge = 0.0
+		cancel_drift()
 	speed_mps = velocity.slide(up_direction).length()
 
 
 func drift_level() -> int:
-	var level: int = 0
-	for threshold: float in DRIFT_LEVEL_THRESHOLDS:
-		if drift_charge >= threshold:
-			level += 1
-	return level
+	return drift_chain
+
+
+func drift_ready() -> bool:
+	return is_drifting and not _drift_failed and drift_chain < 3 and drift_charge >= DRIFT_READY_CHARGE
+
+
+## Held shoulder state is part of prediction so repeated network input has no new edge.
+func _step_drift(left: bool, right: bool, eligible: bool, slip: float, dt: float) -> void:
+	var left_edge: bool = left and not _drift_left_was_pressed
+	var right_edge: bool = right and not _drift_right_was_pressed
+	_drift_left_was_pressed = left
+	_drift_right_was_pressed = right
+	drift_feedback_remaining = maxf(0.0, drift_feedback_remaining - dt)
+	if drift_feedback_remaining == 0.0 and not _drift_failed:
+		drift_feedback = ""
+	if not left and not right:
+		cancel_drift()
+		_drift_armed = true
+		return
+	if not eligible or slip > DRIFT_MAX_SLIP:
+		cancel_drift()
+		return
+	if drift_owner != 0 and not (left if drift_owner == -1 else right):
+		cancel_drift()
+		return
+	if drift_owner == 0:
+		if not _drift_armed:
+			return
+		if left and right:
+			_drift_armed = false
+			return
+		drift_owner = -1 if left else 1
+		is_drifting = true
+	if _drift_failed or drift_chain == 3:
+		return
+	if slip >= DRIFT_MIN_SLIP:
+		drift_charge += dt * DRIFT_CHARGE_RATE * float(stats.drift)
+	if drift_charge > 1.0:
+		drift_charge = 1.0
+		_drift_failed = true
+		_feedback("late")
+		return
+	var opposite_edge: bool = right_edge if drift_owner == -1 else left_edge
+	if opposite_edge:
+		if drift_charge < DRIFT_READY_CHARGE:
+			_drift_failed = true
+			_feedback("early")
+			return
+		drift_chain += 1
+		boost_remaining = maxf(boost_remaining, DRIFT_BOOST_SECONDS[drift_chain - 1])
+		drift_charge = 0.0
+		_feedback("complete" if drift_chain == 3 else "success")
+	elif drift_ready() and drift_feedback_remaining == 0.0:
+		drift_feedback = "ready"
+
+
+func _feedback(value: String) -> void:
+	drift_feedback = value
+	drift_feedback_remaining = DRIFT_FEEDBACK_SECONDS
+
+
+## Canceling never awards a turbo, including pause, respawn and weapon interruption.
+func cancel_drift() -> void:
+	if _drift_failed or drift_feedback == "ready":
+		drift_feedback = ""
+		drift_feedback_remaining = 0.0
+	is_drifting = false
+	drift_owner = 0
+	drift_chain = 0
+	drift_charge = 0.0
+	_drift_failed = false
+	_drift_armed = false
 
 
 func capture_state() -> Dictionary:
@@ -196,7 +258,14 @@ func capture_state() -> Dictionary:
 		"is_drifting": is_drifting,
 		"drift_charge": drift_charge,
 		"boost_remaining": boost_remaining,
-		"drift_was_pressed": _drift_was_pressed,
+		"drift_owner": drift_owner,
+		"drift_chain": drift_chain,
+		"drift_feedback": drift_feedback,
+		"drift_feedback_remaining": drift_feedback_remaining,
+		"drift_left_was_pressed": _drift_left_was_pressed,
+		"drift_right_was_pressed": _drift_right_was_pressed,
+		"drift_armed": _drift_armed,
+		"drift_failed": _drift_failed,
 		"steering_amount": steering_amount,
 	}
 
@@ -212,7 +281,14 @@ func restore_state(state: Dictionary) -> void:
 	is_drifting = bool(state.get("is_drifting", false))
 	drift_charge = clampf(float(state.get("drift_charge", 0.0)), 0.0, 1.0)
 	boost_remaining = clampf(float(state.get("boost_remaining", 0.0)), 0.0, 2.0)
-	_drift_was_pressed = bool(state.get("drift_was_pressed", false))
+	drift_owner = clampi(int(state.get("drift_owner", 0)), -1, 1)
+	drift_chain = clampi(int(state.get("drift_chain", 0)), 0, 3)
+	drift_feedback = str(state.get("drift_feedback", ""))
+	drift_feedback_remaining = clampf(float(state.get("drift_feedback_remaining", 0.0)), 0.0, DRIFT_FEEDBACK_SECONDS)
+	_drift_left_was_pressed = bool(state.get("drift_left_was_pressed", false))
+	_drift_right_was_pressed = bool(state.get("drift_right_was_pressed", false))
+	_drift_armed = bool(state.get("drift_armed", false))
+	_drift_failed = bool(state.get("drift_failed", false))
 	steering_amount = float(state.get("steering_amount", 0.0))
 	speed_mps = velocity.slide(up_direction).length()
 	reset_physics_interpolation()
@@ -223,12 +299,14 @@ func reset_at(location: Transform3D) -> void:
 	velocity = Vector3.ZERO
 	up_direction = location.basis.y.normalized()
 	grounded = false
-	is_drifting = false
-	drift_charge = 0.0
+	cancel_drift()
 	boost_remaining = 0.0
 	speed_mps = 0.0
 	steering_amount = 0.0
-	_drift_was_pressed = false
+	drift_feedback = ""
+	drift_feedback_remaining = 0.0
+	_drift_left_was_pressed = false
+	_drift_right_was_pressed = false
 	reset_physics_interpolation()
 
 

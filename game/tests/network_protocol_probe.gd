@@ -14,12 +14,12 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	var item_command: Dictionary = {"type": "use_item", "sequence": 1, "race_id": 1, "epoch": 0, "slot": 0}
+	var item_command: Dictionary = {"type": "use_item", "sequence": 1, "race_id": 1, "epoch": 0}
 	_check(not Protocol.validate_item_command(item_command).is_empty(), "valid item command")
 	var second_slot: Dictionary = item_command.duplicate()
 	second_slot["slot"] = 1.0
-	_check(not Protocol.validate_item_command(second_slot).is_empty(), "JSON integral slot one accepted")
-	for key: String in ["sequence", "race_id", "epoch", "slot"]:
+	_check(Protocol.validate_item_command(second_slot).is_empty(), "slot selection is rejected")
+	for key: String in ["sequence", "race_id", "epoch"]:
 		for invalid: Variant in [NAN, INF, -INF, "1", null, true, -1, 0.5, 2147483648]:
 			var broken: Dictionary = item_command.duplicate()
 			broken[key] = invalid
@@ -32,8 +32,11 @@ func _run() -> void:
 		var broken: Dictionary = item_command.duplicate()
 		broken.erase(key)
 		_check(Protocol.validate_item_command(broken).is_empty(), "reject missing item field %s" % key)
-	var combat: Dictionary = {"health": 100.0, "max_health": 100.0, "slots": ["", "fanta"], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0, "shards": 0}
+	var combat: Dictionary = {"health": 100.0, "max_health": 100.0, "slots": ["fanta", ""], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0, "shards": 0}
 	_check(not Protocol.validate_combat(combat).is_empty(), "valid combat state")
+	var hole_inventory: Dictionary = combat.duplicate(true)
+	hole_inventory.slots = ["", "fanta"]
+	_check(Protocol.validate_combat(hole_inventory).is_empty(), "FIFO inventory rejects empty head with occupied reserve")
 	for item_id: String in ["fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k", "crystal_shield", "seeker", "rear_trap"]:
 		var equipped: Dictionary = combat.duplicate(true)
 		equipped["slots"] = [item_id, item_id]
@@ -59,14 +62,14 @@ func _run() -> void:
 		broken.erase(key)
 		_check(Protocol.validate_combat(broken).is_empty(), "reject missing combat field %s" % key)
 	_check(Protocol.validate_combat(null).is_empty(), "reject absent combat state")
-	var input: Dictionary = {"type": "input", "sequence": 1, "steering": -1.0, "throttle": 1.0, "brake": 0.0, "drift": true}
+	var input: Dictionary = {"type": "input", "sequence": 1, "steering": -1.0, "throttle": 1.0, "brake": 0.0, "drift_left": true, "drift_right": false}
 	_check(not Protocol.validate_input(input).is_empty(), "valid input")
 	for key: String in ["sequence", "steering", "throttle", "brake"]:
 		for invalid: Variant in [NAN, INF, -INF, "1", null, true]:
 			var broken: Dictionary = input.duplicate()
 			broken[key] = invalid
 			_check(Protocol.validate_input(broken).is_empty(), "reject %s:%s" % [key, str(invalid)])
-	for changes: Dictionary in [{"sequence": 0}, {"sequence": 1.5}, {"sequence": 2147483648}, {"steering": 1.01}, {"brake": -0.1}, {"drift": 1}, {"type": "position"}, {"extra": 1}]:
+	for changes: Dictionary in [{"sequence": 0}, {"sequence": 1.5}, {"sequence": 2147483648}, {"steering": 1.01}, {"brake": -0.1}, {"drift_left": 1}, {"drift_right": 0}, {"drift": true}, {"type": "position"}, {"extra": 1}]:
 		var broken: Dictionary = input.duplicate()
 		broken.merge(changes, true)
 		_check(Protocol.validate_input(broken).is_empty(), "reject invalid input shape/range %s" % str(changes))
@@ -92,7 +95,7 @@ func _run() -> void:
 	_check(Protocol.verify_ticket(ticket, secret, now + 60, manifest).is_empty(), "expired ticket")
 	_check(Protocol.verify_ticket(ticket + "=", secret, now, manifest).is_empty(), "noncanonical signature")
 	_check(Protocol.verify_ticket(ticket, "short", now, manifest).is_empty(), "short secret")
-	for changes: Dictionary in [{"v": 1}, {"protocol_version": 1}, {"vehicle_state_version": 2}, {"match_id": "other"}, {"loadout_hash": "prototype-v1"}, {"loadout_hash": "other"}, {"expires_at": now + 121}, {"expires_at": now + 1.5}, {"player_id": ""}, {"jti": ""}, {"display_name": "x".repeat(129)}]:
+	for changes: Dictionary in [{"v": 1}, {"protocol_version": 1}, {"vehicle_state_version": 1}, {"match_id": "other"}, {"loadout_hash": "prototype-v1"}, {"loadout_hash": "other"}, {"expires_at": now + 121}, {"expires_at": now + 1.5}, {"player_id": ""}, {"jti": ""}, {"display_name": "x".repeat(129)}]:
 		var broken: Dictionary = claims.duplicate()
 		broken.merge(changes, true)
 		_check(Protocol.verify_ticket(_sign(broken, secret), secret, now, manifest).is_empty(), "reject claims %s" % str(changes))
@@ -133,6 +136,11 @@ func _run() -> void:
 	vehicle.global_transform = Transform3D(Basis(Vector3.UP, 0.4), Vector3(4.0, 3.0, -2.0))
 	vehicle.velocity = Vector3(2.0, -1.0, 7.0)
 	vehicle.drift_charge = 0.75
+	vehicle.is_drifting = true
+	vehicle.drift_owner = -1
+	vehicle.drift_chain = 2
+	vehicle.drift_feedback = "ready"
+	vehicle._drift_left_was_pressed = true
 	vehicle.boost_remaining = 1.25
 	var state: Dictionary = JSON.parse_string(JSON.stringify(Protocol.pack_state(vehicle.capture_state())))
 	var unpacked: Dictionary = Protocol.unpack_state(state)
@@ -140,10 +148,25 @@ func _run() -> void:
 	sharp_box_state["balance_version"] = "vehicle-prototype-v2"
 	_check(Protocol.unpack_state(sharp_box_state).is_empty(), "reject sharp-box snapshot")
 	_check(not unpacked.is_empty(), "state JSON roundtrip")
-	_check(Protocol.WIRE_VERSION != Vehicle.STATE_VERSION and state["version"] == Vehicle.STATE_VERSION, "wire update does not change vehicle state schema")
+	_check(Protocol.WIRE_VERSION == 9 and Vehicle.STATE_VERSION == 2 and state["version"] == Vehicle.STATE_VERSION, "manual drift uses wire 9 and independently versioned vehicle state 2")
 	_check(unpacked["transform"].is_equal_approx(vehicle.global_transform) and unpacked["velocity"].is_equal_approx(vehicle.velocity), "snapshot preserves transform and velocity")
 	_check(unpacked["drift_charge"] == 0.75 and unpacked["boost_remaining"] == 1.25, "snapshot preserves drift and boost")
-	for changes: Dictionary in [{"version": 2}, {"position": [NAN, 0.0, 0.0]}, {"velocity": [0.0, INF, 0.0]}, {"position": [1000001.0, 0.0, 0.0]}, {"drift_charge": NAN}, {"boost_remaining": 3.0}, {"grounded": 1}, {"balance_version": "vehicle-prototype-v1"}, {"balance_version": "other"}, {"basis": [[0, 0, 0], [0, 0, 0], [0, 0, 0]]}]:
+	_check(unpacked.drift_owner == -1 and unpacked.drift_chain == 2 and unpacked.drift_feedback == "ready" and unpacked.drift_left_was_pressed and not unpacked.drift_right_was_pressed, "snapshot preserves manual drift owner chain feedback and consumed edge latches")
+	for key: String in ["drift_charge", "boost_remaining", "drift_owner", "drift_chain", "drift_feedback_remaining"]:
+		for invalid: Variant in [NAN, INF, -INF, true, "1", null]:
+			var broken: Dictionary = state.duplicate(true)
+			broken[key] = invalid
+			_check(Protocol.unpack_state(broken).is_empty(), "reject drift state scalar %s:%s" % [key, str(invalid)])
+	for key: String in ["grounded", "is_drifting", "drift_left_was_pressed", "drift_right_was_pressed", "drift_armed", "drift_failed"]:
+		for invalid: Variant in [0, 1, "true", null]:
+			var broken: Dictionary = state.duplicate(true)
+			broken[key] = invalid
+			_check(Protocol.unpack_state(broken).is_empty(), "reject drift latch %s:%s" % [key, str(invalid)])
+	for key: String in ["drift_owner", "drift_chain", "drift_feedback", "drift_feedback_remaining", "drift_left_was_pressed", "drift_right_was_pressed", "drift_armed", "drift_failed"]:
+		var broken: Dictionary = state.duplicate(true)
+		broken.erase(key)
+		_check(Protocol.unpack_state(broken).is_empty(), "reject missing manual drift state field " + key)
+	for changes: Dictionary in [{"version": 1}, {"version": 3}, {"position": [NAN, 0.0, 0.0]}, {"velocity": [0.0, INF, 0.0]}, {"position": [1000001.0, 0.0, 0.0]}, {"drift_charge": NAN}, {"drift_charge": -0.01}, {"drift_charge": 1.01}, {"boost_remaining": 3.0}, {"grounded": 1}, {"balance_version": "vehicle-prototype-v1"}, {"balance_version": "other"}, {"basis": [[0, 0, 0], [0, 0, 0], [0, 0, 0]]}, {"drift_owner": -2}, {"drift_owner": 2}, {"drift_owner": 0.5}, {"drift_chain": -1}, {"drift_chain": 4}, {"drift_chain": 1.5}, {"drift_feedback": "perfect"}, {"drift_feedback": null}, {"drift_feedback": true}, {"drift_feedback_remaining": -0.01}, {"drift_feedback_remaining": Vehicle.DRIFT_FEEDBACK_SECONDS + 0.01}]:
 		var broken: Dictionary = state.duplicate(true)
 		broken.merge(changes, true)
 		_check(Protocol.unpack_state(broken).is_empty(), "reject malformed state %s" % str(changes))

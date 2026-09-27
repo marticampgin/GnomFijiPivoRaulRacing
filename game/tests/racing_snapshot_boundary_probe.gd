@@ -31,8 +31,8 @@ func _run() -> void:
 		invalid_driving.slipstream_target = invalid
 		_check(Protocol.validate_driving(invalid_driving).is_empty(), "bounded target id")
 	var extra_driving: Dictionary = driving.duplicate()
-	extra_driving.drift_level = 3
-	_check(Protocol.validate_driving(extra_driving).is_empty(), "drift level is derived not network field")
+	extra_driving.drift_chain = 3
+	_check(Protocol.validate_driving(extra_driving).is_empty(), "drift chain belongs to vehicle state not driving presentation")
 	var world: Dictionary = {"pickups": [{"id": 0, "position": [0, 1, 2], "available": true}],
 		"projectiles": [{"id": 1, "position": [0, 1, 2], "kind": "bfg10k", "target": ""}],
 		"events": [{"id": 2, "position": [0, 1, 2], "kind": "blast_bfg10k", "radius": 9}],
