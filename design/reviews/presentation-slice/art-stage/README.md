@@ -49,12 +49,15 @@ reports include these checks, not a skipped test or an application focus hack.
 
 ## Follow-up Gates
 
-Explicit model-sheet/blockout and route-direction approval precedes final UVs,
-rigging and detailed scenery. Then refine silhouette/materials, LODs, foliage,
-castle/shore geometry, camera-scene collision and the remaining drift VFX.
+The model sheet was approved as the MVP modeling direction on 2026-09-27
+("Для MVP ок"); this does not accept the rendered blockout or final asset.
+The user requested correction of reversed road arrows before route approval.
+Final UVs, deformation, LODs, detailed scenery and quality budgets remain open.
+Art revision 3 adds corrected arrows and client-only camera scenery queries;
+the evidence above remains the historical art revision 2 checkpoint.
 
-The keyboard fixture recorded intermittent low speeds on uphill sections while
-requesting throttle. Positions stayed continuous and correction was small;
-contact/traction is a hypothesis, not an established diagnosis. Keep this as a
-separate instrumented driving investigation; do not silently change simulation
-compatibility during an art-only pass.
+The uphill speed drops recorded in this historical checkpoint were subsequently
+reproduced as sharp collider contacts with internal road edges. Loadout v3 fixes
+them with a beveled collider; exact seeds, replay and real barrier checks are
+recorded in `docs/vehicle-controller.md` and `docs/delivery.md`. Art revision 3
+does not change that simulation contract.

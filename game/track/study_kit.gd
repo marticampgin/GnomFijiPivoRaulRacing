@@ -1,5 +1,6 @@
 extends "res://track/fantasy_track_visuals.gd"
 
+const CameraObstacles = preload("res://view/camera_obstacles.gd")
 
 func prepare() -> void:
 	_materials_init()
@@ -27,6 +28,8 @@ func _place(mesh: Mesh, material: Material, pose: Transform3D, shadow: bool = tr
 
 
 func finish() -> void:
+	CameraObstacles.build_from(self, [_materials.stone, _materials.cap, _materials.castle_stone,
+		_materials.terrain, _materials.cliff, _materials.roof, _materials.roof_dark, _materials.trunk], _batches)
 	_flush_batches()
 	for visual: Node in get_children():
 		if visual is MultiMeshInstance3D:

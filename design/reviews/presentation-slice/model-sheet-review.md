@@ -1,6 +1,6 @@
 # Hero / Kart Review 01
 
-Status: **proposed, awaiting user approval**. The image is a generated design
+Status: **approved as the MVP modeling direction, 2026-09-27**. The image is a generated design
 turnaround, not a rendered 3D model, a dimensionally exact blueprint, or evidence
 of achieved game quality. No final geometry, UV, rig, or game asset is approved by
 this file.
@@ -67,11 +67,15 @@ must survive daylight without blooming away the facets or obscuring the driver.
 ## Acceptance Record
 
 - Design authority: previously accepted race/garage references, preserved.
-- This sheet: pending explicit user decision.
+- This sheet: user approved the direction for MVP on 2026-09-27, exact response:
+  "Для MVP ок". Selected image SHA256:
+  `942a42d4367fa03d537e0b655ce6ba25b549c4bc2f197f5c9c968f864aab80ef`.
+- Approval covers the broad teal kart, red-hat gnome, low rear crystal and twin
+  exhaust arrangement in this sheet. It does not approve final geometry,
+  measured dimensions, UV/rig, performance or the current Web implementation.
 - Source tooling setup: separately authorized; not visual approval.
 - Final UV/rig production: not started.
 - Real Web implementation and four-route-view gate: not passed by this sheet.
 
-Record approval date, exact selected image hash and any accepted deviations here
-after the user decides. Do not infer approval from the general instruction to
-continue implementation.
+No additional visual deviations were explicitly accepted. Further changes to
+this direction require review; general instructions to continue are not approval.

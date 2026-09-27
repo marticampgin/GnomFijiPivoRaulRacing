@@ -1,5 +1,7 @@
 extends RefCounted
 
+const CameraObstacles = preload("res://view/camera_obstacles.gd")
+const COLLISION_MASK: int = 1 | CameraObstacles.LAYER
 const BOOM_DISTANCE: float = 7.1
 const BOOM_HEIGHT: float = 3.5
 const POSITION_RESPONSE: float = 8.0
@@ -98,7 +100,7 @@ func _clear_boom(anchor: Vector3, desired: Vector3, space: PhysicsDirectSpaceSta
 			offsets.append((right * side + up * vertical).normalized() * CAMERA_RADIUS)
 	var allowed: float = length
 	for offset: Vector3 in offsets:
-		var query := PhysicsRayQueryParameters3D.create(anchor + offset, desired + offset, 1, exclude)
+		var query := PhysicsRayQueryParameters3D.create(anchor + offset, desired + offset, COLLISION_MASK, exclude)
 		query.hit_from_inside = true
 		var hit: Dictionary = space.intersect_ray(query)
 		if not hit.is_empty():

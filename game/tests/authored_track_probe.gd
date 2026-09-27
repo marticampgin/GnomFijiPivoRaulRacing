@@ -169,9 +169,18 @@ func _test_collision(data: Dictionary) -> void:
 	root.add_child(client)
 	client.build(true)
 	var server_shapes: Array[Node] = server.find_children("*", "CollisionShape3D", true, false)
-	var client_shapes: Array[Node] = client.find_children("*", "CollisionShape3D", true, false)
+	var client_shapes: Array[Node] = []
+	for shape_node: Node in client.find_children("*", "CollisionShape3D", true, false):
+		var body: CollisionObject3D = shape_node.get_parent()
+		if body.collision_layer & 1:
+			client_shapes.append(shape_node)
+		else:
+			_check(body.collision_layer == 4 and body.collision_mask == 0,
+				"extra client geometry is exclusively camera-only")
 	var parity: bool = server_shapes.size() == client_shapes.size()
-	for index: int in server_shapes.size():
+	for index: int in mini(server_shapes.size(), client_shapes.size()):
+		parity = parity and server_shapes[index].get_parent().collision_layer == client_shapes[index].get_parent().collision_layer
+		parity = parity and server_shapes[index].get_parent().collision_mask == client_shapes[index].get_parent().collision_mask
 		parity = parity and server_shapes[index].global_transform.is_equal_approx(client_shapes[index].global_transform)
 		if server_shapes[index].shape is BoxShape3D:
 			parity = parity and server_shapes[index].shape.size.is_equal_approx(client_shapes[index].shape.size)

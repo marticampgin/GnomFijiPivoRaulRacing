@@ -1,8 +1,11 @@
 extends SceneTree
 
 const ChaseCamera = preload("res://view/race_camera.gd")
+const CameraObstacles = preload("res://view/camera_obstacles.gd")
 const Track = preload("res://track/authored_track.gd")
 const Baker = preload("res://track/track_baker.gd")
+const CAMERA_ONLY_LAYER: int = 4
+const CAMERA_MASK: int = 1 | CAMERA_ONLY_LAYER
 var checks: int = 0
 var failures: int = 0
 var _car: CharacterBody3D
@@ -101,6 +104,8 @@ func _run() -> void:
 	_check_view("road collision")
 	bank.queue_free()
 	await physics_frame
+	await _check_camera_layers()
+	await _check_obstacle_factory()
 
 	root.size = Vector2i(390, 844)
 	_controller.reset(_car)
@@ -136,34 +141,203 @@ func _check_translation_follow() -> void:
 	_controller.reset(_car)
 
 
+func _check_camera_layers() -> void:
+	_car.transform = Transform3D.IDENTITY
+	_car.velocity = Vector3.ZERO
+	var other_kart: StaticBody3D = _box(Vector3(0.0, 3.0, 3.0), Vector3(10.0, 6.0, 0.5))
+	other_kart.collision_layer = 2
+	other_kart.collision_mask = 0
+	await physics_frame
+	_controller.reset(_car)
+	_check(_camera.position.z > 7.0, "other karts on layer 2 do not compress the camera")
+	other_kart.queue_free()
+	await physics_frame
+	var obstacle: StaticBody3D = _box(Vector3(0.0, 3.0, 3.0), Vector3(10.0, 6.0, 0.5))
+	obstacle.collision_layer = CAMERA_ONLY_LAYER
+	obstacle.collision_mask = 0
+	await physics_frame
+	_controller.reset(_car)
+	_check(_camera.position.z > 1.0 and _camera.position.z < 2.6, "camera-only layer compresses the boom")
+	_check_view("camera-only obstruction")
+	var previous_layer: int = _car.collision_layer
+	var previous_mask: int = _car.collision_mask
+	_car.collision_layer = 2
+	_car.collision_mask = 1
+	for tick: int in 60:
+		await physics_frame
+		_car.velocity = Vector3.BACK * 6.0
+		_car.move_and_slide()
+	_check(_car.position.z > 5.9, "vehicle mask 1 passes through camera-only geometry")
+	_check(_car.get_slide_collision_count() == 0, "camera-only geometry does not register a vehicle contact")
+	_car.collision_layer = previous_layer
+	_car.collision_mask = previous_mask
+	_car.transform = Transform3D.IDENTITY
+	_car.velocity = Vector3.ZERO
+	obstacle.queue_free()
+	await physics_frame
+	_controller.reset(_car)
+	_check(_camera.position.z > 7.0, "camera-only obstacle removal restores an unobstructed boom")
+
+
+func _check_obstacle_factory() -> void:
+	var visual_root := Node3D.new()
+	visual_root.transform = Transform3D(Basis(Vector3.UP, 0.4), Vector3(50.0, 0.0, -20.0))
+	root.add_child(visual_root)
+	var opaque := StandardMaterial3D.new()
+	var transparent := StandardMaterial3D.new()
+	transparent.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(2.0, 5.0, 0.5)
+	var direct := MeshInstance3D.new()
+	direct.mesh = mesh
+	direct.material_override = opaque
+	direct.transform = Transform3D(Basis(Vector3.UP, -0.3).scaled(Vector3(1.1, 0.8, 1.2)), Vector3(-12.0, 2.0, 3.0))
+	visual_root.add_child(direct)
+	var excluded := MeshInstance3D.new()
+	excluded.mesh = mesh
+	excluded.material_override = transparent
+	excluded.position = Vector3(0.0, 2.0, 3.0)
+	visual_root.add_child(excluded)
+	var poses: Array[Transform3D] = [
+		Transform3D(Basis(Vector3.UP, 0.2).scaled(Vector3(0.8, 1.2, 1.0)), Vector3(8.0, 2.0, 3.0)),
+		Transform3D(Basis(Vector3.UP, -0.15).scaled(Vector3(1.3, 0.9, 0.8)), Vector3(16.0, 2.0, 3.0)),
+	]
+	var multi := MultiMesh.new()
+	multi.transform_format = MultiMesh.TRANSFORM_3D
+	multi.mesh = mesh
+	multi.instance_count = poses.size()
+	for index: int in poses.size():
+		multi.set_instance_transform(index, poses[index])
+	var batched_visual := MultiMeshInstance3D.new()
+	batched_visual.multimesh = multi
+	batched_visual.material_override = opaque
+	visual_root.add_child(batched_visual)
+	var batches: Dictionary = {
+		"opaque": {"mesh": mesh, "material": opaque, "transforms": poses},
+		"transparent": {"mesh": mesh, "material": transparent, "transforms": [Transform3D(Basis.IDENTITY, Vector3(24.0, 2.0, 3.0))]},
+	}
+	var materials: Array[Material] = [opaque]
+	var obstacle: StaticBody3D = CameraObstacles.build_from(visual_root, materials, batches)
+	_check(obstacle != null, "obstacle factory creates a body for whitelisted geometry")
+	if obstacle == null:
+		visual_root.queue_free()
+		await physics_frame
+		return
+	var shapes: Array[Node] = obstacle.find_children("*", "CollisionShape3D", true, false)
+	_check(shapes.size() == 1 and shapes[0].shape is ConcavePolygonShape3D, "obstacle factory aggregates geometry into one concave shape")
+	if shapes.size() == 1 and shapes[0].shape is ConcavePolygonShape3D:
+		var shape: ConcavePolygonShape3D = shapes[0].shape
+		var local_faces: PackedVector3Array = mesh.get_faces()
+		var expected := PackedVector3Array()
+		var expected_poses: Array[Transform3D] = [direct.transform, poses[0], poses[1]]
+		for pose: Transform3D in expected_poses:
+			for point: Vector3 in local_faces:
+				expected.append(pose * point)
+		var actual: PackedVector3Array = shape.get_faces()
+		var matches: bool = actual.size() == expected.size()
+		for index: int in mini(actual.size(), expected.size()):
+			matches = matches and actual[index].is_equal_approx(expected[index])
+		_check(matches, "factory preserves exact MeshInstance and CPU batch transforms while excluding both transparent sources")
+		_check(shape.backface_collision and int(obstacle.get_meta("triangle_count")) == expected.size() / 3, "factory retains backfaces and the exact triangle count")
+	await physics_frame
+	var previous_transform: Transform3D = _car.transform
+	var previous_velocity: Vector3 = _car.velocity
+	_car.global_transform = visual_root.global_transform * Transform3D(Basis.IDENTITY, Vector3(8.0, 0.0, 0.0))
+	_car.velocity = Vector3.ZERO
+	_controller.reset(_car)
+	var batch_camera: Vector3 = visual_root.to_local(_camera.global_position)
+	_check(batch_camera.z > 1.0 and batch_camera.z < 2.9, "camera clips at the transformed CPU batch location")
+	_car.global_transform = visual_root.global_transform
+	_controller.reset(_car)
+	_check(visual_root.to_local(_camera.global_position).z > 7.0, "GPU identity readback and excluded transparent mesh do not create an origin obstruction")
+	_car.global_transform = visual_root.global_transform * Transform3D(Basis.IDENTITY, Vector3(24.0, 0.0, 0.0))
+	_controller.reset(_car)
+	_check(visual_root.to_local(_camera.global_position).z > 7.0, "excluded transparent batch does not obstruct the camera")
+	_car.transform = previous_transform
+	_car.velocity = previous_velocity
+	visual_root.queue_free()
+	await physics_frame
+	_controller.reset(_car)
+
+
 func _check_route() -> void:
 	root.size = Vector2i(1600, 900)
 	var track: Node3D = Track.new()
 	root.add_child(track)
-	track.build(false)
 	_check(not track.data.is_empty(), "authored route fixture is valid")
 	if track.data.is_empty():
+		track.queue_free()
 		return
+	var simulation_hash: String = Baker.simulation_hash(track.data)
+	track.build(true)
+	var camera_only_bodies: int = 0
+	for body: CollisionObject3D in track.find_children("*", "CollisionObject3D", true, false):
+		if body.collision_layer & CAMERA_ONLY_LAYER:
+			camera_only_bodies += 1
+			_check(body.collision_layer == CAMERA_ONLY_LAYER and body.collision_mask == 0, "authored camera obstacle has an isolated layer and no response mask")
+	_check(camera_only_bodies > 0, "client route builds camera-only environment obstacles")
+	_check(Baker.simulation_hash(track.data) == simulation_hash, "camera obstacles preserve the baked simulation identity")
 	await physics_frame
 	var route_length: float = float(track.data.length)
 	var steps: int = ceili(route_length / (30.0 / 60.0))
-	for step: int in steps:
-		var offset: float = float(step) * (30.0 / 60.0)
-		var sample: Dictionary = track.sample_at(offset)
-		var tangent: Vector3 = Baker.vector(sample.tangent)
-		_car.global_transform = Transform3D(Basis.looking_at(tangent.slide(Vector3.UP).normalized(), Vector3.UP), Baker.vector(sample.position) + Vector3.UP * 0.36)
-		_car.velocity = tangent * 30.0
-		if step == 0:
-			_controller.reset(_car)
-		_controller.update(_car, 1.0 / 60.0, false, Baker.vector(track.sample_at(offset + 12.0).position))
-		if step % 20 == 0:
-			_check_view("authored route s=%.1f" % offset)
-			var point_query := PhysicsPointQueryParameters3D.new()
-			point_query.position = _camera.position
-			point_query.exclude = [_car.get_rid()]
-			_check(_car.get_world_3d().direct_space_state.intersect_point(point_query).is_empty(), "authored route camera stays outside barrier volumes")
+	for low: bool in [false, true]:
+		track.set_quality(low)
+		for look_back: bool in [false, true]:
+			for step: int in steps:
+				var offset: float = float(step) * (30.0 / 60.0)
+				var sample: Dictionary = track.sample_at(offset)
+				var tangent: Vector3 = Baker.vector(sample.tangent)
+				_car.global_transform = Transform3D(Basis.looking_at(tangent.slide(Vector3.UP).normalized(), Vector3.UP), Baker.vector(sample.position) + Vector3.UP * 0.36)
+				_car.velocity = tangent * 30.0
+				if step == 0:
+					_controller.reset(_car)
+				_controller.update(_car, 1.0 / 60.0, look_back, Baker.vector(track.sample_at(offset + 12.0).position))
+				if step % 20 == 0:
+					var label: String = "authored %s %s s=%.1f" % ["Low" if low else "Standard", "look-back" if look_back else "chase", offset]
+					_check_view(label)
+					var point_query := PhysicsPointQueryParameters3D.new()
+					point_query.position = _camera.position
+					point_query.collision_mask = CAMERA_MASK
+					point_query.exclude = [_car.get_rid()]
+					_check(_car.get_world_3d().direct_space_state.intersect_point(point_query).is_empty(), label + ": camera stays outside solid obstacle volumes")
+					_check_boom_clear(label)
+		_check(Baker.simulation_hash(track.data) == simulation_hash, "quality switch preserves simulation identity with camera obstacles")
 	track.queue_free()
 	await physics_frame
+	var server_track: Node3D = Track.new()
+	root.add_child(server_track)
+	server_track.build(false)
+	var server_camera_bodies: int = 0
+	for body: CollisionObject3D in server_track.find_children("*", "CollisionObject3D", true, false):
+		if body.collision_layer & CAMERA_ONLY_LAYER:
+			server_camera_bodies += 1
+	_check(server_camera_bodies == 0, "headless route does not build client camera obstacles")
+	_check(Baker.simulation_hash(server_track.data) == simulation_hash, "client and headless route retain identical simulation data")
+	server_track.queue_free()
+	await physics_frame
+
+
+func _check_boom_clear(label: String) -> void:
+	var anchor: Vector3 = _car.global_position + Vector3.UP * 1.05
+	var boom: Vector3 = _camera.global_position - anchor
+	if boom.length_squared() < 0.0001:
+		_check(false, label + ": boom must not collapse into its anchor")
+		return
+	var right: Vector3 = boom.cross(Vector3.UP).normalized()
+	if right.length_squared() < 0.0001:
+		right = Vector3.RIGHT
+	var up: Vector3 = right.cross(boom.normalized()).normalized()
+	var offsets: Array[Vector3] = [Vector3.ZERO]
+	for side: float in [-1.0, 1.0]:
+		for vertical: float in [-1.0, 1.0]:
+			offsets.append((right * side + up * vertical).normalized() * ChaseCamera.CAMERA_RADIUS)
+	var clear: bool = true
+	var space: PhysicsDirectSpaceState3D = _car.get_world_3d().direct_space_state
+	for offset: Vector3 in offsets:
+		var query := PhysicsRayQueryParameters3D.create(anchor + offset, _camera.global_position + offset, CAMERA_MASK, [_car.get_rid()])
+		query.hit_from_inside = true
+		clear = clear and space.intersect_ray(query).is_empty()
+	_check(clear, label + ": boom and near-plane corner rays do not cross opaque geometry")
 
 
 func _box(position: Vector3, size: Vector3) -> StaticBody3D:

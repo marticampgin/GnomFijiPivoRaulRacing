@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "status": "proposed-pending-user-approval",
+  "approvalDecision": { "date": "2026-09-27", "userResponse": "Сначала упор на графику, бюджет обсудим", "effect": "Numerical targets remain unapproved; art refinement may proceed. Agree limits before final performance acceptance." },
   "target": { "hardware": "Apple M4", "os": "macOS", "browser": "Chromium", "renderer": "Godot Compatibility WebGL2", "concurrentForegroundRenderers": 1 },
   "profiles": {
     "standard": { "viewport": [1600, 900], "renderScale": 1, "frameIntervalMs": { "p50Max": 16.7, "p95Max": 20, "p99Max": 33.3 } },
@@ -45,5 +46,5 @@
     "rawEvidence": "/private/tmp/gnom-wasm-memory-probe/result.json",
     "screenshot": "/private/tmp/gnom-wasm-memory-probe/loaded-idle.png"
   },
-  "notes": ["Proposed limits are not achieved production results and remain pending user approval", "JS heap, WASM buffer capacity, process RSS and GPU allocations are different metrics, not an additive total", "performance.memory reported different values from CDP in the diagnostic and is not substituted for the declared CDP JS-heap metric", "No desktop tier beyond this local M4 or mobile performance support claimed", "Unavailable or unmeasured metrics are not zero and cannot silently pass the final gate", "The model sheet and final hero production remain pending user approval"]
+  "notes": ["Proposed limits are not achieved production results and remain pending user approval", "JS heap, WASM buffer capacity, process RSS and GPU allocations are different metrics, not an additive total", "performance.memory reported different values from CDP in the diagnostic and is not substituted for the declared CDP JS-heap metric", "No desktop tier beyond this local M4 or mobile performance support claimed", "Unavailable or unmeasured metrics are not zero and cannot silently pass the final gate", "Model sheet approved for MVP on 2026-09-27; final hero asset remains unaccepted", "Historical /private/tmp baseline evidence was absent on 2026-09-27; recapture before performance acceptance"]
 }

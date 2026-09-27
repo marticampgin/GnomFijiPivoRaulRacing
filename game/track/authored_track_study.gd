@@ -11,6 +11,7 @@ var _data: Dictionary
 var _water: ShaderMaterial
 var _fall: ShaderMaterial
 var _built: bool = false
+var direction_sign_poses: Array[Transform3D] = []
 
 
 func build(data: Dictionary) -> void:
@@ -80,8 +81,12 @@ func _road() -> void:
 			var board: Vector3 = base - side * 6.92 + Vector3.UP * 0.82
 			var facing := Basis(-forward.slide(Vector3.UP).normalized(), Vector3.UP, side)
 			_kit._box(board, Vector3(3.5, 0.65, 0.09), _kit._materials.red, facing)
+			# The board faces the road, but the chevron tip must follow route +s.
+			var arrow_facing := Basis(forward.slide(Vector3.UP).normalized(), Vector3.DOWN, side)
 			for offset: float in [-1.0, 0.0, 1.0]:
-				_kit._place(_kit._chevron_mesh(), _kit._materials.white, _kit._pose(board + facing.x * offset + facing.z * 0.06, Vector3(0.9, 0.65, 1), facing), false)
+				var pose: Transform3D = _kit._pose(board + facing.x * offset + facing.z * 0.06, Vector3(0.9, 0.65, 1), arrow_facing)
+				direction_sign_poses.append(pose)
+				_kit._place(_kit._chevron_mesh(), _kit._materials.white, pose, false)
 
 
 func _shore_ribbons() -> void:

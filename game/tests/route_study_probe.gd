@@ -22,7 +22,19 @@ func _run() -> void:
 	study.build(data)
 	_check(Baker.simulation_hash(data) == before, "visual study does not modify simulation data")
 	_check(not study.get_meta("production_accepted", true), "study is explicitly not production accepted")
-	_check(study.find_children("*", "CollisionObject3D", true, false).is_empty(), "study adds no physics bodies")
+	var bodies: Array[Node] = study.find_children("*", "CollisionObject3D", true, false)
+	_check(bodies.size() == 1, "study aggregates camera scenery into one body")
+	var camera_body: StaticBody3D = study.find_child("CameraOnlyScenery", true, false)
+	_check(camera_body != null and camera_body.collision_layer == 4 and camera_body.collision_mask == 0,
+		"scenery is on camera-only layer, outside vehicle collision mask")
+	if camera_body == null or camera_body.get_child_count() != 1 or not camera_body.get_child(0) is CollisionShape3D or not camera_body.get_child(0).shape is ConcavePolygonShape3D:
+		_check(false, "camera scenery has one valid triangle shape")
+		study.queue_free()
+		await process_frame
+		quit(1)
+		return
+	var camera_faces: PackedVector3Array = camera_body.get_child(0).shape.get_faces()
+	_check(camera_faces.size() > 0, "camera scenery contains real mesh triangles")
 	var road: MeshInstance3D = study.find_child("StudyStoneRoad", true, false)
 	_check(road != null, "stone road exists")
 	if road != null:
@@ -39,13 +51,29 @@ func _run() -> void:
 	_check(castle != null, "castle has continuous rock foundation")
 	var total: int = 0
 	var foliage_count: int = 0
+	var chevrons: int = 0
 	for visual: Node in study.find_children("*", "MultiMeshInstance3D", true, false):
 		total += visual.multimesh.instance_count
 		if visual.get_meta("study_foliage", false):
 			foliage_count += visual.multimesh.instance_count
+	for pose: Transform3D in study.direction_sign_poses:
+		var nearest: Dictionary = {}
+		var distance: float = INF
+		for sample: Dictionary in data.samples:
+			var candidate: float = Baker.vector(sample.position).distance_squared_to(pose.origin)
+			if candidate < distance:
+				distance = candidate
+				nearest = sample
+		var forward: Vector3 = Baker.vector(nearest.tangent).slide(Vector3.UP).normalized()
+		_check(pose.basis.x.normalized().dot(forward) > 0.98,
+			"road chevron tip follows increasing checkpoint direction")
+		chevrons += 1
+	_check(chevrons > 0, "route direction regression covers actual rendered arrows")
 	_check(foliage_count > 1000, "forest uses textured alpha-scissor foliage sample")
 	var nodes: int = study.find_children("*", "GeometryInstance3D", true, false).size()
 	study.set_quality(true)
+	_check(camera_body.get_child(0).shape.get_faces() == camera_faces,
+		"Low preserves camera obstacles exactly")
 	var low_count: int = 0
 	for visual: Node in study.find_children("*", "MultiMeshInstance3D", true, false):
 		if visual.get_meta("study_foliage", false):
