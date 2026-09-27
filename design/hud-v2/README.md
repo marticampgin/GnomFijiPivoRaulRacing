@@ -91,8 +91,9 @@ Specific obstacle assets and shortcut geometry remain implementation work within
 the approved rules, not a reason to reopen the entire interview.
 
 Next order: shared local simulation, per-device input and cameras, pause/results/
-repeat; then the new race mechanics and track changes. OpenSpec reconciliation is
-pending confirmation of the artifact scope. Existing gameplay still uses the prior
+repeat; then the new race mechanics and track changes. The user approved reconciling
+the parent OpenSpec proposal, design, four specs and tasks, then implementation.
+Existing gameplay still uses the prior
 single-player HUD and has not gained split-screen from this design acceptance.
 
 ## Verification And Handoff
