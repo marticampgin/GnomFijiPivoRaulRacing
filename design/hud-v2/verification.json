@@ -1,7 +1,8 @@
 {
   "reviewedAt": "2026-09-27",
   "visualReviewComplete": true,
-  "status": "draft-awaiting-user-acceptance",
+  "status": "accepted-design-not-implemented",
+  "acceptedAt": "2026-09-27",
   "results": [
     {
       "id": "18:4",
