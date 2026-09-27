@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process';
-import { mkdir, readFile, stat } from 'node:fs/promises';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { patchWebPresent } from './web-present-compat.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const lock = JSON.parse(await readFile(resolve(root, 'tooling/godot.json'), 'utf8'));
@@ -28,6 +29,8 @@ try {
   await mkdir(dirname(output), { recursive: true });
   run(godot, ['--headless', '--path', resolve(root, 'game'), '--editor', '--import']);
   run(godot, ['--headless', '--path', resolve(root, 'game'), args[0] === '--debug' ? '--export-debug' : '--export-release', 'Web', output]);
+  const runtime = resolve(root, 'build/web/index.js');
+  await writeFile(runtime, patchWebPresent(await readFile(runtime, 'utf8'), lock.engineVersion));
   for (const extension of ['html', 'js', 'wasm', 'pck']) {
     const artifact = resolve(root, `build/web/index.${extension}`);
     if ((await stat(artifact)).size === 0) throw new Error(`Empty export artifact: ${artifact}`);

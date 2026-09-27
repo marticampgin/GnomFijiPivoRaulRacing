@@ -35,6 +35,28 @@ GODOT_BIN=/absolute/path/to/Godot node scripts/export-web.mjs --debug
 
 The command rejects a different editor version or altered/missing templates, imports the project, then exports to `build/web/index.html`. Run it from any working directory. On macOS, `GODOT_BIN` points to `Godot.app/Contents/MacOS/Godot`, not the `.app` directory. `--debug` is for development diagnostics; release is the default.
 
+After export, `scripts/web-present-compat.mjs` applies one version-guarded change
+to the generated Emscripten `blitOffscreenFramebuffer`: the live boolean query
+`getParameter(SCISSOR_TEST)` becomes `isEnabled(SCISSOR_TEST)`. Chromium profiling
+identified synchronous stalls at the original query. The state is not cached,
+and scissor disable/restore, framebuffer restore and rendering quality are unchanged.
+Official template archives remain untouched. A different engine version or an
+unexpected/ambiguous source fragment fails export rather than silently skipping
+the workaround. Revalidate or remove it when upgrading Godot/Emscripten. A direct
+editor export bypasses this step; use the script for team Web builds.
+
+```sh
+node scripts/test-web-present-compat.mjs
+node scripts/test-web-present.mjs
+```
+
+The first test checks both pinned template variants and rejects source/version
+drift. The second runs the actual exported presentation function with changing
+scissor state and verifies the WebGL2 blit and restored framebuffer. Real browser
+coverage uses `scripts/qa/local-web.cjs`; neither test certifies GPU timing.
+API references: [isEnabled semantics](https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/isEnabled)
+and [synchronous WebGL queries](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/WebGL_best_practices#avoid_blocking_api_calls_in_production).
+
 The custom HTML shell lives in `game/web/shell.html`. Its companion application files are served by the backend from `web/`; changing those files does not require rebuilding the engine. Changes inside `game/` do require a new export. Serve the output over HTTP on localhost or HTTPS in a deployment, not through `file://`. The server must return `.wasm` as `application/wasm` and retain all exported filenames. An exported HTML file is not proof that the game rendered: browser console, screenshots, canvas pixels and interaction must also be checked.
 
 ## Prepare ARM64 Artifact
