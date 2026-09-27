@@ -139,17 +139,28 @@ func _step_session(delta: float) -> void:
 		_finish_count = 0
 		_phase = "waiting"
 	elif _phase == "racing":
-		var all_done: bool = true
-		for player: Dictionary in _players.values():
-			if not player["spectator"] and not player["finished"]:
-				all_done = false
-		if all_done or _race_elapsed >= 180.0 or _finish_remaining == 0.0:
+		if _race_participants_finished() or _race_elapsed >= 180.0 or _finish_remaining == 0.0:
 			_phase = "results"
 			for player: Dictionary in _players.values():
 				player["dnf"] = not player["spectator"] and not player["finished"]
 				player["result_progress"] = _race_progress(player)
 	elif _phase == "results":
 		_try_repeat()
+
+
+func _race_participants_finished() -> bool:
+	var has_human: bool = false
+	var bots_done: bool = true
+	for player: Dictionary in _players.values():
+		if player["spectator"] or player.get("expired", false):
+			continue
+		if player["is_bot"]:
+			bots_done = bots_done and bool(player["finished"])
+		else:
+			has_human = true
+			if not player["finished"]:
+				return false
+	return has_human or bots_done
 
 
 func _human_count() -> int:

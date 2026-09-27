@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(resolve(root, 'shared/track-manifest.json'), 'utf8'));
 const { track_id, schema_version, simulation_revision, simulation_hash, art_revision } = manifest;
-const compatibility = { protocol_version: 8, vehicle_state_version: 1, loadout_hash: 'prototype-v11', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
+const compatibility = { protocol_version: 8, vehicle_state_version: 1, loadout_hash: 'prototype-v12', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
 const secret = 'network-probe-only-not-a-deployment-secret-2026';
 const port = Number(process.env.NETWORK_TEST_PORT || 19080);
 const url = `ws://127.0.0.1:${port}`;
@@ -98,6 +98,7 @@ try {
   await rejectTicket(ticket('pre-counterplay-balance', { loadout_hash: 'prototype-v9' }), 'pre-counterplay balance rejected');
   await rejectTicket(ticket('pre-counterplay-wire', { protocol_version: 6 }), 'pre-counterplay wire rejected');
   await rejectTicket(ticket('pre-track-event-balance', { loadout_hash: 'prototype-v10' }), 'pre-track-event balance rejected');
+  await rejectTicket(ticket('pre-playtest-fixes', { loadout_hash: 'prototype-v11' }), 'pre-playtest-fixes balance rejected');
   await rejectTicket(ticket('pre-track-event-wire', { protocol_version: 7 }), 'pre-track-event wire rejected');
   await rejectTicket(ticket('bad-style', { style_id: 'faster' }), 'unknown signed style rejected');
   await rejectTicket(ticket('missing-style', { style_id: undefined }), 'missing signed style rejected');
@@ -118,6 +119,7 @@ try {
     ['pre-counterplay hello balance', { ...compatibility, loadout_hash: 'prototype-v9' }],
     ['pre-counterplay hello wire', { ...compatibility, protocol_version: 6 }],
     ['pre-track-event hello balance', { ...compatibility, loadout_hash: 'prototype-v10' }],
+    ['pre-playtest-fixes hello balance', { ...compatibility, loadout_hash: 'prototype-v11' }],
     ['pre-track-event hello wire', { ...compatibility, protocol_version: 7 }],
     ['unsupported hello state schema', { ...compatibility, vehicle_state_version: 999 }],
     ['old hello vehicle simulation', { ...compatibility, loadout_hash: 'prototype-v1' }],

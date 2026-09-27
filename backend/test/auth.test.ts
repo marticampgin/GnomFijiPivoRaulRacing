@@ -189,7 +189,7 @@ test('all four styles are signed without accepting client-owned vehicle stats', 
     assert.equal(payload.style_id, styleId);
     assert.equal(result.styleId, styleId);
     assert.equal(payload.player_id, client.user.id);
-    assert.equal(payload.loadout_hash, 'prototype-v11');
+    assert.equal(payload.loadout_hash, 'prototype-v12');
     assert.equal(payload.protocol_version, 8);
     assert.equal(payload.v, 3);
   }

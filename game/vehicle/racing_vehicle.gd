@@ -2,7 +2,7 @@ class_name RacingVehicle
 extends CharacterBody3D
 
 const STATE_VERSION: int = 1
-const BALANCE_VERSION: String = "vehicle-prototype-v11"
+const BALANCE_VERSION: String = "vehicle-prototype-v12"
 const COLLISION_SIZE: Vector3 = Vector3(2.18, 0.7, 2.696)
 const COLLISION_BEVEL: float = 0.1
 const DEFAULT_STATS: Dictionary = {

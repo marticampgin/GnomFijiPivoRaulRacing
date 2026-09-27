@@ -176,7 +176,9 @@ func apply_damage(player: Dictionary, amount: float, source: Dictionary = {}, im
 	var actual: float = maxf(0.0, amount) * multiplier
 	if actual <= 0.0:
 		return false
-	player.combat.health = maxf(0.0, float(player.combat.health) - actual)
+	var health: float = player.combat.health
+	var floor_health: float = minf(1.0, health) if impact_kind == "contact" else 0.0
+	player.combat.health = maxf(floor_health, health - actual)
 	if actual > 0.0 and (impact_kind == "weapon" or (impact_kind == "contact" and actual >= Catalog.SHARD_STRONG_CONTACT_DAMAGE)):
 		_lose_shards(player, player.combat.health == 0.0)
 	if player.combat.health == 0.0:

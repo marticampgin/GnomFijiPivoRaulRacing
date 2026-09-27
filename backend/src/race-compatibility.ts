@@ -4,7 +4,7 @@ export const WIRE_VERSION = 8;
 export const TICKET_VERSION = 3;
 export const VEHICLE_STATE_VERSION = 1;
 export const TRACK_SCHEMA_VERSION = 1;
-export const LOADOUT_HASH = 'prototype-v11';
+export const LOADOUT_HASH = 'prototype-v12';
 export const STYLE_IDS = ['handling', 'acceleration', 'speed', 'drift'] as const;
 export type StyleId = typeof STYLE_IDS[number];
 
