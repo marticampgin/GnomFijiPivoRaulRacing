@@ -46,6 +46,9 @@ var _last_hud_ms: int = 0
 var _correction: float = 0.0
 var _ping: float = 0.0
 var _client_countdown: float = 0.0
+var _local_race: Node3D
+var _local_view: Node3D
+var _local_layout: String = "side-by-side"
 
 
 func _ready() -> void:
@@ -97,6 +100,13 @@ func _physics_process(delta: float) -> void:
 	if _worker:
 		_step_server(delta)
 		return
+	if is_instance_valid(_local_race):
+		_local_race.step_local(delta)
+		var commands: Dictionary = {}
+		for seat: int in _local_race.inputs.assignments():
+			commands[seat] = _local_race.command_for_seat(seat)
+		_local_view.update_view(0.0 if _local_race.is_paused_local() else delta, commands)
+		return
 	# A resumed browser may already have fresh packets waiting behind a stale clock.
 	_poll_client()
 	# CharacterBody3D replay must use the engine's fixed physics delta.
@@ -124,6 +134,10 @@ func _physics_process(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	if _worker:
+		return
+	if is_instance_valid(_local_race):
+		if Time.get_ticks_msec() - _last_hud_ms >= 100:
+			_publish_hud()
 		return
 	_poll_client()
 	_interpolate_remotes(delta)
@@ -393,6 +407,8 @@ func _apply_graphics_settings(quality: String, reduced_effects: bool) -> void:
 		return
 	_quality = quality
 	_reduced_effects = reduced_effects
+	if is_instance_valid(_local_view):
+		_local_view.set_quality(quality, reduced_effects)
 	if is_instance_valid(_item_visuals):
 		_item_visuals.set_quality(quality)
 		_item_visuals.set_reduced_effects(reduced_effects)
@@ -463,6 +479,9 @@ func _on_host_message(arguments: Array) -> void:
 	if not parsed is Dictionary:
 		return
 	var data: Dictionary = parsed
+	if str(data.get("type", "")).begins_with("local_"):
+		_on_local_message(data)
+		return
 	match data.get("type"):
 		"use_item":
 			if Protocol._integer(data.get("slot"), 0) and int(data["slot"]) <= 1:
@@ -479,6 +498,8 @@ func _on_host_message(arguments: Array) -> void:
 			_leave("ready")
 		"focus":
 			_focused = bool(data.get("visible", true))
+			if is_instance_valid(_local_race):
+				_local_race.set_focused(_focused)
 			if not _focused:
 				_release_inputs()
 		"input_enabled":
@@ -735,6 +756,14 @@ func _send(packet: Dictionary) -> void:
 
 
 func _leave(status: String) -> void:
+	if is_instance_valid(_local_view):
+		_local_view.free()
+		_local_view = null
+	if is_instance_valid(_local_race):
+		_local_race.free()
+		_local_race = null
+	if is_instance_valid(_camera):
+		_camera.current = true
 	if _socket != null:
 		_socket.close()
 	_socket = null
@@ -766,6 +795,17 @@ func _leave(status: String) -> void:
 
 func _publish_hud() -> void:
 	_last_hud_ms = Time.get_ticks_msec()
+	if is_instance_valid(_local_race):
+		var local_state: Dictionary = _local_hud_state()
+		local_state["mode"] = "local"
+		local_state["layout"] = _local_layout
+		local_state["devices"] = _local_devices()
+		local_state["sectors"] = _local_view.sectors()
+		local_state["graphics"] = {"quality": _quality, "reducedEffects": _reduced_effects}
+		local_state["fps"] = Engine.get_frames_per_second()
+		if _bridge != null:
+			_bridge.update(JSON.stringify(local_state))
+		return
 	var location: Vector3 = Vector3.ZERO if _local == null else _local.global_position
 	var forward: Vector3 = Vector3.FORWARD if _local == null else -_local.global_basis.z
 	var data: Dictionary = {"status": _status, "playerId": _player_id, "players": _hud.get("players", []),
@@ -794,3 +834,93 @@ func _publish_hud() -> void:
 
 func _blur_intensity() -> float:
 	return _items.blur_intensity(_client_combat)
+
+
+func _local_devices() -> Array:
+	var devices: Array = [{"id": -1, "name": "Keyboard"}]
+	for device: int in Input.get_connected_joypads():
+		devices.append({"id": device, "name": Input.get_joy_name(device)})
+	return devices
+
+
+func _local_hud_state() -> Dictionary:
+	var snapshot: Dictionary = _local_race.presentation()
+	var players: Array = []
+	var seats: Array = []
+	for entry: Dictionary in snapshot.players:
+		var vehicle: CharacterBody3D = _local_race._players[entry.id].vehicle
+		var location: Vector3 = vehicle.global_position
+		var row: Dictionary = {"id": entry.id, "name": entry.name, "rank": entry.position,
+			"position": [location.x, location.z], "worldPosition": [location.x, location.y, location.z],
+			"isBot": entry.is_bot, "finished": entry.finished, "dnf": entry.dnf,
+			"elapsed": entry.elapsed, "ready": entry.ready, "seat": entry.slot}
+		players.append(row)
+		if entry.is_bot:
+			continue
+		var combat: Dictionary = entry.combat
+		var seat: Dictionary = row.duplicate()
+		seat.merge({"device": snapshot.devices[entry.slot], "styleId": entry.style_id,
+			"speed": vehicle.speed_mps * 3.6, "lap": entry.lap, "laps": RACE_LAPS,
+			"health": combat.health, "maxHealth": combat.max_health, "items": combat.slots,
+			"effects": combat.effects, "drift": vehicle.drift_charge, "boost": vehicle.boost_remaining,
+			"epoch": entry.epoch, "lookBack": _local_race.command_for_seat(entry.slot).get("look_back", false),
+			"canUseItems": snapshot.phase == "racing" and not snapshot.paused and not entry.finished and float(combat.destroyed_remaining) <= 0.0,
+			"blurIntensity": _local_race._items.blur_intensity(combat),
+			"destroyedRemaining": combat.destroyed_remaining, "invulnerableRemaining": combat.invulnerable_remaining})
+		seats.append(seat)
+	seats.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.seat) < int(b.seat))
+	return {"seats": seats, "players": players, "paused": snapshot.paused,
+		"disconnected": snapshot.disconnected_seats, "pauseReason": snapshot.pause_reason,
+		"countdown": snapshot.countdown, "status": snapshot.phase, "phase": snapshot.phase,
+		"raceId": snapshot.race_id, "tick": snapshot.tick, "trackDescriptor": _track.descriptor()}
+
+
+func _on_local_message(data: Dictionary) -> void:
+	var action: String = str(data.get("type", ""))
+	if action == "local_devices":
+		if _bridge != null:
+			_bridge.update(JSON.stringify({"mode": "local_devices", "devices": _local_devices()}))
+		return
+	if action == "local_start":
+		if not data.get("seats") is Array or data.get("layout", "side-by-side") not in ["side-by-side", "stacked"]:
+			return
+		var candidate: Node3D = load("res://race/local_race_session.gd").new()
+		add_child(candidate)
+		candidate.configure(_track)
+		candidate.set_focused(_focused)
+		if not candidate.start_local(data["seats"]):
+			candidate.free()
+			if _bridge != null:
+				_bridge.update(JSON.stringify({"mode": "local_error", "error": "devices_unavailable"}))
+			return
+		_leave("ready")
+		_local_race = candidate
+		_local_layout = data.get("layout", "side-by-side")
+		_local_view = load("res://view/local_race_view.gd").new()
+		_local_race.add_child(_local_view)
+		_camera.current = false
+		_local_view.configure(_local_race, _local_layout)
+		_local_view.set_quality(_quality, _reduced_effects)
+		_publish_hud()
+		return
+	if action == "local_leave":
+		_leave("ready")
+		return
+	if not is_instance_valid(_local_race):
+		return
+	var seat: int = int(data.get("seat", -1))
+	match action:
+		"local_pause":
+			_local_race.pause_local()
+		"local_resume":
+			_local_race.resume_local()
+		"local_recover":
+			if _local_race.resume_local():
+				_local_race.recover_seat(seat)
+		"local_ready":
+			_local_race.ready_seat(seat)
+		"local_assign":
+			_local_race.assign_device(seat, int(data.get("device", -2)))
+		"local_use_item":
+			_local_race.use_item_seat(seat, int(data.get("slot", -1)))
+	_publish_hud()

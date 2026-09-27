@@ -93,8 +93,11 @@ the approved rules, not a reason to reopen the entire interview.
 Next order: shared local simulation, per-device input and cameras, pause/results/
 repeat; then the new race mechanics and track changes. The user approved reconciling
 the parent OpenSpec proposal, design, four specs and tasks, then implementation.
-Existing gameplay still uses the prior
-single-player HUD and has not gained split-screen from this design acceptance.
+The local runtime now includes all five gameplay layouts and the accepted hierarchy
+for existing items, health, rank, lap, drift charge and effects. The prior HUD remains
+in the network prototype. New shards, reverse, three drift levels and attack warnings
+are pending their mechanics; they are not populated with illustrative mockup values.
+Physical-controller and four-camera performance acceptance remain open.
 
 ## Verification And Handoff
 

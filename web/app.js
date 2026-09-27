@@ -7,6 +7,16 @@
   let mapProjection = null, mapHash = null;
   let raceId = null, musicContext = null, musicTimer = null, musicStep = 0;
   let musicEnabled = true;
+  let localMode = false;
+  const localUI = window.GnomLocalUI.create({
+    send(message) {
+      send(message);
+      if (['local_resume','local_use_item','local_recover'].includes(message.type)) ui.canvas.focus();
+    },
+    onStart(payload) { send(payload); },
+    onExit() { leave(); },
+    onGraphics(value) { graphics = value; saveGraphics(); },
+  });
   const itemLabels = {fanta:'Fanta', mermaid_rum:'Mermaid Rum', ice_rum:'Ice Rum', stroh80:'Stroh 80', lays_crab:'Lay’s Crab', bfg10k:'BFG 10K'};
   function renderItems(state) {
     for (let slot = 0; slot < 2; slot++) {
@@ -114,7 +124,7 @@
     for (const input of document.querySelectorAll('input[name="quality"]')) input.checked = input.value === graphics.quality;
     $('reduced-effects').checked = graphics.reducedEffects;
     send({type:'graphics', quality:graphics.quality, reduced_effects:graphics.reducedEffects});
-    if (lastState && inRace) renderItems(lastState);
+    if (lastState && inRace && !localMode) renderItems(lastState);
   }
   function saveGraphics() {
     try { localStorage.setItem(graphicsKey, JSON.stringify(graphics)); } catch { /* Storage may be disabled. */ }
@@ -127,8 +137,9 @@
   applyGraphics();
   function setError(message) { $('hub-error').textContent = message; $('hub-error').hidden = !message; }
   function updateReady() {
-    ui['join-button'].disabled = !engineReady || !session || busy;
-    ui['profile-button'].disabled = !session || busy;
+    ui['join-button'].disabled = !engineReady || busy;
+    ui['profile-button'].disabled = busy;
+    $('local-button').disabled = !engineReady || busy;
     $('driving-style').disabled = busy || inRace;
   }
   function messageFor(error) {
@@ -177,11 +188,12 @@
     finally { busy = false; updateReady(); for (const button of $('profile-list').children) button.disabled = false; }
   }
   async function join() {
-    if (busy || !session || !engineReady) return;
+    if (busy || !engineReady) return;
     unlockMusic();
     busy = true; updateReady(); setError('');
     $('reconnect-button').disabled = true;
     try {
+      if (!session) applySession(await api('/api/auth/bootstrap'));
       const styleId = inRace ? (validStyle(lastState?.nextStyleId) ? lastState.nextStyleId : validStyle(lastState?.styleId) ? lastState.styleId : joinedStyle || selectedStyle) : selectedStyle;
       const connection = await api('/api/race/ticket', {styleId});
       joinedStyle = validStyle(connection.styleId) ? connection.styleId : styleId;
@@ -199,7 +211,8 @@
     finally { busy = false; updateReady(); $('reconnect-button').disabled = false; }
   }
   function leave() {
-    send({type:'leave'}); inRace = false; lastFinish = false;
+    send({type:localMode ? 'local_leave' : 'leave'}); inRace = false; lastFinish = false;
+    localMode = false; localUI.hide();
     raceId = null; restarting = false; stopMusic();
     joinedStyle = null; lastState = null; updateReady();
     ui.canvas.style.filter = '';
@@ -222,7 +235,16 @@
   }
   ui['result-dialog'].addEventListener('cancel', event => event.preventDefault());
   ui['join-button'].addEventListener('click', join);
-  ui['profile-button'].addEventListener('click', () => openDialog(ui['profile-dialog']));
+  $('local-button').addEventListener('click', () => { send({type:'local_devices'}); localUI.showSetup(); });
+  ui['profile-button'].addEventListener('click', async () => {
+    if (busy) return;
+    busy = true; updateReady(); setError('');
+    try {
+      if (!session) applySession(await api('/api/auth/bootstrap'));
+      openDialog(ui['profile-dialog']);
+    } catch (error) { setError(messageFor(error)); }
+    finally { busy = false; updateReady(); }
+  });
   $('menu-button').addEventListener('click', () => openDialog(ui['menu-dialog']));
   $('resume-button').addEventListener('click', () => ui['menu-dialog'].close());
   $('recover-button').addEventListener('click', () => { send({type:'recover'}); ui['menu-dialog'].close(); });
@@ -259,7 +281,7 @@
   window.addEventListener('blur', () => send({type:'focus', visible:false}));
   window.addEventListener('focus', () => send({type:'focus', visible:!document.hidden}));
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && inRace && !document.querySelector('dialog[open]')) { event.preventDefault(); openDialog(ui['menu-dialog']); }
+    if (event.key === 'Escape' && inRace && !localMode && !document.querySelector('dialog[open]')) { event.preventDefault(); openDialog(ui['menu-dialog']); }
   });
   function drawMap(players, currentId, descriptor) {
     const canvas = $('minimap'), context = canvas.getContext('2d');
@@ -356,7 +378,23 @@
   }
   window.GnomHost = {
     register(callback) { receiver = callback; engineReady = true; applyGraphics(); $('load-state').hidden = true; updateReady(); },
-    update(json) { render(JSON.parse(json)); },
+    update(json) {
+      const state = JSON.parse(json);
+      if (state.mode === 'local_devices') { localUI.updateDevices(state.devices); return; }
+      if (state.mode === 'local_error') { localUI.showError('Устройство недоступно или назначено дважды. Проверьте состав.'); return; }
+      if (state.mode === 'local') {
+        if (!localMode) {
+          localMode = true; inRace = true; stopMusic();
+          ui.hub.hidden = true; ui.hud.hidden = true; ui.canvas.style.filter = '';
+          ui.canvas.focus(); updateReady();
+        }
+        lastState = state;
+        localUI.updateDevices(state.devices);
+        localUI.update(state);
+        return;
+      }
+      if (!localMode) render(state);
+    },
     get state() { return lastState; },
     async boot(config) {
       const missing = Engine.getMissingFeatures({threads:false});
@@ -370,5 +408,6 @@
       } catch(error) { engineReady = false; updateReady(); setError('Не удалось загрузить игру. Обновите страницу.'); console.error(error); }
     },
   };
-  api('/api/auth/bootstrap').then(applySession).catch(error => { $('connection-label').textContent = 'Сервер недоступен'; setError(messageFor(error)); });
+  $('connection-label').textContent = 'Локальная игра';
+  setInterval(() => { if (engineReady && !inRace) send({type:'local_devices'}); }, 1000);
 })();

@@ -142,3 +142,26 @@ Default output folders are `/tmp/gnom-browser-driver-qa` and
 These are functional and visual study/blockout checks, not final-art approval,
 touch-control support, production bot AI, a performance budget pass or an ARM
 server capacity measurement.
+# Local Split-Screen
+
+Build with `node scripts/export-web.mjs`, then start
+`node scripts/local-web.mjs --detach`. The reported localhost URL serves static
+assets only, with no account API, PostgreSQL or race worker. The network prototype
+continues to use `scripts/dev.mjs`.
+
+Focused native checks (use the pinned Godot executable):
+
+```sh
+godot --headless --path game --script res://tests/local_race_probe.gd --log-file /tmp/local-race.log
+godot --headless --path game --script res://tests/local_view_probe.gd --log-file /tmp/local-view.log
+godot --headless --path game --script res://tests/local_app_probe.gd --log-file /tmp/local-app.log
+```
+
+These cover local commands, one shared world/tick, pause/disconnect/reassignment,
+item projection, recovery, result readiness and reset using short fixtures. They do
+not claim a full browser race or physical gamepad verification. Browser smoke:
+local setup -> each 1/2-side/2-stacked/3/4 layout -> drive -> pause -> resume -> exit.
+Check each canvas sector is nonblank and moves, no API/WebSocket is opened, and
+assigned device disconnect blocks resume without removing its player. Test one
+keyboard plus distinct controllers, or all controllers; virtual gamepads are only
+an automated boundary test, never evidence about real hardware.

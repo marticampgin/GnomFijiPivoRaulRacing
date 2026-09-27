@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#131715">
   <title>GNOM FIJI · P.I.V.O RAUL RACING</title>
   <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="/local-race.css">
   $GODOT_HEAD_INCLUDE
 </head>
 <body>
@@ -31,7 +32,8 @@
           <label><input type="radio" name="driving-style" value="drift"><span>Дрифт</span></label>
         </div>
       </fieldset>
-      <button id="join-button" class="primary" disabled><span>ВЫЙТИ НА ТРАССУ</span><img src="/assets/icons/arrow-up-right.svg" alt=""></button>
+      <button id="local-button" class="primary" disabled><span>ЛОКАЛЬНАЯ ГОНКА</span><img src="/assets/icons/arrow-up-right.svg" alt=""></button>
+      <button id="join-button" class="text-button" disabled>Сетевой полигон</button>
       <div id="load-state" class="load-state" role="status"><span id="load-label">Загрузка игры</span><progress id="load-progress" max="100" value="0"></progress></div>
       <p id="hub-error" class="error" role="alert" hidden></p>
     </section>
@@ -87,6 +89,7 @@
   <dialog id="result-dialog" aria-labelledby="result-title"><span class="mode-tag">ФИНИШ</span><h2 id="result-title">Результаты заезда</h2><p id="finish-time" class="finish-time"></p><p id="result-status" role="status"></p><ol id="result-racers" class="result-racers" aria-label="Результаты участников"></ol><button id="restart-button" class="primary" disabled>ЕЩЁ ЗАЕЗД</button><button id="result-exit" class="text-button">Вернуться в меню</button></dialog>
   <noscript>Для запуска игры нужен JavaScript.</noscript>
   <script src="/track-map.js"></script>
+  <script src="/local-race.js"></script>
   <script src="/app.js"></script>
   <script src="$GODOT_URL"></script>
   <script>window.GnomHost.boot($GODOT_CONFIG);</script>
