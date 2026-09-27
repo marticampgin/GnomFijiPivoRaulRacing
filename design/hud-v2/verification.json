@@ -1,0 +1,337 @@
+{
+  "reviewedAt": "2026-09-27",
+  "visualReviewComplete": true,
+  "status": "draft-awaiting-user-acceptance",
+  "results": [
+    {
+      "id": "18:4",
+      "name": "02 / 1 player",
+      "panes": 1,
+      "textCount": 20,
+      "wrongFont": [],
+      "outOfBounds": [],
+      "health": [
+        {
+          "name": "HUD/Health/76",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "76"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 115.5199966430664,
+              "visible": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18:73",
+      "name": "03 / 2 players / vertical",
+      "panes": 2,
+      "textCount": 38,
+      "wrongFont": [],
+      "outOfBounds": [],
+      "health": [
+        {
+          "name": "HUD/Health/76",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "76"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 115.5199966430664,
+              "visible": true
+            }
+          ]
+        },
+        {
+          "name": "HUD/Health/100",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "100"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 152,
+              "visible": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18:206",
+      "name": "04 / 2 players / horizontal",
+      "panes": 2,
+      "textCount": 36,
+      "wrongFont": [],
+      "outOfBounds": [],
+      "health": [
+        {
+          "name": "HUD/Health/76",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "76"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 115.5199966430664,
+              "visible": true
+            }
+          ]
+        },
+        {
+          "name": "HUD/Health/100",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "100"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 152,
+              "visible": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18:335",
+      "name": "05 / 3 players + overview",
+      "panes": 3,
+      "textCount": 61,
+      "wrongFont": [],
+      "outOfBounds": [],
+      "health": [
+        {
+          "name": "HUD/Health/76",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "76"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 115.5199966430664,
+              "visible": true
+            }
+          ]
+        },
+        {
+          "name": "HUD/Health/100",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "100"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 152,
+              "visible": true
+            }
+          ]
+        },
+        {
+          "name": "HUD/Health/34",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "34"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 51.68000030517578,
+              "visible": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18:543",
+      "name": "06 / 4 players / quad",
+      "panes": 4,
+      "textCount": 73,
+      "wrongFont": [],
+      "outOfBounds": [],
+      "health": [
+        {
+          "name": "HUD/Health/76",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "76"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 115.5199966430664,
+              "visible": true
+            }
+          ]
+        },
+        {
+          "name": "HUD/Health/100",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "100"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 152,
+              "visible": true
+            }
+          ]
+        },
+        {
+          "name": "HUD/Health/34",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "34"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 51.68000030517578,
+              "visible": true
+            }
+          ]
+        },
+        {
+          "name": "HUD/Health/88",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "88"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 133.75999450683594,
+              "visible": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "18:800",
+      "name": "07 / States / missile burn reverse recovery",
+      "panes": 4,
+      "textCount": 72,
+      "wrongFont": [],
+      "outOfBounds": [],
+      "health": [
+        {
+          "name": "HUD/Health/76",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "76"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 115.5199966430664,
+              "visible": true
+            }
+          ]
+        },
+        {
+          "name": "HUD/Health/24",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "24"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 36.47999954223633,
+              "visible": true
+            }
+          ]
+        },
+        {
+          "name": "HUD/Health/34",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "34"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            },
+            {
+              "width": 51.68000030517578,
+              "visible": true
+            }
+          ]
+        },
+        {
+          "name": "HUD/Health/0",
+          "values": [
+            "ПРОЧНОСТЬ",
+            "0"
+          ],
+          "bars": [
+            {
+              "width": 152,
+              "visible": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "selectedNodeId": "18:543",
+  "nativeComponents": 27
+}
