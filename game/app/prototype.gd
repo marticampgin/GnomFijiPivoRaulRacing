@@ -8,6 +8,7 @@ const Transport = preload("res://net/prototype_socket_server.gd")
 const Driver = preload("res://input/driver_input.gd")
 const BotDriver = preload("res://ai/racing_bot_driver.gd")
 const VehicleContacts = preload("res://vehicle/vehicle_contacts.gd")
+const Items = preload("res://items/race_items.gd")
 const HERO_COLOR: Color = Color("2e9d99")
 const MAX_PLAYERS: int = 10
 const PHYSICS_DT: float = 1.0 / 60.0
@@ -31,6 +32,10 @@ var _race_id: int = 0
 var _phase: String = "waiting"
 var _race_elapsed: float = 0.0
 var _finish_remaining: float = -1.0
+var _items: RefCounted = Items.new()
+var _item_visuals: Node3D
+var _item_sequence: int = 0
+var _client_combat: Dictionary = {}
 
 var _socket: WebSocketPeer
 var _ticket: String = ""
@@ -90,6 +95,10 @@ func _ready() -> void:
 		print("RACE_WORKER_READY ws://127.0.0.1:%d protocol=%d physics=60 snapshots=20 track=%s" % [port, Protocol.WIRE_VERSION, _track.identity()["track_id"]])
 		return
 	_setup_view()
+	_item_visuals = load("res://items/item_visuals.gd").new()
+	add_child(_item_visuals)
+	_item_visuals.set_quality(_quality)
+	_item_visuals.set_reduced_effects(_reduced_effects)
 	if OS.has_feature("web"):
 		_bridge = JavaScriptBridge.get_interface("GnomHost")
 		if _bridge != null:
@@ -126,7 +135,7 @@ func _physics_process(delta: float) -> void:
 			_send(command)
 			if _local == null:
 				return
-		_local.step(command if _can_drive() else Protocol.NEUTRAL, delta)
+		_step_local(command, delta)
 		_client_countdown = maxf(0.0, _client_countdown - delta)
 	_update_camera(delta)
 
@@ -138,6 +147,7 @@ func _process(delta: float) -> void:
 	_interpolate_remotes(delta)
 	if is_instance_valid(_local) and is_instance_valid(_local_visual):
 		_local_visual.update_visual(delta, _local.speed_mps, _local.steering_amount, _local.is_drifting, minf(1.0, _local.boost_remaining))
+		_local_visual.visible = _combat_visible(_client_combat)
 	if _joined and Time.get_ticks_msec() - _last_ping_ms >= 1000:
 		_last_ping_ms = Time.get_ticks_msec()
 		_send({"type": "ping", "sent": _last_ping_ms})
@@ -177,16 +187,31 @@ func _step_server(delta: float) -> void:
 			_phase = "racing"
 	if _phase == "racing":
 		_race_elapsed += delta
+		for id: String in _items.step(_players, delta):
+			_recover(_players[id])
+			_items.restore(_players[id])
 		if _finish_remaining >= 0.0:
 			_finish_remaining = maxf(0.0, _finish_remaining - delta)
 	var now: int = Time.get_ticks_msec()
 	var contact_bodies: Array = []
 	var previous_transforms: Dictionary = {}
+	var impact_damage: Dictionary = {}
 	for id: String in _players.keys():
 		var player: Dictionary = _players[id]
 		if not player["is_bot"] and not player["connected"] and now - int(player["disconnected_at"]) > RECONNECT_MS:
 			player["expired"] = true
 		var queue: Array = player["queue"]
+		while not player["item_queue"].is_empty():
+			var use_command: Dictionary = player["item_queue"].pop_front()
+			player["combat"]["item_ack"] = int(use_command["sequence"])
+			if _phase == "racing" and player["connected"] and use_command["epoch"] == player["epoch"]:
+				_items.use(player, int(use_command["slot"]), _players)
+		if player["is_bot"] and _phase == "racing" and (_tick + int(player["slot"]) * 13) % 120 == 0:
+			for item_slot: int in 2:
+				var item: String = player["combat"]["slots"][item_slot]
+				if item in ["mermaid_rum", "ice_rum"] and float(player["combat"]["health"]) > 85.0:
+					continue
+				_items.use(player, item_slot, _players)
 		if not queue.is_empty():
 			player["input"] = queue.pop_front()
 			player["ack"] = int(player["input"]["sequence"])
@@ -196,19 +221,41 @@ func _step_server(delta: float) -> void:
 		if (not player["is_bot"] and (not player["connected"] or now - int(player["last_input_at"]) > INPUT_TIMEOUT_MS)) or _phase != "racing" or player["finished"] or player["spectator"]:
 			command = Protocol.NEUTRAL
 		player["previous_position"] = player["vehicle"].global_position
-		if _phase == "racing" and not player["finished"] and not player["spectator"]:
+		player["vehicle"].configure(_items.effects_stats(player, Styles.stats_for(player["style_id"])))
+		var destroyed: bool = float(player["combat"]["destroyed_remaining"]) > 0.0
+		if _phase == "racing" and not player["finished"] and not player["spectator"] and not destroyed:
 			contact_bodies.append(player["vehicle"])
 			previous_transforms[player["vehicle"].get_instance_id()] = player["vehicle"].global_transform
-		player["vehicle"].step(command, delta)
+		if destroyed:
+			player["vehicle"].velocity = Vector3.ZERO
+			player["vehicle"].speed_mps = 0.0
+		else:
+			var before_velocity: Vector3 = player["vehicle"].velocity
+			player["vehicle"].step(command, delta)
+			if _phase == "racing" and not player["finished"] and not player["spectator"]:
+				for collision_index: int in player["vehicle"].get_slide_collision_count():
+					var collision: KinematicCollision3D = player["vehicle"].get_slide_collision(collision_index)
+					var normal: Vector3 = collision.get_normal()
+					if absf(normal.dot(player["vehicle"].up_direction)) < 0.5:
+						var closing: float = maxf(0.0, -before_velocity.dot(normal))
+						impact_damage[id] = maxf(float(impact_damage.get(id, 0.0)), _contact_damage(closing))
 	if contact_bodies.size() > 1:
+		var impacts: Array = []
 		VehicleContacts.resolve(contact_bodies, previous_transforms,
-			_players.values().map(func(player: Dictionary) -> CharacterBody3D: return player["vehicle"]))
+			_players.values().map(func(player: Dictionary) -> CharacterBody3D: return player["vehicle"]), impacts)
+		for impact: Dictionary in impacts:
+			for player: Dictionary in _players.values():
+				if player["vehicle"] == impact["a"] or player["vehicle"] == impact["b"]:
+					impact_damage[player["id"]] = maxf(float(impact_damage.get(player["id"], 0.0)), _contact_damage(float(impact["closing"])))
+	for id: String in impact_damage:
+		_items.apply_damage(_players[id], float(impact_damage[id]))
 	# Checkpoints observe the final contact-corrected pose, never an unresolved overlap.
 	for player: Dictionary in _players.values():
 		if _phase == "racing" and not player["finished"] and not player["spectator"]:
 			player["elapsed"] += delta
-			_update_progress(player)
-		if _track.needs_recovery(player["vehicle"].global_position) or not bool(player["progress"]["interval_valid"]) or (player["is_bot"] and player["driver"].needs_recovery()):
+			if float(player["combat"]["destroyed_remaining"]) <= 0.0:
+				_update_progress(player)
+		if float(player["combat"]["destroyed_remaining"]) <= 0.0 and (_track.needs_recovery(player["vehicle"].global_position) or not bool(player["progress"]["interval_valid"]) or (player["is_bot"] and player["driver"].needs_recovery())):
 			_recover(player)
 	_remove_expired_waiters()
 	if _human_count() == 0:
@@ -250,6 +297,24 @@ func _on_packet(peer_id: int, data: Dictionary) -> void:
 		return
 	var player: Dictionary = _players[_peer_players[peer_id]]
 	match data.get("type"):
+		"use_item":
+			var item_command: Dictionary = Protocol.validate_item_command(data)
+			if item_command.is_empty():
+				_server.close_peer(peer_id, "invalid_item")
+				return
+			if item_command["race_id"] != _race_id or item_command["epoch"] != player["epoch"]:
+				return
+			var item_sequence: int = int(item_command["sequence"])
+			if item_sequence <= int(player["item_accepted"]):
+				return
+			if item_sequence > int(player["item_accepted"]) + 120 or player["item_queue"].size() >= 16:
+				_server.close_peer(peer_id, "invalid_item")
+				return
+			player["item_accepted"] = item_sequence
+			if _phase == "racing" and not player["spectator"] and not player["finished"] and float(player["combat"]["health"]) > 0.0:
+				player["item_queue"].append(item_command)
+			else:
+				player["combat"]["item_ack"] = item_sequence
 		"input":
 			var command: Dictionary = Protocol.validate_input(data)
 			if command.is_empty() or int(command["sequence"]) <= int(player["accepted"]) or int(command["sequence"]) > int(player["accepted"]) + 120:
@@ -275,7 +340,7 @@ func _on_packet(peer_id: int, data: Dictionary) -> void:
 			if data.size() != 1 or Time.get_ticks_msec() - int(player["last_recover_at"]) < 1000:
 				return
 			player["last_recover_at"] = Time.get_ticks_msec()
-			if _phase == "racing" and not player["finished"] and not player["spectator"]:
+			if _phase == "racing" and not player["finished"] and not player["spectator"] and float(player["combat"]["destroyed_remaining"]) <= 0.0:
 				_recover(player)
 		_:
 			_server.close_peer(peer_id, "unknown_packet")
@@ -322,12 +387,14 @@ func _join_server(peer_id: int, ticket: String) -> void:
 	player["connected"] = true
 	player["expired"] = false
 	player["queue"].clear()
+	player["item_queue"].clear()
+	player["combat"]["item_ack"] = player["item_accepted"]
 	player["input"] = Protocol.NEUTRAL.duplicate()
 	player["accepted"] = player["ack"]
 	player["last_input_at"] = Time.get_ticks_msec()
 	_peer_players[peer_id] = id
 	_server.authenticate(peer_id)
-	_server.send_to(peer_id, {"type": "welcome", "player_id": id, "compatibility": Protocol.compatibility(_track.identity()), "ack": player["ack"]})
+	_server.send_to(peer_id, {"type": "welcome", "player_id": id, "compatibility": Protocol.compatibility(_track.identity()), "ack": player["ack"], "item_ack": player["combat"]["item_ack"]})
 	_broadcast_snapshot()
 
 
@@ -341,6 +408,8 @@ func _on_disconnect(peer_id: int) -> void:
 		player["connected"] = false
 		player["disconnected_at"] = Time.get_ticks_msec()
 		player["queue"].clear()
+		player["item_queue"].clear()
+		player["combat"]["item_ack"] = player["item_accepted"]
 		player["input"] = Protocol.NEUTRAL.duplicate()
 
 
@@ -358,14 +427,16 @@ func _new_player(id: String, display_name: String, slot: int, bot: bool, style_i
 		style_id = Styles.IDS[slot % Styles.IDS.size()]
 	vehicle.configure(Styles.stats_for(style_id))
 	vehicle.reset_at(_track.spawn_transform(slot))
-	return {"id": id, "name": display_name, "slot": slot, "vehicle": vehicle,
+	var player: Dictionary = {"id": id, "name": display_name, "slot": slot, "vehicle": vehicle,
 		"style_id": style_id, "next_style_id": style_id,
 		"is_bot": bot, "driver": BotDriver.new(_track, slot) if bot else null,
 		"spectator": false, "ready": bot, "dnf": false,
 		"peer_id": 0, "connected": true, "disconnected_at": 0, "last_input_at": 0,
-		"accepted": 0, "ack": 0, "queue": [], "input": Protocol.NEUTRAL.duplicate(),
+		"accepted": 0, "ack": 0, "queue": [], "item_queue": [], "item_accepted": 0, "input": Protocol.NEUTRAL.duplicate(),
 		"lap": 1, "progress": _track.initial_progress(), "previous_position": vehicle.global_position,
 		"finished": false, "finish_order": 0, "elapsed": 0.0, "last_recover_at": -1000, "epoch": 0}
+	_items.init_player(player)
+	return player
 
 
 func _remove_one_bot() -> void:
@@ -405,6 +476,10 @@ func _start_race() -> void:
 		_players[id] = _new_player(id, "Bot %02d" % (slot + 1), slot, true)
 		slot += 1
 	_race_id += 1
+	_items.reset(_players, _track)
+	for player: Dictionary in _players.values():
+		player["combat"]["item_ack"] = player["item_accepted"]
+		player["item_queue"].clear()
 	_phase = "countdown"
 	_countdown = 300
 	_finish_count = 0
@@ -443,6 +518,8 @@ func _recover(player: Dictionary) -> void:
 	_track.mark_recovered(player["progress"])
 	player["previous_position"] = player["vehicle"].global_position
 	player["queue"].clear()
+	player["item_queue"].clear()
+	player["combat"]["item_ack"] = player["item_accepted"]
 	player["input"] = Protocol.NEUTRAL.duplicate()
 	player["ack"] = player["accepted"]
 	player["epoch"] += 1
@@ -479,15 +556,18 @@ func _broadcast_snapshot() -> void:
 	for index: int in standings.size():
 		var player: Dictionary = standings[index]
 		entries.append({"id": player["id"], "name": player["name"], "slot": player["slot"],
+			"combat": _items.player_state(player),
 			"style_id": player["style_id"], "next_style_id": player["next_style_id"],
 			"position": 0 if player["spectator"] else index + 1, "lap": mini(RACE_LAPS, int(player["lap"])), "finished": player["finished"],
 			"is_bot": player["is_bot"], "spectator": player["spectator"], "ready": player["ready"], "dnf": player["dnf"],
 			"connected": player["connected"], "elapsed": player["elapsed"], "ack": player["ack"], "epoch": player["epoch"],
 			"state": Protocol.pack_state(player["vehicle"].capture_state())})
 	var packet: Dictionary = {"type": "snapshot", "tick": _tick, "race_id": _race_id, "phase": _phase,
+		"items_world": _items.world_state(),
 		"finish_remaining": _finish_remaining, "race_remaining": maxf(0.0, 180.0 - _race_elapsed),
 		"countdown": maxf(0.0, float(_countdown) / 60.0), "players": entries}
 	for peer_id: int in _peer_players:
+		packet["items_world"] = _items.world_state(_peer_players[peer_id])
 		_server.send_to(peer_id, packet, true)
 
 
@@ -539,6 +619,9 @@ func _apply_graphics_settings(quality: String, reduced_effects: bool) -> void:
 		return
 	_quality = quality
 	_reduced_effects = reduced_effects
+	if is_instance_valid(_item_visuals):
+		_item_visuals.set_quality(quality)
+		_item_visuals.set_reduced_effects(reduced_effects)
 	var low: bool = quality == "low"
 	get_viewport().scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
 	get_viewport().scaling_3d_scale = 0.75 if low else 1.0
@@ -561,9 +644,42 @@ func _sample_input() -> Dictionary:
 	if not _focused or not _input_enabled:
 		return Protocol.NEUTRAL.duplicate()
 	var command: Dictionary = Driver.sample()
+	if command["use_item_1"]:
+		_use_item(0)
+	if command["use_item_2"]:
+		_use_item(1)
 	for key: String in ["use_item_1", "use_item_2", "look_back"]:
 		command.erase(key)
 	return command
+
+
+func _use_item(slot: int) -> void:
+	if not _joined or not _can_drive() or not _focused or not _input_enabled or slot not in [0, 1]:
+		return
+	_item_sequence += 1
+	_send({"type": "use_item", "sequence": _item_sequence, "race_id": _race_id, "epoch": _hud.get("epoch", 0), "slot": slot})
+
+
+func _step_local(command: Dictionary, delta: float) -> void:
+	if not _client_combat.is_empty():
+		_local.configure(_items.effects_stats({"combat": _client_combat}, Styles.stats_for(_hud.get("style_id", Styles.DEFAULT_ID))))
+	if float(_client_combat.get("destroyed_remaining", 0.0)) > 0.0:
+		_local.velocity = Vector3.ZERO
+		_local.speed_mps = 0.0
+	else:
+		_local.step(command if _can_drive() else Protocol.NEUTRAL, delta)
+	# Only duration-based movement is predicted. Health, inventory and revival stay authoritative.
+	var effects: Dictionary = _client_combat.get("effects", {})
+	for effect: String in effects.keys():
+		effects[effect]["remaining"] = maxf(0.0, float(effects[effect]["remaining"]) - delta)
+		if effects[effect]["remaining"] <= 0.0:
+			effects.erase(effect)
+
+
+func _combat_visible(combat: Dictionary) -> bool:
+	if float(combat.get("destroyed_remaining", 0.0)) > 0.0:
+		return false
+	return _reduced_effects or float(combat.get("invulnerable_remaining", 0.0)) <= 0.0 or Time.get_ticks_msec() % 400 < 280
 
 
 func _on_host_message(arguments: Array) -> void:
@@ -574,6 +690,9 @@ func _on_host_message(arguments: Array) -> void:
 		return
 	var data: Dictionary = parsed
 	match data.get("type"):
+		"use_item":
+			if Protocol._integer(data.get("slot"), 0) and int(data["slot"]) <= 1:
+				_use_item(int(data["slot"]))
 		"graphics":
 			if data.get("quality") is String and data.get("reduced_effects") is bool:
 				_apply_graphics_settings(data["quality"], data["reduced_effects"])
@@ -612,7 +731,7 @@ func _connect_client(url: String, ticket: String) -> void:
 
 
 func _release_inputs() -> void:
-	for action: String in ["drive_left", "drive_right", "drive_accelerate", "drive_brake", "drive_drift", "look_back"]:
+	for action: String in ["drive_left", "drive_right", "drive_accelerate", "drive_brake", "drive_drift", "look_back", "use_item_1", "use_item_2"]:
 		Input.action_release(action)
 
 
@@ -643,6 +762,7 @@ func _poll_client() -> void:
 					return
 				_player_id = str(parsed.get("player_id", ""))
 				_sequence = int(parsed.get("ack", 0))
+				_item_sequence = int(parsed.get("item_ack", 0))
 				_joined = true
 				_status = "connected"
 			"snapshot":
@@ -674,12 +794,19 @@ func _apply_snapshot(packet: Dictionary) -> void:
 	_finish_remaining = float(packet.get("finish_remaining", -1.0))
 	_race_elapsed = 180.0 - float(packet.get("race_remaining", 180.0))
 	_client_countdown = float(packet.get("countdown", 0.0))
+	if is_instance_valid(_item_visuals):
+		if generation_changed:
+			_item_visuals.clear()
+		_item_visuals.apply_world(packet.get("items_world", {}))
 	var public_players: Array = []
 	var seen: Array[String] = []
 	for entry: Variant in packet["players"]:
 		if not entry is Dictionary or not entry.get("state") is Dictionary:
 			continue
 		if not Styles.is_valid(entry.get("style_id")):
+			_leave("update_required")
+			return
+		if Protocol.validate_combat(entry.get("combat")).is_empty():
 			_leave("update_required")
 			return
 		var state: Dictionary = Protocol.unpack_state(entry["state"])
@@ -696,7 +823,8 @@ func _apply_snapshot(packet: Dictionary) -> void:
 		if id == _player_id:
 			if _local == null:
 				_local = _create_vehicle(int(entry.get("slot", 0)), true)
-			_local.configure(Styles.stats_for(entry["style_id"]))
+			_client_combat = entry["combat"].duplicate(true)
+			_item_sequence = maxi(_item_sequence, int(_client_combat["item_ack"]))
 			var before: Vector3 = _local.global_position
 			var ack: int = int(entry.get("ack", 0))
 			_pending = _pending.filter(func(command: Dictionary) -> bool: return int(command["sequence"]) > ack)
@@ -704,13 +832,14 @@ func _apply_snapshot(packet: Dictionary) -> void:
 			var epoch_changed: bool = int(_hud.get("epoch", -1)) != int(entry.get("epoch", 0))
 			if epoch_changed or generation_changed:
 				_pending.clear()
+			_hud = entry.duplicate(true)
+			_hud.erase("state")
 			for command: Dictionary in _pending:
-				_local.step(command if _phase == "racing" and not entry.get("finished", false) and not entry.get("spectator", false) else Protocol.NEUTRAL, PHYSICS_DT)
+				_step_local(command, PHYSICS_DT)
+			_local.configure(_items.effects_stats({"combat": _client_combat}, Styles.stats_for(entry["style_id"])))
 			if (epoch_changed or generation_changed) and _race_camera != null:
 				_race_camera.reset(_local)
 			_correction = before.distance_to(_local.global_position)
-			_hud = entry.duplicate()
-			_hud.erase("state")
 			_status = "spectating" if entry.get("spectator", false) else ("finished" if entry.get("finished", false) else ("results" if _phase == "results" else _phase))
 		else:
 			if not _remotes.has(id):
@@ -726,6 +855,7 @@ func _apply_snapshot(packet: Dictionary) -> void:
 				_remotes[id].erase("near_lead")
 				_remotes[id]["node"].global_transform = state["transform"]
 			_remotes[id]["epoch"] = int(entry.get("epoch", 0))
+			_remotes[id]["combat"] = entry["combat"].duplicate(true)
 			samples.append({"at": Time.get_ticks_msec(), "tick": server_tick, "transform": state["transform"],
 				"velocity": state["velocity"],
 				"speed": state["velocity"].slide(state["up_direction"]).length(), "steering": state["steering_amount"],
@@ -740,7 +870,7 @@ func _apply_snapshot(packet: Dictionary) -> void:
 
 
 func _can_drive() -> bool:
-	return _status == "practice" or (_phase == "racing" and not _hud.get("finished", false) and not _hud.get("spectator", false))
+	return _status == "practice" or (_phase == "racing" and not _hud.get("finished", false) and not _hud.get("spectator", false) and float(_client_combat.get("destroyed_remaining", 0.0)) <= 0.0)
 
 
 func _presentation_time_msec() -> int:
@@ -811,6 +941,7 @@ func _interpolate_remotes(delta: float) -> void:
 				remote.erase("near_sample_at")
 				remote.erase("near_lead")
 		remote["node"].global_transform = result
+		remote["node"].visible = _combat_visible(remote.get("combat", {}))
 		remote["node"].update_visual(delta, motion["speed"], motion["steering"], motion["drifting"], minf(1.0, motion["boost"]))
 
 
@@ -839,6 +970,10 @@ func _leave(status: String) -> void:
 	_queued_snapshot.clear()
 	_player_id = ""
 	_sequence = 0
+	_item_sequence = 0
+	_client_combat.clear()
+	if is_instance_valid(_item_visuals):
+		_item_visuals.clear()
 	_tick = 0
 	_race_id = 0
 	_phase = "waiting"
@@ -860,6 +995,11 @@ func _publish_hud() -> void:
 	var location: Vector3 = Vector3.ZERO if _local == null else _local.global_position
 	var forward: Vector3 = Vector3.FORWARD if _local == null else -_local.global_basis.z
 	var data: Dictionary = {"status": _status, "playerId": _player_id, "players": _hud.get("players", []),
+		"items": _client_combat.get("slots", ["", ""]), "health": _client_combat.get("health", 100.0), "maxHealth": _client_combat.get("max_health", 100.0),
+		"effects": _client_combat.get("effects", {}), "itemAck": _client_combat.get("item_ack", 0),
+		"destroyedRemaining": _client_combat.get("destroyed_remaining", 0.0), "invulnerableRemaining": _client_combat.get("invulnerable_remaining", 0.0),
+		"canUseItems": _joined and _can_drive() and _focused and _input_enabled,
+		"blurIntensity": _blur_intensity(),
 		"styleId": _hud.get("style_id", Styles.DEFAULT_ID), "nextStyleId": _hud.get("next_style_id", Styles.DEFAULT_ID),
 		"raceId": _race_id, "phase": _phase, "spectating": _hud.get("spectator", false),
 		"repeatReady": _hud.get("ready", false), "dnf": _hud.get("dnf", false),
@@ -876,3 +1016,11 @@ func _publish_hud() -> void:
 		"pendingInputs": _pending.size(), "fps": Engine.get_frames_per_second()}
 	if _bridge != null:
 		_bridge.update(JSON.stringify(data))
+
+
+func _blur_intensity() -> float:
+	return _items.blur_intensity(_client_combat)
+
+
+func _contact_damage(closing: float) -> float:
+	return clampf((closing - 8.0) * 1.5, 0.0, 30.0)

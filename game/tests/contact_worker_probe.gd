@@ -74,6 +74,7 @@ func _run() -> void:
 		if scenario == "active":
 			_check(rear_speed < 19.0 and front_speed > 1.0, "server rear contact slows striker and accelerates target (%s / %s)" % [rear_speed, front_speed])
 			_check(is_equal_approx(rear_speed + front_speed, 20.0), "worker contact transfers equal-mass forward momentum")
+			_check(rear["combat"]["health"] < 100.0 and front["combat"]["health"] < 100.0, "hard contact damages both equal-mass racers")
 			for player: Dictionary in [rear, front]:
 				_check(worker.progress_positions.get(player["id"]) == player["vehicle"].global_position, "%s progress sees final contact-corrected pose" % player["id"])
 				_check(player["progress"]["interval_valid"] and player["epoch"] == 0, "%s contact leaves route progress valid without recovery" % player["id"])

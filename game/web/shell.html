@@ -47,6 +47,15 @@
     <div class="connection hud-panel"><small>СОЕДИНЕНИЕ</small><strong id="network-status">Подключение</strong><span id="ping">0 мс</span></div>
     <div class="drift hud-panel"><div><strong>ДРИФТ</strong><span id="boost-label">ЗАРЯД</span></div><div class="drift-track"><div id="drift-fill"></div></div></div>
     <div class="speed hud-panel"><strong id="speed">0</strong><span>км/ч</span></div>
+    <div class="combat-hud">
+      <div class="health-meter" role="meter" aria-label="Прочность" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="health-fill"></span><strong id="health-value">100</strong></div>
+      <div class="item-slots" aria-label="Предметы">
+        <button id="item-slot-0" class="item-slot" disabled aria-label="Пустой слот 1"><img alt="" hidden><span class="empty-slot" aria-hidden="true">+</span></button>
+        <button id="item-slot-1" class="item-slot" disabled aria-label="Пустой слот 2"><img alt="" hidden><span class="empty-slot" aria-hidden="true">+</span></button>
+      </div>
+      <div id="item-effects" class="item-effects" aria-label="Активные эффекты"></div>
+    </div>
+    <div id="destroyed-status" class="destroyed-status" role="status" hidden></div>
     <div id="countdown" class="countdown" role="status" hidden></div>
     <div id="disconnect" class="disconnect hud-panel" hidden><h2 id="disconnect-title">Соединение прервано</h2><button id="reconnect-button" class="primary">ПЕРЕПОДКЛЮЧИТЬСЯ</button><button id="disconnect-exit" class="text-button">Вернуться в меню</button></div>
   </section>

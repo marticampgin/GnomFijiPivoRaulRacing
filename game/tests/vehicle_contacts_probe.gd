@@ -19,13 +19,18 @@ func _run() -> void:
 	await physics_frame
 	a.velocity = Vector3(0, 0, -30)
 	b.velocity = Vector3(0, 0, -10)
-	Contacts.resolve([a, b], {})
+	var impacts: Array = []
+	Contacts.resolve([a, b], {}, [], impacts)
+	_check(impacts.size() == 1 and is_equal_approx(impacts[0].closing, 20.0), "one damage metric per pair preserves pre-impact closing speed")
+	_check(impacts[0].a == a and impacts[0].b == b, "damage metric identifies both bodies")
 	_check(a.velocity.z > -30 and b.velocity.z < -10, "rear impact slows rear and accelerates front")
 	_check(absf(a.velocity.z + b.velocity.z + 40) < 0.001, "equal masses conserve planar momentum")
 	_check(a.velocity.length_squared() + b.velocity.length_squared() <= 1000.01, "impact never creates energy")
 	var energy: float = a.velocity.length_squared() + b.velocity.length_squared()
+	impacts.clear()
 	for frame: int in 8:
-		Contacts.resolve([a, b], {})
+		Contacts.resolve([a, b], {}, [], impacts)
+	_check(impacts.is_empty(), "standing contact cannot repeatedly report damage")
 	_check(a.velocity.length_squared() + b.velocity.length_squared() <= energy + 0.001, "resting contact has no repeated kick")
 	a.position = Vector3(0, 1, 0)
 	b.position = Vector3(0, 1, -2)

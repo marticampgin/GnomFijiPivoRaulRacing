@@ -3,12 +3,12 @@ extends RefCounted
 
 const Vehicle = preload("res://vehicle/racing_vehicle.gd")
 const Styles = preload("res://vehicle/driving_styles.gd")
-const WIRE_VERSION: int = 4
+const WIRE_VERSION: int = 5
 const TICKET_VERSION: int = 3
 const VEHICLE_STATE_VERSION: int = Vehicle.STATE_VERSION
 const TRACK_SCHEMA_VERSION: int = 1
 const MATCH_ID: String = "prototype-1"
-const LOADOUT_HASH: String = "prototype-v6"
+const LOADOUT_HASH: String = "prototype-v7"
 const NEUTRAL: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false}
 
 
@@ -29,6 +29,51 @@ static func validate_input(data: Dictionary) -> Dictionary:
 	if not data.get("drift") is bool:
 		return {}
 	return data.duplicate()
+
+
+static func validate_item_command(data: Dictionary) -> Dictionary:
+	if data.size() != 5 or data.get("type") != "use_item":
+		return {}
+	if not _integer(data.get("sequence"), 1) or not _integer(data.get("race_id"), 1):
+		return {}
+	if not _integer(data.get("epoch"), 0) or not _integer(data.get("slot"), 0) or int(data["slot"]) > 1:
+		return {}
+	return data.duplicate()
+
+
+static func validate_combat(data: Variant) -> Dictionary:
+	if not data is Dictionary or data.size() != 7:
+		return {}
+	if not _bounded(data.get("health"), 0.0, 100.0) or not _number(data.get("max_health")) or data["max_health"] != 100.0:
+		return {}
+	if not _bounded(data.get("destroyed_remaining"), 0.0, 2.0) or not _bounded(data.get("invulnerable_remaining"), 0.0, 2.0):
+		return {}
+	if not _integer(data.get("item_ack"), 0):
+		return {}
+	var slots: Variant = data.get("slots")
+	if not slots is Array or slots.size() != 2:
+		return {}
+	for slot: Variant in slots:
+		if not slot is String or not slot in ["", "fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k"]:
+			return {}
+	var effects: Variant = data.get("effects")
+	if not effects is Dictionary or effects.size() > 5:
+		return {}
+	for key: Variant in effects:
+		if not key is String or not key in ["fanta", "mermaid_rum", "ice_rum", "lays_crab", "burn"]:
+			return {}
+		var effect: Variant = effects[key]
+		if not effect is Dictionary or effect.size() != (2 if key == "burn" else 1):
+			return {}
+		if not _bounded(effect.get("remaining"), 0.0, 4.0 if key == "burn" else 8.0):
+			return {}
+		if key == "burn" and not _bounded(effect.get("damage"), 0.0, 5.75):
+			return {}
+	return data.duplicate(true)
+
+
+static func _bounded(value: Variant, minimum: float, maximum: float) -> bool:
+	return _number(value) and float(value) >= minimum and float(value) <= maximum
 
 
 static func track_identity(manifest: Dictionary) -> Dictionary:
@@ -83,6 +128,7 @@ static func validate_welcome(data: Dictionary, expected_track: Dictionary) -> bo
 	return (data.get("type") == "welcome" and data.get("player_id") is String
 		and not data["player_id"].is_empty() and data["player_id"].length() <= 128
 		and _integer(data.get("ack"), 0) and data.get("compatibility") is Dictionary
+		and (not data.has("item_ack") or _integer(data["item_ack"], 0))
 		and compatible(data["compatibility"], expected_track))
 
 

@@ -14,6 +14,49 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	var item_command: Dictionary = {"type": "use_item", "sequence": 1, "race_id": 1, "epoch": 0, "slot": 0}
+	_check(not Protocol.validate_item_command(item_command).is_empty(), "valid item command")
+	var second_slot: Dictionary = item_command.duplicate()
+	second_slot["slot"] = 1.0
+	_check(not Protocol.validate_item_command(second_slot).is_empty(), "JSON integral slot one accepted")
+	for key: String in ["sequence", "race_id", "epoch", "slot"]:
+		for invalid: Variant in [NAN, INF, -INF, "1", null, true, -1, 0.5, 2147483648]:
+			var broken: Dictionary = item_command.duplicate()
+			broken[key] = invalid
+			_check(Protocol.validate_item_command(broken).is_empty(), "reject item %s:%s" % [key, str(invalid)])
+	for changes: Dictionary in [{"sequence": 0}, {"race_id": 0}, {"slot": 2}, {"type": "grant_item"}, {"extra": 1}]:
+		var broken: Dictionary = item_command.duplicate()
+		broken.merge(changes, true)
+		_check(Protocol.validate_item_command(broken).is_empty(), "reject item shape/range %s" % str(changes))
+	for key: String in item_command:
+		var broken: Dictionary = item_command.duplicate()
+		broken.erase(key)
+		_check(Protocol.validate_item_command(broken).is_empty(), "reject missing item field %s" % key)
+	var combat: Dictionary = {"health": 100.0, "max_health": 100.0, "slots": ["", "fanta"], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0}
+	_check(not Protocol.validate_combat(combat).is_empty(), "valid combat state")
+	for item_id: String in ["fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k"]:
+		var equipped: Dictionary = combat.duplicate(true)
+		equipped["slots"] = [item_id, item_id]
+		_check(not Protocol.validate_combat(equipped).is_empty(), "valid inventory item %s" % item_id)
+	var active_combat: Dictionary = combat.duplicate(true)
+	for effect_id: String in ["fanta", "mermaid_rum", "ice_rum", "lays_crab"]:
+		active_combat["effects"][effect_id] = {"remaining": 8.0}
+	active_combat["effects"]["burn"] = {"remaining": 4.0, "damage": 5.75}
+	_check(not Protocol.validate_combat(active_combat).is_empty(), "bounded simultaneous effects accepted")
+	for key: String in ["health", "max_health", "destroyed_remaining", "invulnerable_remaining", "item_ack"]:
+		for invalid: Variant in [NAN, INF, -INF, true, "1", null, -1, 2147483648]:
+			var broken: Dictionary = combat.duplicate(true)
+			broken[key] = invalid
+			_check(Protocol.validate_combat(broken).is_empty(), "reject combat %s:%s" % [key, str(invalid)])
+	for changes: Dictionary in [{"health": 101}, {"max_health": 99}, {"slots": [""]}, {"slots": ["", "", ""]}, {"slots": [0, ""]}, {"slots": ["cheat", ""]}, {"effects": []}, {"effects": {"cheat": {"remaining": 1}}}, {"effects": {"fanta": {"remaining": 9}}}, {"effects": {"burn": {"remaining": 4, "damage": 6}}}, {"effects": {"burn": {"remaining": 4}}}, {"effects": {"fanta": {"remaining": 2, "damage": 2}}}, {"effects": {"fanta": {"remaining": NAN}}}, {"destroyed_remaining": 3}, {"invulnerable_remaining": 3}, {"item_ack": 0.5}, {"extra": 1}]:
+		var broken: Dictionary = combat.duplicate(true)
+		broken.merge(changes, true)
+		_check(Protocol.validate_combat(broken).is_empty(), "reject combat structure/range %s" % str(changes))
+	for key: String in combat:
+		var broken: Dictionary = combat.duplicate(true)
+		broken.erase(key)
+		_check(Protocol.validate_combat(broken).is_empty(), "reject missing combat field %s" % key)
+	_check(Protocol.validate_combat(null).is_empty(), "reject absent combat state")
 	var input: Dictionary = {"type": "input", "sequence": 1, "steering": -1.0, "throttle": 1.0, "brake": 0.0, "drift": true}
 	_check(not Protocol.validate_input(input).is_empty(), "valid input")
 	for key: String in ["sequence", "steering", "throttle", "brake"]:

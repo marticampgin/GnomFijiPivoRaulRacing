@@ -54,6 +54,15 @@ speed, turn and drift/boost differences. `race_lifecycle_probe.gd` verifies that
 queued styles apply only on the next race and survive recovery. The mixed-style
 bot race checks all four profiles without modifying the shared collision mass.
 
+Items use `items_probe.gd`, `items_worker_probe.gd` and `item_visuals_probe.gd`
+for catalog effects, command deduplication, destruction/recovery and asset events.
+`items_race_probe.gd` runs the actual worker with ten bots and combat enabled;
+destruction recovery is expected, while checkpoint bypass and missing finishes
+remain failures. `GNOM_DRIVER_ITEMS=1 GNOM_DRIVER_LAPS=1` adds natural pickup and
+keyboard Q/E use to the browser driver, requiring a server acknowledgment.
+Health loss/destruction is excluded from the road-seam speed-loss heuristic,
+not from the independent collision and item assertions.
+
 Choose the scope to match the change. Hero-only geometry/material edits use the
 short smoke below, not the full race. Route/physics/progress/network changes
 still require their relevant integration checks and, when affected, a full finish.

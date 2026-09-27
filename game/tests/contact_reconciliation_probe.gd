@@ -114,8 +114,8 @@ func _run() -> void:
 
 func _snapshot(tick: int, generation: int, ack: int, epoch: int, state: Dictionary) -> Dictionary:
 	return {"type": "snapshot", "tick": tick, "race_id": generation, "phase": "racing", "countdown": 0.0, "players": [
-		{"id": "contact-probe", "slot": 0, "ack": ack, "epoch": epoch, "style_id": "handling", "state": state},
-		{"id": "other", "slot": 1, "epoch": epoch, "style_id": "handling", "state": state},
+		{"id": "contact-probe", "slot": 0, "ack": ack, "epoch": epoch, "style_id": "handling", "combat": {"health": 100.0, "max_health": 100.0, "slots": ["", ""], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0}, "state": state},
+		{"id": "other", "slot": 1, "epoch": epoch, "style_id": "handling", "combat": {"health": 100.0, "max_health": 100.0, "slots": ["", ""], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0}, "state": state},
 	]}
 
 

@@ -10,8 +10,9 @@ const Vehicle = preload("res://vehicle/racing_vehicle.gd")
 ## excluded_bodies supplies other layer-2 karts (spectators/finished racers).
 ## Godot supplies convex narrowphase/continuous casts; response is equal-mass,
 ## inelastic and planar, so contacts cannot add kinetic energy or tip a kart.
-static func resolve(bodies: Array, previous_transforms: Dictionary, excluded_bodies: Array = []) -> int:
+static func resolve(bodies: Array, previous_transforms: Dictionary, excluded_bodies: Array = [], impacts: Array = []) -> int:
 	var contacts: int = 0
+	var pair_impacts: Dictionary = {}
 	if bodies.size() < 2:
 		return contacts
 	var all_rids: Array[RID] = []
@@ -30,6 +31,10 @@ static func resolve(bodies: Array, previous_transforms: Dictionary, excluded_bod
 				var normal: Vector3 = contact.normal
 				var closing: float = (a.velocity - b.velocity).dot(normal)
 				if closing < 0.0:
+					# Report the strongest approach once per pair, not once per solver pass.
+					var key: Vector2i = Vector2i(i, j)
+					if -closing > float(pair_impacts.get(key, {}).get("closing", 0.0)):
+						pair_impacts[key] = {"a": a, "b": b, "closing": -closing}
 					var impulse: Vector3 = normal * (-closing * 0.5)
 					a.velocity += impulse
 					b.velocity -= impulse
@@ -42,6 +47,7 @@ static func resolve(bodies: Array, previous_transforms: Dictionary, excluded_bod
 						_move(a, normal * maxf(0.0, distance - moved_a - moved_b))
 		for body: CharacterBody3D in bodies:
 			body.speed_mps = body.velocity.slide(body.up_direction).length()
+	impacts.append_array(pair_impacts.values())
 	return contacts
 
 

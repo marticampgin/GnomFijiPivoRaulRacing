@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(resolve(root, 'shared/track-manifest.json'), 'utf8'));
 const { track_id, schema_version, simulation_revision, simulation_hash, art_revision } = manifest;
-const compatibility = { protocol_version: 4, vehicle_state_version: 1, loadout_hash: 'prototype-v6', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
+const compatibility = { protocol_version: 5, vehicle_state_version: 1, loadout_hash: 'prototype-v7', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
 const secret = 'network-probe-only-not-a-deployment-secret-2026';
 const port = Number(process.env.NETWORK_TEST_PORT || 19080);
 const url = `ws://127.0.0.1:${port}`;
@@ -90,6 +90,8 @@ try {
   await rejectTicket(ticket('old-protocol', { protocol_version: 1 }), 'signed stale wire protocol rejected');
   await rejectTicket(ticket('previous-protocol', { protocol_version: 2 }), 'pre-lifecycle wire protocol rejected');
   await rejectTicket(ticket('pre-styles', { protocol_version: 3 }), 'pre-style wire protocol rejected');
+  await rejectTicket(ticket('pre-items', { protocol_version: 4 }), 'pre-item wire protocol rejected');
+  await rejectTicket(ticket('pre-item-balance', { loadout_hash: 'prototype-v6' }), 'pre-item balance rejected');
   await rejectTicket(ticket('bad-style', { style_id: 'faster' }), 'unknown signed style rejected');
   await rejectTicket(ticket('missing-style', { style_id: undefined }), 'missing signed style rejected');
   await rejectTicket(ticket('bot:1'), 'reserved bot identity rejected');
@@ -101,6 +103,8 @@ try {
   await rejectTicket(ticket('wrong-track', { track: { ...compatibility.track, simulation_hash: 'a'.repeat(64) } }), 'signed stale track hash rejected');
   for (const [label, descriptor] of [
     ['stale hello protocol', { ...compatibility, protocol_version: 1 }],
+    ['pre-item hello protocol', { ...compatibility, protocol_version: 4 }],
+    ['pre-item hello balance', { ...compatibility, loadout_hash: 'prototype-v6' }],
     ['unsupported hello state schema', { ...compatibility, vehicle_state_version: 999 }],
     ['old hello vehicle simulation', { ...compatibility, loadout_hash: 'prototype-v1' }],
     ['sharp-box hello vehicle simulation', { ...compatibility, loadout_hash: 'prototype-v2' }],
@@ -119,7 +123,24 @@ try {
   verify(true, 'two real WebSocket clients share authoritative snapshot');
   verify(new Set(grid.players.map(player => player.slot)).size === 10, 'ten racers have distinct grid slots');
   verify(new Set(grid.players.filter(player => player.is_bot).map(player => player.style_id)).size === 4, 'bots use all four authoritative styles');
+  verify(grid.players.every(player => player.combat && player.combat.health === player.combat.max_health
+    && player.combat.slots.length === 2 && player.combat.item_ack === 0), 'every racer starts with authoritative durability and two slots');
   await waitFor(() => first.messages.find(message => message.type === 'snapshot' && message.countdown === 0), 'countdown complete', 8000);
+  const initialItemState = ownState(first, 'driver-a');
+  const itemCommand = { type: 'use_item', sequence: 1, race_id: grid.race_id, epoch: initialItemState.epoch, slot: 0 };
+  first.socket.send(JSON.stringify(itemCommand));
+  const acknowledgedItem = await waitFor(() => ownState(first, 'driver-a', player => player.combat.item_ack === 1), 'empty-slot item command acknowledged');
+  first.socket.send(JSON.stringify(itemCommand));
+  await delay(120);
+  verify(!first.closed && ownState(first, 'driver-a').combat.item_ack === 1, 'duplicate item command is idempotent without disconnect');
+  assert.deepEqual(ownState(first, 'driver-a').combat.slots, acknowledgedItem.combat.slots);
+  verify(true, 'duplicate item command leaves inventory unchanged');
+  first.socket.send(JSON.stringify({ ...itemCommand, sequence: 2, race_id: grid.race_id + 1 }));
+  first.socket.send(JSON.stringify({ ...itemCommand, sequence: 2, epoch: initialItemState.epoch + 1 }));
+  await delay(120);
+  verify(!first.closed && ownState(first, 'driver-a').combat.item_ack === 1, 'wrong race and recovery epoch cannot advance item acknowledgement');
+  assert.deepEqual(ownState(first, 'driver-a').combat.slots, acknowledgedItem.combat.slots);
+  verify(true, 'stale item commands do not consume or grant inventory');
   const before = ownState(first, 'driver-a').state.position;
   let sequence = first.ack;
   for (let index = 0; index < 60; index++) {
@@ -152,6 +173,14 @@ try {
   malformed.socket.send(JSON.stringify({ type: 'input', sequence: sequence + 1, steering: null, throttle: 1, brake: 0, drift: false }));
   await waitFor(() => malformed.closed, 'non-numeric input close');
   verify(malformed.reason === 'invalid_input', 'non-numeric input rejected over socket');
+  for (const mutation of [{ slot: 2 }, { sequence: 1.5 }, { extra: true }, { epoch: null }, { sequence: 122 }]) {
+    const malformedItem = await joined('driver-a');
+    const itemState = await waitFor(() => ownState(malformedItem, 'driver-a'), 'item validation snapshot');
+    malformedItem.socket.send(JSON.stringify({ type: 'use_item', sequence: itemState.combat.item_ack + 1,
+      race_id: grid.race_id, epoch: itemState.epoch, slot: 0, ...mutation }));
+    await waitFor(() => malformedItem.closed, 'malformed item close');
+    verify(malformedItem.reason === 'invalid_item', `malformed item rejected: ${JSON.stringify(mutation)}`);
+  }
   const unknown = await joined('driver-a');
   unknown.socket.send(JSON.stringify({ type: 'grant_money', amount: 1000 }));
   await waitFor(() => unknown.closed, 'unknown packet close');

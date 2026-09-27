@@ -7,6 +7,44 @@
   let mapProjection = null, mapHash = null;
   let raceId = null, musicContext = null, musicTimer = null, musicStep = 0;
   let musicEnabled = true;
+  const itemLabels = {fanta:'Fanta', mermaid_rum:'Mermaid Rum', ice_rum:'Ice Rum', stroh80:'Stroh 80', lays_crab:'Lay’s Crab', bfg10k:'BFG 10K'};
+  function renderItems(state) {
+    for (let slot = 0; slot < 2; slot++) {
+      const button = $(`item-slot-${slot}`), id = state.items?.[slot], label = itemLabels[id];
+      const icon = button.querySelector('img');
+      if (label) icon.src = `/assets/items/${id}.png`;
+      else icon.removeAttribute('src');
+      icon.hidden = !label; button.querySelector('.empty-slot').hidden = !!label;
+      button.disabled = !label || !state.canUseItems;
+      button.title = label ? `${label} · ${slot === 0 ? 'Q' : 'E'}` : `Пустой слот ${slot + 1}`;
+      button.setAttribute('aria-label', button.title);
+    }
+    const maximum = Math.max(1, Number(state.maxHealth) || 100);
+    const health = Math.max(0, Math.min(maximum, Number(state.health ?? maximum)));
+    $('health-fill').style.width = `${health / maximum * 100}%`;
+    $('health-value').textContent = String(Math.ceil(health));
+    const meter = document.querySelector('.health-meter');
+    meter.setAttribute('aria-valuemax', String(maximum)); meter.setAttribute('aria-valuenow', String(health));
+    meter.classList.toggle('critical', health / maximum < .3);
+    const remaining = Math.max(0, Number(state.destroyedRemaining) || 0);
+    $('destroyed-status').hidden = remaining <= 0;
+    $('destroyed-status').textContent = remaining > 0 ? `ВОССТАНОВЛЕНИЕ · ${Math.ceil(remaining)}` : '';
+    const effects = {...state.effects};
+    if (state.invulnerableRemaining > 0) effects.invulnerable = {remaining:state.invulnerableRemaining};
+    const labels = {...itemLabels, burn:'Горение', invulnerable:'Защита'};
+    $('item-effects').replaceChildren(...Object.entries(effects).filter(([id, effect]) => labels[id] && Number(effect?.remaining ?? effect) > 0).map(([id, effect]) => {
+      const badge = document.createElement('span'), icon = document.createElement('img'), timer = document.createElement('b');
+      badge.className = `item-effect ${id}`; badge.title = labels[id]; badge.setAttribute('aria-label', `${labels[id]}: ${Math.ceil(Number(effect?.remaining ?? effect))} с`);
+      icon.src = `/assets/items/${id === 'burn' ? 'stroh80' : id === 'invulnerable' ? 'ice_rum' : id}.png`; icon.alt = '';
+      timer.textContent = `${Math.ceil(Number(effect?.remaining ?? effect))}с`; badge.append(icon,timer); return badge;
+    }));
+    const blur = Math.max(0, Math.min(1, Number(state.blurIntensity) || 0));
+    ui.canvas.style.filter = blur > 0 && inRace ? `blur(${blur * (graphics.reducedEffects ? .6 : 3)}px)` : '';
+  }
+  for (let slot = 0; slot < 2; slot++) $(`item-slot-${slot}`).addEventListener('click', () => {
+    if (inRace && lastState?.canUseItems && itemLabels[lastState.items?.[slot]] && !document.querySelector('dialog[open]')) send({type:'use_item', slot});
+    ui.canvas.focus();
+  });
   const styleLabels = {handling:'Управляемость', acceleration:'Ускорение', speed:'Скорость', drift:'Дрифт'};
   const validStyle = value => Object.hasOwn(styleLabels, value);
   let selectedStyle = 'handling', joinedStyle = null;
@@ -76,6 +114,7 @@
     for (const input of document.querySelectorAll('input[name="quality"]')) input.checked = input.value === graphics.quality;
     $('reduced-effects').checked = graphics.reducedEffects;
     send({type:'graphics', quality:graphics.quality, reduced_effects:graphics.reducedEffects});
+    if (lastState && inRace) renderItems(lastState);
   }
   function saveGraphics() {
     try { localStorage.setItem(graphicsKey, JSON.stringify(graphics)); } catch { /* Storage may be disabled. */ }
@@ -163,6 +202,7 @@
     send({type:'leave'}); inRace = false; lastFinish = false;
     raceId = null; restarting = false; stopMusic();
     joinedStyle = null; lastState = null; updateReady();
+    ui.canvas.style.filter = '';
     for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
     ui.hub.hidden = false; ui.hud.hidden = true;
     ui['join-button'].focus();
@@ -247,6 +287,7 @@
   function render(state) {
     lastState = state;
     if (!inRace) return;
+    renderItems(state);
     if (validStyle(state.styleId)) {
       joinedStyle = state.styleId;
       $('active-style').textContent = styleLabels[joinedStyle];

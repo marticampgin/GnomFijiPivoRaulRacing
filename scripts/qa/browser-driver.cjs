@@ -11,6 +11,7 @@ const durationSeconds = Number(process.env.GNOM_DRIVER_SECONDS || 240);
 const maximumSpeed = Number(process.env.GNOM_DRIVER_SPEED || 24);
 const tracePhysics = process.env.GNOM_DRIVER_TRACE === '1';
 const verifyRepeat = process.env.GNOM_DRIVER_REPEAT === '1';
+const verifyItems = process.env.GNOM_DRIVER_ITEMS === '1';
 const viewport = { width: 1600, height: 900 };
 const sourcePackage = path.resolve(__dirname, '../../game/track/baked/castle_waterfalls.json');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -109,8 +110,8 @@ async function main() {
   const state = () => page.evaluate(() => {
     const value = window.GnomHost?.state;
     if (!value) return null;
-    const { status, worldPosition, forward, speed, lap, finished, elapsed, countdown, ping, correction, fps, serverTick, track, playerId, players, raceId, phase, canRestart, repeatReady } = value;
-    return { status, worldPosition, forward, speed, lap, finished, elapsed, countdown, ping, correction, fps, serverTick, track, playerId, players, raceId, phase, canRestart, repeatReady };
+    const { status, worldPosition, forward, speed, lap, finished, elapsed, countdown, ping, correction, fps, serverTick, track, playerId, players, raceId, phase, canRestart, repeatReady, items, health, effects, itemAck, destroyedRemaining, canUseItems } = value;
+    return { status, worldPosition, forward, speed, lap, finished, elapsed, countdown, ping, correction, fps, serverTick, track, playerId, players, raceId, phase, canRestart, repeatReady, items, health, effects, itemAck, destroyedRemaining, canUseItems };
   });
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -144,6 +145,8 @@ async function main() {
     let lastServerTick = last.serverTick;
     let lastProgressAt = Date.now();
     let lastLogAt = 0;
+    const itemUses = [];
+    let itemReadyAfter = 0;
     const started = Date.now();
     while (Date.now() - started < durationSeconds * 1000) {
       const current = await state();
@@ -157,6 +160,15 @@ async function main() {
       }
       if (current.serverTick !== lastServerTick) { lastServerTick = current.serverTick; lastProgressAt = Date.now(); }
       assert.ok(Date.now() - lastProgressAt < 5000, 'Server snapshots stopped');
+      if (verifyItems && current.canUseItems && Date.now() > itemReadyAfter) {
+        for (let slot = 0; slot < 2; slot++) {
+          if (!current.items?.[slot]) continue;
+          if (itemUses.length === 0) await page.screenshot({ path: path.join(output, 'item-pickup.png') });
+          itemUses.push({ slot, id: current.items[slot], tick: current.serverTick });
+          await page.keyboard.press(slot === 0 ? 'q' : 'e', { delay: 40 });
+          itemReadyAfter = Date.now() + 350;
+        }
+      }
       if (Array.isArray(current.forward) && current.forward.length === 3) {
         heading = normal([current.forward[0], current.forward[2]]);
         report.headingSource = 'observed HUD forward';
@@ -168,7 +180,7 @@ async function main() {
       previousPosition = current.worldPosition;
       const controls = controlsFor(route, current, heading);
       const nearestRacer = Math.min(...current.players.filter(player => player.id !== current.playerId).map(player => Math.hypot(...player.worldPosition.map((value, axis) => value - current.worldPosition[axis]))));
-      samples.push({ elapsedMs, position: current.worldPosition, forward: current.forward || null, lap: current.lap, finished: current.finished, speedKph: current.speed, serverTick: current.serverTick, correction: current.correction, fps: current.fps, nearestRacer, ...controls });
+      samples.push({ elapsedMs, position: current.worldPosition, forward: current.forward || null, lap: current.lap, finished: current.finished, speedKph: current.speed, serverTick: current.serverTick, correction: current.correction, fps: current.fps, nearestRacer, health: current.health, destroyedRemaining: current.destroyedRemaining, ...controls });
       if (Date.now() - lastLogAt > 5000) {
         console.log(JSON.stringify({ elapsed: Math.round(elapsedMs / 1000), lap: current.lap, speed: Math.round(current.speed), s: Math.round(controls.s), centerError: +controls.centerError.toFixed(2), steering: +controls.steering.toFixed(2) }));
         lastLogAt = Date.now();
@@ -198,6 +210,10 @@ async function main() {
     report.elapsedSeconds = (Date.now() - started) / 1000;
     report.completed = report.completed === true;
     assert.ok(report.completed, `Driver did not complete ${requiredLaps} lap(s) within ${durationSeconds}s`);
+    if (verifyItems) {
+      assert.ok(itemUses.length >= 1 && report.finalState.itemAck >= 1, 'Natural pickup and keyboard item use must receive server acknowledgment');
+      report.checks.items = { uses: itemUses, ack: report.finalState.itemAck, minimumHealth: Math.min(...samples.map(sample => sample.health)) };
+    }
     const contactStops = samples.flatMap((sample, index) => {
       const previous = samples[index - 1];
       if (!previous) return [];
@@ -206,6 +222,7 @@ async function main() {
       return gap > 0 && gap <= 250 && previous.speedMps > 8 && sample.speedMps < previous.speedMps * 0.25
         && !previous.brake && !sample.brake && previous.centerError < 3.5 && sample.centerError < 3.5
         && previous.nearestRacer > 4 && sample.nearestRacer > 4
+        && !previous.destroyedRemaining && !sample.destroyedRemaining && previous.health === sample.health
         && travel < 4 && previous.lap === sample.lap
         ? [{ elapsedMs: sample.elapsedMs, s: sample.s, beforeMps: previous.speedMps, afterMps: sample.speedMps }]
         : [];
