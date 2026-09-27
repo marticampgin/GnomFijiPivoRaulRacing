@@ -1,0 +1,665 @@
+{
+  "version": "hero-materials-v2",
+  "blenderVersion": "4.5.13 LTS",
+  "source": "authored local Blender nodes, no external textures or third-party assets",
+  "atlasSize": 2048,
+  "uvLayer": "HeroAtlasUV",
+  "uv": {
+    "Body": {
+      "corners": 34544,
+      "triangleUvArea": 0.08760848671601071,
+      "sha256": "8dc62b43a764ebdb35a33ca42a8049348325abfeddd1a2abeb498dae24a13e10"
+    },
+    "Crystal": {
+      "corners": 98,
+      "triangleUvArea": 0.0012175532039892384,
+      "sha256": "89dc3ff6254f0fdb6381148f645619b9ebfaf21ef4362c91199b682acb905008"
+    },
+    "DriverBody": {
+      "corners": 13240,
+      "triangleUvArea": 0.010974276169329077,
+      "sha256": "a958e1424d9b77f5d576585b98ee35b1bbb49fdca59434992bb9f0fe6cadd5ea"
+    },
+    "EngineCradle": {
+      "corners": 8688,
+      "triangleUvArea": 0.012535307679338345,
+      "sha256": "c4656dfcd173f0bcb71e12d17253ee9e0ff460e8c8d022f1b3a036fde2e29381"
+    },
+    "FrontLeftRoll": {
+      "corners": 10104,
+      "triangleUvArea": 0.018626568541959862,
+      "sha256": "0f895becef1d362b86a15c1c9317c7a70308d99a0cfc4c13ace0f0abfb4283e6"
+    },
+    "FrontRightRoll": {
+      "corners": 10104,
+      "triangleUvArea": 0.018626562680104302,
+      "sha256": "17fac513a349c0d90c78fd802e8140ef239fb93d6209a0d16982cbd5b7de3a0c"
+    },
+    "Hat": {
+      "corners": 4116,
+      "triangleUvArea": 0.002809957956577576,
+      "sha256": "8f273318d1a03daea800346c9f33c286c08cc974ec7c7ae01d3ae17bdefe61ef"
+    },
+    "Head": {
+      "corners": 39226,
+      "triangleUvArea": 0.009432327386963986,
+      "sha256": "a89218c9f43202dc8df1c5021b4db6f102960a21a8f738f28fb8fe35adf83a12"
+    },
+    "LeftHand": {
+      "corners": 3892,
+      "triangleUvArea": 0.0004239321629317949,
+      "sha256": "d770efcfb8dddecd43f3de3c665674952b0a8284a06a805d97c1677971b39898"
+    },
+    "RearLeftRoll": {
+      "corners": 10104,
+      "triangleUvArea": 0.021963969241318868,
+      "sha256": "4fb943cdf24b7d51b30f3d98822ab5e42196df9cb69a5c0fb38c517c25af1f2c"
+    },
+    "RearRightRoll": {
+      "corners": 10104,
+      "triangleUvArea": 0.021963967808093985,
+      "sha256": "c19f42cc19f4de73edc7a8ae58a0d74aae5c04982ac1fe484bdd5cae2bcc82b6"
+    },
+    "RightHand": {
+      "corners": 3892,
+      "triangleUvArea": 0.00042393218832392776,
+      "sha256": "3b186850ab6657a76cd883a71f24c9aa4c9a9a10fee6f2dad0c772b2fca6f487"
+    },
+    "SteeringWheel": {
+      "corners": 3288,
+      "triangleUvArea": 0.0010367004885774994,
+      "sha256": "2f215bde7f320b6830ce897c1af65c171d3fe9f2866b94423800461b2bb2d509"
+    }
+  },
+  "uvOverlapAudit": {
+    "method": "Analytic triangle clipping with a 256x256 spatial broad phase; convex UV islands only for offending polygons",
+    "positiveAreaTolerance": 1e-12,
+    "edgeLineTolerance": 1e-12,
+    "collapsedUvTolerance": 1e-18,
+    "geometryAreaTolerance": 1e-12,
+    "analyticControlsPassed": 5,
+    "maxRepairPasses": 5,
+    "repairPasses": 3,
+    "polygonRepairOperations": 392,
+    "before": {
+      "triangles": 75512,
+      "positiveAreaTrianglesChecked": 75412,
+      "uniqueBroadPhasePairs": 891124,
+      "analyticTriangleIntersections": 168465,
+      "interObjectOverlapPairs": 0,
+      "sameObjectOverlapPairs": 1528,
+      "summedPairwiseIntersectionArea": 0.0003854484906756214,
+      "maxIntersectionArea": 1.4540268726236319e-06,
+      "collapsedNonzeroGeometryUvTriangles": 4,
+      "degenerateGeometryTriangles": 96,
+      "tinyValidUvTrianglesBelowOverlapTolerance": 0,
+      "offendingPolygons": 387
+    },
+    "after": {
+      "triangles": 75512,
+      "positiveAreaTrianglesChecked": 75416,
+      "uniqueBroadPhasePairs": 840553,
+      "analyticTriangleIntersections": 168329,
+      "interObjectOverlapPairs": 0,
+      "sameObjectOverlapPairs": 0,
+      "summedPairwiseIntersectionArea": 0.0,
+      "maxIntersectionArea": 0.0,
+      "collapsedNonzeroGeometryUvTriangles": 0,
+      "degenerateGeometryTriangles": 96,
+      "tinyValidUvTrianglesBelowOverlapTolerance": 0,
+      "offendingPolygons": 0
+    },
+    "history": [
+      {
+        "triangles": 75512,
+        "positiveAreaTrianglesChecked": 75412,
+        "uniqueBroadPhasePairs": 891124,
+        "analyticTriangleIntersections": 168465,
+        "interObjectOverlapPairs": 0,
+        "sameObjectOverlapPairs": 1528,
+        "summedPairwiseIntersectionArea": 0.0003854484906756214,
+        "maxIntersectionArea": 1.4540268726236319e-06,
+        "collapsedNonzeroGeometryUvTriangles": 4,
+        "degenerateGeometryTriangles": 96,
+        "tinyValidUvTrianglesBelowOverlapTolerance": 0,
+        "offendingPolygons": 387
+      },
+      {
+        "triangles": 75512,
+        "positiveAreaTrianglesChecked": 75415,
+        "uniqueBroadPhasePairs": 854425,
+        "analyticTriangleIntersections": 166021,
+        "interObjectOverlapPairs": 0,
+        "sameObjectOverlapPairs": 3,
+        "summedPairwiseIntersectionArea": 2.734268367277082e-10,
+        "maxIntersectionArea": 1.3655743202889425e-10,
+        "collapsedNonzeroGeometryUvTriangles": 0,
+        "degenerateGeometryTriangles": 96,
+        "tinyValidUvTrianglesBelowOverlapTolerance": 1,
+        "offendingPolygons": 1
+      },
+      {
+        "triangles": 75512,
+        "positiveAreaTrianglesChecked": 75416,
+        "uniqueBroadPhasePairs": 838694,
+        "analyticTriangleIntersections": 167796,
+        "interObjectOverlapPairs": 0,
+        "sameObjectOverlapPairs": 2,
+        "summedPairwiseIntersectionArea": 5.748548840085219e-11,
+        "maxIntersectionArea": 3.8323669627944845e-11,
+        "collapsedNonzeroGeometryUvTriangles": 0,
+        "degenerateGeometryTriangles": 96,
+        "tinyValidUvTrianglesBelowOverlapTolerance": 0,
+        "offendingPolygons": 4
+      },
+      {
+        "triangles": 75512,
+        "positiveAreaTrianglesChecked": 75416,
+        "uniqueBroadPhasePairs": 840553,
+        "analyticTriangleIntersections": 168329,
+        "interObjectOverlapPairs": 0,
+        "sameObjectOverlapPairs": 0,
+        "summedPairwiseIntersectionArea": 0.0,
+        "maxIntersectionArea": 0.0,
+        "collapsedNonzeroGeometryUvTriangles": 0,
+        "degenerateGeometryTriangles": 96,
+        "tinyValidUvTrianglesBelowOverlapTolerance": 0,
+        "offendingPolygons": 0
+      }
+    ],
+    "topologyAltered": false,
+    "limitations": [
+      "Existing zero-area geometry remains counted and unchanged",
+      "Does not assess artistic seams or mip-filtering quality",
+      "Summed pairwise overlap area is not a union area"
+    ]
+  },
+  "textures": {
+    "albedo": {
+      "path": "textures/hero-albedo.png",
+      "pathRelativeTo": "source_dir",
+      "width": 2048,
+      "height": 2048,
+      "colorSpace": "sRGB",
+      "bytes": 2800125,
+      "sha256": "1391d76a0cda2af18b756e55667c665d0d68a80709156862ea20eb7ec81f8c12",
+      "pixelChecks": {
+        "sampledPixels": 65536,
+        "nonblackSamples": 29650,
+        "rgbMin": 0.0,
+        "rgbMax": 1.0,
+        "meshRegionHits": {
+          "Body": 32,
+          "Crystal": 23,
+          "DriverBody": 32,
+          "EngineCradle": 32,
+          "FrontLeftRoll": 32,
+          "FrontRightRoll": 32,
+          "Hat": 32,
+          "Head": 32,
+          "LeftHand": 32,
+          "RearLeftRoll": 32,
+          "RearRightRoll": 32,
+          "RightHand": 32,
+          "SteeringWheel": 32
+        }
+      }
+    },
+    "orm": {
+      "path": "textures/hero-orm.png",
+      "pathRelativeTo": "source_dir",
+      "width": 2048,
+      "height": 2048,
+      "colorSpace": "Non-Color",
+      "bytes": 3125707,
+      "sha256": "414c9fc4f092b874cb907712a2a6911f5451135be58d9c683b042bf9bb841053",
+      "pixelChecks": {
+        "sampledPixels": 65536,
+        "nonblackSamples": 29650,
+        "rgbMin": 0.0,
+        "rgbMax": 1.0,
+        "meshRegionHits": {}
+      }
+    },
+    "emission": {
+      "path": "textures/hero-emission.png",
+      "pathRelativeTo": "source_dir",
+      "width": 2048,
+      "height": 2048,
+      "colorSpace": "sRGB",
+      "bytes": 63967,
+      "sha256": "85fa0bff3a7c7efc458ce97d73d2b8322e8f5d34a071323798e001395f280cd5",
+      "pixelChecks": {
+        "sampledPixels": 65536,
+        "nonblackSamples": 274,
+        "rgbMin": 0.0,
+        "rgbMax": 0.7450980544090271,
+        "meshRegionHits": {}
+      }
+    }
+  },
+  "runtimeMaterial": "HeroRuntimePBR",
+  "sourceMaterials": {
+    "BlueCloth": {
+      "baseColorLinear": [
+        0.021219009533524513,
+        0.10224173218011856,
+        0.19120168685913086,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.9200000166893005,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "cloth"
+    },
+    "BlueDark": {
+      "baseColorLinear": [
+        0.014443843625485897,
+        0.04817182570695877,
+        0.09530746936798096,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.9200000166893005,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "cloth"
+    },
+    "Brass": {
+      "baseColorLinear": [
+        0.41788506507873535,
+        0.2345505803823471,
+        0.04970656707882881,
+        1.0
+      ],
+      "baseMetallic": 0.75,
+      "baseRoughness": 0.3700000047683716,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "brass"
+    },
+    "BrassLight": {
+      "baseColorLinear": [
+        0.637596845626831,
+        0.42869049310684204,
+        0.14702726900577545,
+        1.0
+      ],
+      "baseMetallic": 0.75,
+      "baseRoughness": 0.30000001192092896,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "brass"
+    },
+    "Crystal": {
+      "baseColorLinear": [
+        0.06301001459360123,
+        0.7758222222328186,
+        0.8631572127342224,
+        1.0
+      ],
+      "baseMetallic": 0.10000000149011612,
+      "baseRoughness": 0.20000000298023224,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        0.06301001459360123,
+        0.7758222222328186,
+        0.8631572127342224,
+        1.0
+      ],
+      "emissionStrength": 0.6000000238418579,
+      "family": "polished-detail"
+    },
+    "DarkSteel": {
+      "baseColorLinear": [
+        0.02955683507025242,
+        0.04373503103852272,
+        0.04373503103852272,
+        1.0
+      ],
+      "baseMetallic": 0.699999988079071,
+      "baseRoughness": 0.3799999952316284,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "steel"
+    },
+    "EyeWhite": {
+      "baseColorLinear": [
+        0.9130986332893372,
+        0.8713670969009399,
+        0.68668532371521,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.3199999928474426,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "polished-detail"
+    },
+    "Hair": {
+      "baseColorLinear": [
+        0.7835378050804138,
+        0.7912979125976562,
+        0.7379103899002075,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.8899999856948853,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "hair"
+    },
+    "HairShadow": {
+      "baseColorLinear": [
+        0.520995557308197,
+        0.577580451965332,
+        0.5711248517036438,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.9399999976158142,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "hair"
+    },
+    "Headlamp": {
+      "baseColorLinear": [
+        1.0,
+        0.7991027235984802,
+        0.40724021196365356,
+        1.0
+      ],
+      "baseMetallic": 0.05000000074505806,
+      "baseRoughness": 0.23000000417232513,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        0.7991027235984802,
+        0.40724021196365356,
+        1.0
+      ],
+      "emissionStrength": 0.44999998807907104,
+      "family": "polished-detail"
+    },
+    "Iris": {
+      "baseColorLinear": [
+        0.09530746936798096,
+        0.26635560393333435,
+        0.2917706370353699,
+        1.0
+      ],
+      "baseMetallic": 0.05000000074505806,
+      "baseRoughness": 0.23999999463558197,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "polished-detail"
+    },
+    "Leather": {
+      "baseColorLinear": [
+        0.05951123684644699,
+        0.04373503103852272,
+        0.03071344457566738,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.5600000023841858,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "leather"
+    },
+    "LeatherLight": {
+      "baseColorLinear": [
+        0.12477181851863861,
+        0.0802198201417923,
+        0.05612849071621895,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.6299999952316284,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "leather"
+    },
+    "RedCloth": {
+      "baseColorLinear": [
+        0.3967552185058594,
+        0.022173885256052017,
+        0.03189603239297867,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.9300000071525574,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "cloth"
+    },
+    "RedDark": {
+      "baseColorLinear": [
+        0.20863686501979828,
+        0.01599629409611225,
+        0.022173885256052017,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.9300000071525574,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "cloth"
+    },
+    "Rubber": {
+      "baseColorLinear": [
+        0.014443843625485897,
+        0.019382361322641373,
+        0.023153366521000862,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.8399999737739563,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "rubber"
+    },
+    "Skin": {
+      "baseColorLinear": [
+        0.7379103899002075,
+        0.3277781009674072,
+        0.2015562504529953,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.699999988079071,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "skin"
+    },
+    "SkinShadow": {
+      "baseColorLinear": [
+        0.3915724754333496,
+        0.13563333451747894,
+        0.09305896610021591,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.7699999809265137,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "skin"
+    },
+    "SkinWarm": {
+      "baseColorLinear": [
+        0.7011018991470337,
+        0.2462013214826584,
+        0.16202937066555023,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.6700000166893005,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "skin"
+    },
+    "TealEnamel": {
+      "baseColorLinear": [
+        0.017641954123973846,
+        0.26635560393333435,
+        0.25015828013420105,
+        1.0
+      ],
+      "baseMetallic": 0.18000000715255737,
+      "baseRoughness": 0.4000000059604645,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "enamel"
+    },
+    "Tread": {
+      "baseColorLinear": [
+        0.02955683507025242,
+        0.03560131415724754,
+        0.040915198624134064,
+        1.0
+      ],
+      "baseMetallic": 0.0,
+      "baseRoughness": 0.8600000143051147,
+      "detail": "mild source-authored object-space grain; baked color and roughness",
+      "emissionColorLinear": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emissionStrength": 0.0,
+      "family": "rubber"
+    }
+  },
+  "meshCount": 13,
+  "runtimeMaterialSurfaces": 13,
+  "geometryAndPivotSha256Before": "bc7c1110a35458b88190a4773bedb7bf4a1f61df63878471d93591f103922e45",
+  "geometryAndPivotSha256After": "bc7c1110a35458b88190a4773bedb7bf4a1f61df63878471d93591f103922e45",
+  "geometryAndPivotsPreserved": true,
+  "bake": {
+    "engine": "Cycles CPU",
+    "type": "EMIT channel transfer",
+    "samples": 1,
+    "seed": 0,
+    "marginPixels": 4,
+    "islandMarginPixels": 8,
+    "ambientOcclusion": "constant one, no lighting baked into albedo",
+    "tangentNormal": null
+  },
+  "sourceMaterialRestore": "Assign material datablocks named in mesh hero_source_material_names; restore per-face indices from hero_source_material_indices",
+  "requiredExportOptions": {
+    "export_texcoords": true,
+    "export_materials": "EXPORT",
+    "export_format": "GLB"
+  },
+  "runtimeVerification": "pending real Godot import and browser inspection; no final task 5.3 acceptance asserted"
+}

@@ -3,20 +3,20 @@
 This directory stores editable source assets and export settings for
 `build-presentation-faithful-racing-slice`. It is not a Godot resource directory.
 
-Current state: concept review plus an editable Blender hero/kart blockout.
-`hero/hero-blockout.blend` and its explicit runtime GLB have been produced;
-the direct Godot import probe passed 262 checks. This is not an approved final
-model, finished UV/textured asset, skeletal rig, LOD set, or browser performance
-acceptance. Source, geometry measurements, provenance and reproduction commands
-are recorded in [the hero blockout notes](hero/README.md).
+Current state: approved MVP model-sheet direction plus an editable Blender
+hero/kart with a shared UV/PBR atlas pass. This is not an approved final model,
+skeletal rig, LOD set or browser performance acceptance. Exact measured import
+results, source hashes, provenance and reproduction commands are recorded in
+[the hero notes](hero/README.md) and the runtime asset manifest.
 
 ## Review Gate
 
-The proposed hero sheet and dimensions live in
+The hero sheet and dimensions live in
 `design/reviews/presentation-slice/hero-kart-review-01.png` and
 `design/reviews/presentation-slice/model-sheet-review.md`.
-The user must approve the resolved design before final UV/rig work. The numeric
-dimensions are proposed authoring targets, not measurements from the raster.
+The user approved the sheet for MVP on 2026-09-27. Numeric dimensions are authoring
+targets, not measurements from the raster; the rendered final model still needs
+separate acceptance.
 
 ## Storage Contract
 
@@ -33,9 +33,9 @@ dimensions are proposed authoring targets, not measurements from the raster.
 
 ## Production Export Contract
 
-The small pipeline probe and the review blockout have been exported/imported.
-The following requirements still apply to a final production asset; the blockout
-does not establish finished UVs, animation clips or a ten-visible-kart budget:
+The small pipeline probe and the UV/PBR work in progress have been exported/imported.
+The following requirements still apply to a final production asset; the material
+pass does not establish finished animation clips or a ten-visible-kart budget:
 
 - Runtime space: meters, +Y up, -Z forward, +X right. Exported transform scale is
   one. A visual adapter preserves the vehicle's existing physics-origin contract.
@@ -55,5 +55,5 @@ See `design/reviews/presentation-slice/preflight.md`. Local Blender setup was
 authorized during the implementation turn. Blender 4.5.13 LTS was then installed
 locally and its headless version check passed. Installation verification is
 separate from concept approval. The basic pipeline probe passed 43 checks and
-the actual blockout import passed 262; rendered Web acceptance is recorded
+the original untextured blockout import passed 262; subsequent import and Web QA is recorded
 separately in [delivery status](../docs/delivery.md).

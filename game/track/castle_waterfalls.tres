@@ -12,5 +12,5 @@ point_count = 15
 
 [resource]
 script = ExtResource("1")
-art_revision = 3
+art_revision = 4
 route = SubResource("Route")

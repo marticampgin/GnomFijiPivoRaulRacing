@@ -1,13 +1,17 @@
-# Hero/Kart Review Blockout
+# Hero/Kart MVP Material Pass
 
-This is an editable, geometry-authored **review blockout**, not a final character,
-approved model sheet, completed UV asset, or skeletal rig. The user authorized
-continued local implementation; explicit model-sheet and final-art approval
-remain pending. The accepted Figma concepts remain the visual authority.
+This is an editable, geometry-authored **MVP work in progress**, not a final
+character or skeletal rig. The model sheet was approved as the MVP direction on
+2026-09-27 ("Для MVP ок"); final rendered-model approval remains pending.
+The accepted Figma concepts remain the visual authority.
 
 ## Files
 
 - `build_blockout.py`: reproducible local Blender construction/export/render script.
+- `hero_materials.py`: authored surface recipes, global UV packing and PBR baking.
+- `hero_uv.py`: analytic overlap checks and bounded repair of folded UV polygons.
+- `textures/`: generated albedo, ORM and emission atlases, also embedded in GLB/source.
+- `material-bake.json`: measured UV, texture and geometry-invariance evidence.
 - `hero-blockout.blend`: compressed, editable source, with a separate studio setup.
 - `../../game/art/vehicles/hero-blockout.glb`: runtime hierarchy only, no studio.
 - `../../game/art/vehicles/hero-blockout.manifest.json`: provenance and runtime contract.
@@ -16,17 +20,28 @@ remain pending. The accepted Figma concepts remain the visual authority.
 
 Geometry is authored from rings, lofts, curved sections and supporting mesh forms.
 Logical parts are joined into 13 editable meshes for export. The source builder
-retains the individual design decisions. Materials use PBR base colors,
-metallic/roughness and emission; no external textures, downloads, UV unwrap,
-armature, animation clips, or LODs are represented as finished work.
+retains the individual design decisions. One shared 2048-square atlas set carries
+color, roughness/metallic and emission across all 13 meshes. Source-authored grain,
+cloth weave and restrained enamel/brass wear are baked offline, not evaluated by
+Godot. ORM is non-color (R=1, G=roughness, B=metallic); albedo/emission use sRGB.
+There is no baked lighting/AO or normal map. Armature, clips and LODs remain open.
+Godot imports this GLB with embedded lossless textures (image handling 3), avoiding
+another generated PNG copy beside the runtime asset. This setting preserves the
+self-contained scene; see [Godot's image-handling modes](https://docs.godotengine.org/en/stable/classes/class_gltfstate.html).
+
+The UV pass checks positive-area triangle intersections across and within all
+meshes, isolates only faulty polygons, repacks, and refuses an unresolved bake
+after five repair passes. It does not modify vertex positions or topology.
+Existing zero-area geometry is counted separately, not presented as repaired;
+final topology cleanup belongs to the still-open geometry stage. The audit does
+not replace artistic seam/texel-density review or browser mip-filtering checks.
 
 ## Provenance
 
 Primary rear reference: `design/assets/race-concept.jpg` from the accepted race
 art. Secondary front/material reference: `design/assets/kart-concept.jpg`.
-The proposed `design/reviews/presentation-slice/hero-kart-review-01.png` informed
-the combined proportions but remains an unapproved raster proposal, not a
-geometrically authoritative turnaround.
+The accepted `design/reviews/presentation-slice/hero-kart-review-01.png` informs
+the combined proportions; it is a raster direction, not an exact geometric blueprint.
 
 Figma authorities: original presentation `JK4YNN8zKqhuZonVbDZ8YB` node `2:291`;
 accepted race HUD `OejURNEY5ZRhWWOBicFNYP` node `3:101`; accepted garage node
@@ -40,7 +55,7 @@ macOS restricted sandbox cannot initialize Blender's Metal detection; this
 command was run with explicit approved local-process permission, offline.
 
 ```sh
-/private/tmp/gnom-blender-4.5.13/Blender.app/Contents/MacOS/Blender \
+.tools/blender/4.5.13/Blender.app/Contents/MacOS/Blender \
   --background --factory-startup --offline-mode --python-exit-code 1 \
   --python art-source/hero/build_blockout.py -- \
   --source-dir art-source/hero \
@@ -51,18 +66,21 @@ command was run with explicit approved local-process permission, offline.
 The command replaces the owned source/GLB outputs, produces no `.blend1` backup,
 and renders the same geometry with four cameras into `/private/tmp`. The source
 contains studio lights/cameras/floor for review; export selection excludes them.
-Source plus runtime GLB are guarded below 10 MiB. Blender binary build hash:
+Source plus runtime GLB have a 32 MiB repository accident guard, increased from
+the untextured prototype's 10 MiB guard for packed 2048 atlases. This is not an
+approved Web transfer/frame/memory budget; those remain deferred by the user.
+Blender binary build hash:
 `daeeeca98fb0`. Installation/archive verification is in `tooling/blender.json`.
 
 ```sh
-/private/tmp/gnom-racing-godot-4.7.2/Godot.app/Contents/MacOS/Godot \
+.tools/godot/4.7.2/editor/Godot.app/Contents/MacOS/Godot \
   --headless --path art-source/hero/godot --script import_probe.gd -- \
   "$PWD/game/art/vehicles/hero-blockout.glb" \
   "$PWD/art-source/hero/import-check.json"
 ```
 
 The import probe does not open the runtime project or change its importer. It
-measures transformed vertices, material availability, exact attachment names,
+measures transformed vertices, UV coverage, embedded textures, exact attachment names,
 ground contact, local-X rolling, steering/hand parenting, crystal height and
 rear exhaust orientation. It is not a browser-render or performance acceptance
 test. On this macOS host an approved launch also avoids sandbox user-data and
@@ -99,7 +117,7 @@ hat and sculpted beard silhouette, four correctly oriented tires, a compact
 crystal below the shoulders, and two low rear nozzles. These are actual shared
 mesh views, not separately generated concept images.
 
-Remaining art work includes facial/hair refinement, final topology/UVs/textures,
+Remaining art work includes facial/hair refinement, final topology and material tuning,
 finished deformations, optimized LODs and user approval. The stylized blockout
 is simpler than the accepted illustrative art. Material surfaces and triangles
 must be profiled in a ten-visible-kart browser fixture; a successful import is

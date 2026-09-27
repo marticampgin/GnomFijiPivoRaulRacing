@@ -1,9 +1,9 @@
 {
-  "assetSha256": "98080f644da5db890b8151b7451a6b0962bbc24faffc5429bab917221070c9f8",
+  "assetSha256": "612bbda7c69521987ca79037d1a6eff9a20c5ff7d45593746168bcf7b815f484",
   "bounds": {
     "max": [
       1.08999991416931,
-      2.08093500137329,
+      2.09221220016479,
       1.32400000095367
     ],
     "min": [
@@ -13,36 +13,16 @@
     ],
     "size": [
       2.17999982833862,
-      2.08093500137329,
+      2.09221220016479,
       2.69600009918213
     ]
   },
-  "checks": 262,
+  "checks": 265,
   "failures": [],
   "godotVersion": "4.7.2-stable (official)",
-  "kind": "review-blockout-import-probe",
+  "kind": "hero-uv-pbr-import-probe",
   "materials": [
-    "TealEnamel",
-    "DarkSteel",
-    "Brass",
-    "Headlamp",
-    "Rubber",
-    "Leather",
-    "BrassLight",
-    "LeatherLight",
-    "Crystal",
-    "BlueCloth",
-    "BlueDark",
-    "RedCloth",
-    "RedDark",
-    "Skin",
-    "SkinWarm",
-    "SkinShadow",
-    "EyeWhite",
-    "Iris",
-    "Hair",
-    "HairShadow",
-    "Tread"
+    "HeroRuntimePBR"
   ],
   "meshBounds": {
     "Body": {
@@ -149,19 +129,19 @@
     },
     "Hat": {
       "max": [
-        0.350697010755539,
-        2.08093500137329,
-        0.294747412204742
+        0.350704252719879,
+        2.09221220016479,
+        0.299732208251953
       ],
       "min": [
-        -0.225119024515152,
-        1.59617018699646,
-        -0.121119022369385
+        -0.227358639240265,
+        1.59610116481781,
+        -0.123483523726463
       ],
       "size": [
-        0.575816035270691,
-        0.484764814376831,
-        0.415866434574127
+        0.578062891960144,
+        0.496111035346985,
+        0.423215746879578
       ]
     },
     "Head": {
@@ -297,11 +277,347 @@
   ],
   "notCovered": [
     "final aesthetic approval",
-    "final UVs/textures",
+    "UV island overlap, padding and texel-density quality",
+    "GPU mipmap sampling when running headless",
+    "normal map",
     "skeletal rig",
-    "browser renderer",
+    "browser renderer and color-space appearance",
     "10-racer frame budget"
   ],
-  "surfaces": 54,
-  "triangles": 73208
+  "pbr": {
+    "ambientOcclusion": "constant-one packed R channel; AO binding not required",
+    "bindings": {
+      "albedo": {
+        "bound": true,
+        "height": 2048,
+        "runtimeImageReadback": "not attempted with headless renderer",
+        "runtimeMipmaps": null,
+        "width": 2048
+      },
+      "emission": {
+        "bound": true,
+        "height": 2048,
+        "runtimeImageReadback": "not attempted with headless renderer",
+        "runtimeMipmaps": null,
+        "width": 2048
+      },
+      "metallic": {
+        "bound": true,
+        "height": 2048,
+        "runtimeImageReadback": "not attempted with headless renderer",
+        "runtimeMipmaps": null,
+        "width": 2048
+      },
+      "roughness": {
+        "bound": true,
+        "height": 2048,
+        "runtimeImageReadback": "not attempted with headless renderer",
+        "runtimeMipmaps": null,
+        "width": 2048
+      }
+    },
+    "emissionEnabled": true,
+    "expectedAtlasSize": 2048,
+    "normalMapBound": false,
+    "runtimeMaterialCount": 1,
+    "textureEvidence": "embedded GLB image decode; runtime bindings checked separately",
+    "textureFilter": 3,
+    "textures": {
+      "albedo": {
+        "decodedBytes": 12582912,
+        "decodedMipmaps": false,
+        "embeddedBytes": 2800125,
+        "height": 2048,
+        "mimeType": "image/png",
+        "nonblackSamples": 7945,
+        "sampledPixels": 16384,
+        "sourceImage": 1,
+        "width": 2048
+      },
+      "emission": {
+        "decodedBytes": 12582912,
+        "decodedMipmaps": false,
+        "embeddedBytes": 63967,
+        "height": 2048,
+        "mimeType": "image/png",
+        "nonblackSamples": 70,
+        "sampledPixels": 16384,
+        "sourceImage": 0,
+        "width": 2048
+      },
+      "orm": {
+        "authoredCoverage": {
+          "criterion": "R > 0.5; authored R is constant one",
+          "sampledPixels": 7603
+        },
+        "channels": {
+          "metallic": {
+            "channel": "B",
+            "maximum": 0.749019622802734,
+            "minimum": 0.0,
+            "nonzeroSamples": 3543,
+            "sampledPixels": 7603
+          },
+          "roughness": {
+            "channel": "G",
+            "maximum": 0.976470589637756,
+            "minimum": 0.117647059261799,
+            "nonzeroSamples": 7603,
+            "sampledPixels": 7603
+          }
+        },
+        "decodedBytes": 12582912,
+        "decodedMipmaps": false,
+        "embeddedBytes": 3125707,
+        "height": 2048,
+        "mimeType": "image/png",
+        "nonblackSamples": 7945,
+        "sampledPixels": 16384,
+        "sourceImage": 2,
+        "width": 2048
+      }
+    }
+  },
+  "surfaces": 13,
+  "triangles": 75512,
+  "uv": {
+    "boundsTolerance": 0.0001,
+    "channel": "UV1 / TEXCOORD_0",
+    "surfaces": [
+      {
+        "complete": true,
+        "finite": true,
+        "maximum": [
+          0.987655460834503,
+          0.996093690395355
+        ],
+        "minimum": [
+          0.00389105058275163,
+          0.00440985755994916
+        ],
+        "node": "Body",
+        "surface": 0,
+        "triangleUvArea": 0.0876047458800073,
+        "uvCount": 16151,
+        "vertices": 16151,
+        "withinAtlas": true
+      },
+      {
+        "complete": true,
+        "finite": true,
+        "maximum": [
+          0.626169204711914,
+          0.512809932231903
+        ],
+        "minimum": [
+          0.00389105058275163,
+          0.318410009145737
+        ],
+        "node": "Crystal",
+        "surface": 0,
+        "triangleUvArea": 0.00121770659666254,
+        "uvCount": 98,
+        "vertices": 98,
+        "withinAtlas": true
+      },
+      {
+        "complete": true,
+        "finite": true,
+        "maximum": [
+          0.996047914028168,
+          0.985641241073608
+        ],
+        "minimum": [
+          0.00389105058275163,
+          0.0122682536020875
+        ],
+        "node": "DriverBody",
+        "surface": 0,
+        "triangleUvArea": 0.0109750818205221,
+        "uvCount": 5031,
+        "vertices": 5031,
+        "withinAtlas": true
+      },
+      {
+        "complete": true,
+        "finite": true,
+        "maximum": [
+          0.99606317281723,
+          0.996093690395355
+        ],
+        "minimum": [
+          0.00389105058275163,
+          0.00411993591114879
+        ],
+        "node": "Hat",
+        "surface": 0,
+        "triangleUvArea": 0.00281021371691637,
+        "uvCount": 2330,
+        "vertices": 2330,
+        "withinAtlas": true
+      },
+      {
+        "complete": true,
+        "finite": true,
+        "maximum": [
+          0.996017396450043,
+          0.996093690395355
+        ],
+        "minimum": [
+          0.00389105058275163,
+          0.00415045395493507
+        ],
+        "node": "Head",
+        "surface": 0,
+        "triangleUvArea": 0.00943267147250282,
+        "uvCount": 14713,
+        "vertices": 14713,
+        "withinAtlas": true
+      },
+      {
+        "complete": true,
+        "finite": true,
+        "maximum": [
+          0.978988349437714,
+          0.996093690395355
+        ],
+        "minimum": [
+          0.00389105058275163,
+          0.020920118317008
+        ],
+        "node": "EngineCradle",
+        "surface": 0,
+        "triangleUvArea": 0.0125355133558571,
+        "uvCount": 4432,
+        "vertices": 4432,
+        "withinAtlas": true
+      },
+      {
+        "complete": true,
+        "finite": true,
+        "maximum": [
+          0.979171454906464,
+          0.996093690395355
+        ],
+        "minimum": [
+          0.00389105058275163,
+          0.0298619065433741
+        ],
+        "node": "FrontLeftRoll",
+        "surface": 0,
+        "triangleUvArea": 0.0186249796402933,
+        "uvCount": 5210,
+        "vertices": 5210,
+        "withinAtlas": true
+      },
+      {
+        "complete": true,
+        "finite": true,
+        "maximum": [
+          0.979171454906464,
+          0.996093690395355
+        ],
+        "minimum": [
+          0.00389105058275163,
+          0.0298619065433741
+        ],
+        "node": "FrontRightRoll",
+        "surface": 0,
+        "triangleUvArea": 0.0186262999636284,
+        "uvCount": 5200,
+        "vertices": 5200,
+        "withinAtlas": true
+      },
+      {
+        "complete": true,
+        "finite": true,
+        "maximum": [
+          0.979171454906464,
+          0.996093690395355
+        ],
+        "minimum": [
+          0.00389105058275163,
+          0.0298619065433741
+        ],
+        "node": "RearLeftRoll",
+        "surface": 0,
+        "triangleUvArea": 0.021966152117912,
+        "uvCount": 5210,
+        "vertices": 5210,
+        "withinAtlas": true
+      },
+      {
+        "complete": true,
+        "finite": true,
+        "maximum": [
+          0.979171454906464,
+          0.996093690395355
+        ],
+        "minimum": [
+          0.00389105058275163,
+          0.0298619065433741
+        ],
+        "node": "RearRightRoll",
+        "surface": 0,
+        "triangleUvArea": 0.0219678769976497,
+        "uvCount": 5210,
+        "vertices": 5210,
+        "withinAtlas": true
+      },
+      {
+        "complete": true,
+        "finite": true,
+        "maximum": [
+          0.995910584926605,
+          0.937209129333496
+        ],
+        "minimum": [
+          0.0957503616809845,
+          0.0123445484787226
+        ],
+        "node": "LeftHand",
+        "surface": 0,
+        "triangleUvArea": 0.000423782512669391,
+        "uvCount": 1559,
+        "vertices": 1559,
+        "withinAtlas": true
+      },
+      {
+        "complete": true,
+        "finite": true,
+        "maximum": [
+          0.995864808559418,
+          0.926390469074249
+        ],
+        "minimum": [
+          0.104188598692417,
+          0.0123445484787226
+        ],
+        "node": "RightHand",
+        "surface": 0,
+        "triangleUvArea": 0.000424073774567546,
+        "uvCount": 1556,
+        "vertices": 1556,
+        "withinAtlas": true
+      },
+      {
+        "complete": true,
+        "finite": true,
+        "maximum": [
+          0.969985485076904,
+          0.996093690395355
+        ],
+        "minimum": [
+          0.142076745629311,
+          0.0298771653324366
+        ],
+        "node": "SteeringWheel",
+        "surface": 0,
+        "triangleUvArea": 0.00103709699195065,
+        "uvCount": 1341,
+        "vertices": 1341,
+        "withinAtlas": true
+      }
+    ]
+  }
 }

@@ -1,4 +1,4 @@
-"""Editable, review-only hero blockout. No final UV, skeletal rig or baked textures."""
+"""Editable MVP hero with baked PBR atlases; final sculpt/rig acceptance remains open."""
 
 import argparse
 import hashlib
@@ -10,6 +10,10 @@ import sys
 import bpy
 import bmesh
 from mathutils import Quaternion, Vector
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hero_materials import prepare_materials, bake_runtime_materials
 
 PI = math.pi
 M = {}
@@ -216,6 +220,9 @@ def make_body(root):
         parts.append(cylinder('Lamp brass barrel', (lamp[0], .96, lamp[2]), (lamp[0], 1.12, lamp[2]), .139, 'Brass'))
         parts.append(cylinder('Lamp ivory glass', (lamp[0], 1.123, lamp[2]), (lamp[0], 1.137, lamp[2]), .112, 'Headlamp'))
         parts.append(ring('Lamp protective ring', (lamp[0], 1.14, lamp[2]), (1, 0, 0), (0, 0, 1), .118, .009, 'BrassLight'))
+        for offset in (-.048, .048):
+            half = math.sqrt(.108 ** 2 - offset ** 2)
+            parts.append(tube('Lamp guard', [(lamp[0] + offset, 1.143, lamp[2] - half), (lamp[0] + offset, 1.153, lamp[2]), (lamp[0] + offset, 1.143, lamp[2] + half)], .006, 'Brass', 6))
         parts.append(box('Split bumper', (side * .38, 1.29, .34), (.37, .15, .14), 'TealEnamel', .05))
         parts.append(box('Bumper cap', (side * .535, 1.292, .34), (.055, .16, .15), 'Brass', .02))
     parts.append(box('Grille dark opening', (0, 1.203, .47), (.45, .035, .27), 'Rubber', .085))
@@ -283,9 +290,15 @@ def make_driver(root):
     for side in (-1, 1):
         body.append(tube('Bent sleeve', [(side * .18, -.07, 1.14), (side * .28, .02, 1.085), (side * .30, .17, .965), (side * .205, .36, .97)], [.093, .09, .078, .059], 'BlueCloth', 16))
         body.append(tube('Sleeve seam', [(side * .244, -.006, 1.15), (side * .345, .10, 1.028), (side * .255, .31, 1.0)], .009, 'BlueDark', 6))
+        body.append(tube('Leather cuff', [(side * .225, .316, .97), (side * .208, .353, .97)], .064, 'Leather', 16))
+        body.append(tube('Cuff piping', [(side * .23, .311, .97), (side * .226, .320, .97)], .067, 'LeatherLight', 16))
+        body.append(ellipsoid('Cuff stud', (side * .263, .33, 1.004), (.008, .008, .008), 'Brass', 8, 6))
         body.append(ellipsoid('Bent trouser thigh', (side * .15, .08, .70), (.14, .27, .105), 'BlueDark'))
         body.append(ellipsoid('Boot', (side * .17, .38, .50), (.12, .18, .08), 'Leather'))
         body.append(tube('Leather shoulder strap', [(side * .13, -.20, 1.17), (side * .155, .005, 1.15), (side * .20, .064, .87)], .025, 'Leather', 8))
+        body.append(tube('Strap buckle', [(side * .164, .069, .943), (side * .209, .076, .946), (side * .201, .083, .994), (side * .16, .075, .99), (side * .164, .069, .943)], .006, 'Brass', 6))
+        for z in (.89, .915, 1.04, 1.065):
+            body.append(ellipsoid('Strap stitch', (side * (.20 - (z - .87) * .16), .086 - (z - .87) * .17, z), (.007, .0035, .0025), 'LeatherLight', 8, 4))
     batch(body, 'DriverBody', lean, (0, -.08, .71))
     head_pivot = empty('HeadMotion', (0, -.075, 1.43), lean)
     face = []
@@ -341,11 +354,15 @@ def make_driver(root):
         ring_points = []
         for i in range(32):
             a = i * 2 * PI / 32
-            wrinkle = 1.0 + .03 * math.sin(a * 5 + row_index * .75)
+            fold = .028 * math.sin(row_index * 2.5 + a * 2) * math.sin(PI * row_index / (len(rows) - 1))
+            wrinkle = 1.0 + .045 * math.sin(a * 5 + row_index * .75) + fold / max(rx, .05)
             ring_points.append(Vector((cx, cy, z)) + right * (math.cos(a) * rx * wrinkle) + across * (math.sin(a) * ry * wrinkle) + tangent * (.004 * math.cos(a * 3 + row_index)))
         hat_rings.append(ring_points)
     hat_parts = [loft('Bent cloth crown', hat_rings, 'RedCloth')]
     hat_parts.append(tube('Hat rolled hem', [(math.cos(i * 2 * PI / 48) * .208, -.074 + math.sin(i * 2 * PI / 48) * .178, 1.628 + .006 * math.sin(i * 4 * PI / 48)) for i in range(49)], .018, 'RedDark'))
+    for index in range(32):
+        a = 2 * PI * index / 32
+        hat_parts.append(tube('Hat hem stitch', [(.225 * math.cos(a - .013), -.074 + .195 * math.sin(a - .013), 1.626), (.225 * math.cos(a + .013), -.074 + .195 * math.sin(a + .013), 1.634)], .0025, 'RedCloth', 5))
     batch(hat_parts, 'Hat', head_pivot, (0, -.075, 1.43))
     return lean
 
@@ -454,6 +471,7 @@ def main():
         ('SkinShadow', 'a86756', 0, .77), ('Hair', 'e5e6df', 0, .89), ('HairShadow', 'bfc8c7', 0, .94),
         ('EyeWhite', 'f5f0d8', 0, .32), ('Iris', '578d93', .05, .24), ('Crystal', '47e4ef', .1, .2, .6), ('Headlamp', 'ffe7ab', .05, .23, .45),
     ]: make_material(*params)
+    prepare_materials(M)
     root = empty('HeroBlockout')
     make_body(root)
     make_wheel(root, 'FrontLeft', -1, .78, .40, .34, True)
@@ -480,18 +498,21 @@ def main():
     ground_offset = -bounds_min[2]
     for obj in list(root.children): obj.location.z += ground_offset
     bpy.context.view_layer.update()
+    material_report = bake_runtime_materials([obj for obj in children if obj.type == 'MESH'], source)
+    (source / 'material-bake.json').write_text(json.dumps(material_report, indent=2) + '\n')
     bpy.ops.object.select_all(action='DESELECT')
     root.select_set(True)
     for obj in children: obj.select_set(True)
     bpy.context.view_layer.objects.active = root
-    bpy.ops.export_scene.gltf(filepath=str(runtime), export_format='GLB', use_selection=True, export_yup=True, export_apply=True, export_texcoords=False, export_normals=True, export_materials='EXPORT', export_animations=False, export_cameras=False, export_lights=False)
+    bpy.ops.export_scene.gltf(filepath=str(runtime), export_format='GLB', use_selection=True, export_yup=True, export_apply=True, export_texcoords=True, export_normals=True, export_materials='EXPORT', export_animations=False, export_cameras=False, export_lights=False)
     cameras = stage()
     source_path = source / 'hero-blockout.blend'
     bpy.context.scene.camera = cameras[3]
     bpy.context.preferences.filepaths.save_version = 0
     bpy.ops.wm.save_as_mainfile(filepath=str(source_path), compress=True)
-    if source_path.stat().st_size + runtime.stat().st_size >= 10 * 1024 * 1024:
-        raise RuntimeError('Source + runtime must remain below 10 MiB')
+    # Repository accident guard, not the still-unapproved Web performance budget.
+    if source_path.stat().st_size + runtime.stat().st_size >= 32 * 1024 * 1024:
+        raise RuntimeError('Source + runtime exceeded the 32 MiB authoring guard')
     for cam in cameras:
         bpy.context.scene.camera = cam
         bpy.context.scene.render.filepath = str(renders / (cam.name + '.png'))
