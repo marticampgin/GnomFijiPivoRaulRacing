@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(resolve(root, 'shared/track-manifest.json'), 'utf8'));
 const { track_id, schema_version, simulation_revision, simulation_hash, art_revision } = manifest;
-const compatibility = { protocol_version: 2, vehicle_state_version: 1, loadout_hash: 'prototype-v3', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
+const compatibility = { protocol_version: 3, vehicle_state_version: 1, loadout_hash: 'prototype-v3', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
 const secret = 'network-probe-only-not-a-deployment-secret-2026';
 const port = Number(process.env.NETWORK_TEST_PORT || 19080);
 const url = `ws://127.0.0.1:${port}`;
@@ -88,6 +88,8 @@ try {
   await rejectTicket(ticket('expired', { expires_at: Math.floor(Date.now() / 1000) - 1 }), 'expired ticket rejected');
   await rejectTicket(ticket('wrong-match', { match_id: 'other' }), 'wrong match rejected');
   await rejectTicket(ticket('old-protocol', { protocol_version: 1 }), 'signed stale wire protocol rejected');
+  await rejectTicket(ticket('previous-protocol', { protocol_version: 2 }), 'pre-lifecycle wire protocol rejected');
+  await rejectTicket(ticket('bot:1'), 'reserved bot identity rejected');
   await rejectTicket(ticket('wrong-state', { vehicle_state_version: 999 }), 'signed unsupported vehicle state schema rejected');
   await rejectTicket(ticket('old-vehicle', { loadout_hash: 'prototype-v1' }), 'signed old vehicle simulation rejected');
   await rejectTicket(ticket('sharp-box-vehicle', { loadout_hash: 'prototype-v2' }), 'signed sharp-box vehicle simulation rejected');
@@ -106,9 +108,10 @@ try {
   const first = await joined('driver-a', goodTicket);
   await rejectTicket(goodTicket, 'ticket replay rejected');
   const second = await joined('driver-b');
-  await waitFor(() => first.messages.find(message => message.type === 'snapshot' && message.players.length === 2), 'two-player snapshot');
+  const grid = await waitFor(() => first.messages.find(message => message.type === 'snapshot' && message.players.length === 10 && message.players.filter(player => !player.is_bot).length === 2), 'two humans and eight bots');
   verify(true, 'two real WebSocket clients share authoritative snapshot');
-  await waitFor(() => first.messages.find(message => message.type === 'snapshot' && message.countdown === 0), 'countdown complete');
+  verify(new Set(grid.players.map(player => player.slot)).size === 10, 'ten racers have distinct grid slots');
+  await waitFor(() => first.messages.find(message => message.type === 'snapshot' && message.countdown === 0), 'countdown complete', 8000);
   const before = ownState(first, 'driver-a').state.position;
   let sequence = first.ack;
   for (let index = 0; index < 60; index++) {
@@ -117,6 +120,9 @@ try {
   }
   const driven = await waitFor(() => ownState(first, 'driver-a', player => player.ack >= sequence), 'input acknowledgement');
   verify(Math.hypot(...driven.state.position.map((value, index) => value - before[index])) > 3, 'server advances car from validated input');
+  const bot = grid.players.find(player => player.is_bot);
+  const movingBot = ownState(first, bot.id);
+  verify(Math.hypot(...movingBot.state.position.map((value, index) => value - bot.state.position[index])) > 3, 'server bot drives under authoritative physics');
   await delay(1300);
   const stopped = ownState(first, 'driver-a');
   verify(Math.hypot(stopped.state.velocity[0], stopped.state.velocity[2]) < 0.5, 'stale input brakes authoritative car');
@@ -141,7 +147,11 @@ try {
   for (let index = 0; index < 110; index++) flooding.socket.send(JSON.stringify({ type: 'ping', sent: index }));
   await waitFor(() => flooding.closed, 'flood close');
   verify(flooding.reason === 'rate_limit', 'packet rate limit enforced');
-  for (let index = 2; index < 10; index++) await joined(`slot-${index}`);
+  for (let index = 2; index < 10; index++) {
+    const late = await joined(`slot-${index}`);
+    const waiting = await waitFor(() => ownState(late, `slot-${index}`), 'late join state');
+    verify(waiting.spectator === true && waiting.position === 0 && !waiting.finished, 'late human waits without inheriting bot progress');
+  }
   const overflow = await connect(ticket('eleventh'));
   await waitFor(() => overflow.closed, 'lobby capacity');
   verify(overflow.reason === 'lobby_full', 'ten-car cap includes reserved reconnect slots');

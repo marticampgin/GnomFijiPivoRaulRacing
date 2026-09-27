@@ -5,6 +5,44 @@
   let session = null, receiver = null, engineReady = false, inRace = false, busy = false;
   let lastState = null, lastFinish = false, restarting = false, mergeId = null;
   let mapProjection = null, mapHash = null;
+  let raceId = null, musicContext = null, musicTimer = null, musicStep = 0;
+  let musicEnabled = true;
+  try { musicEnabled = localStorage.getItem('gnom.music.v1') !== 'off'; } catch { /* Optional storage. */ }
+  $('music-enabled').checked = musicEnabled;
+  function stopMusic() {
+    clearInterval(musicTimer); musicTimer = null; musicStep = 0;
+  }
+  function updateMusic() {
+    const active = musicEnabled && inRace && lastState?.status === 'racing' && lastState?.lap === 3 && !document.hidden;
+    if (!active || musicContext?.state !== 'running') { stopMusic(); return; }
+    if (musicTimer) return;
+    // Original final-lap motif; generated locally, with no downloaded audio dependency.
+    const melody = [64,67,71,76,74,71,67,69,64,67,71,79,76,74,71,67];
+    const beat = () => {
+      const now = musicContext.currentTime;
+      for (const [note, volume, duration] of [[melody[musicStep % melody.length], .032, .14], [musicStep % 4 === 0 ? 40 : 47, .035, .1]]) {
+        const oscillator = musicContext.createOscillator(), gain = musicContext.createGain();
+        oscillator.type = 'triangle'; oscillator.frequency.value = 440 * 2 ** ((note - 69) / 12);
+        gain.gain.setValueAtTime(0, now); gain.gain.linearRampToValueAtTime(volume, now + .012); gain.gain.exponentialRampToValueAtTime(.0001, now + duration);
+        oscillator.connect(gain); gain.connect(musicContext.destination); oscillator.start(now); oscillator.stop(now + duration + .01);
+        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+      }
+      musicStep++;
+    };
+    beat(); musicTimer = setInterval(beat, 160);
+  }
+  function unlockMusic() {
+    if (!musicEnabled) return;
+    const Audio = window.AudioContext || window.webkitAudioContext;
+    if (!Audio) return;
+    musicContext ||= new Audio();
+    musicContext.resume().then(updateMusic).catch(() => {});
+  }
+  $('music-enabled').addEventListener('change', event => {
+    musicEnabled = event.target.checked;
+    try { localStorage.setItem('gnom.music.v1', musicEnabled ? 'on' : 'off'); } catch { /* Optional storage. */ }
+    if (musicEnabled) unlockMusic(); else stopMusic();
+  });
   const graphicsKey = 'gnom.graphics.v1';
   let graphics = { quality:'standard', reducedEffects:matchMedia('(prefers-reduced-motion:reduce)').matches };
   try {
@@ -79,11 +117,12 @@
   }
   async function join() {
     if (busy || !session || !engineReady) return;
+    unlockMusic();
     busy = true; updateReady(); setError('');
     $('reconnect-button').disabled = true;
     try {
       const connection = await api('/api/race/ticket', {});
-      inRace = true; lastFinish = false; restarting = false;
+      inRace = true; lastFinish = false; restarting = false; raceId = null;
       ui.hub.hidden = true; ui.hud.hidden = false;
       $('disconnect').hidden = true;
       send({type:'join', url:connection.websocketUrl, ticket:connection.ticket, compatibility:connection.compatibility});
@@ -95,6 +134,7 @@
   }
   function leave() {
     send({type:'leave'}); inRace = false; lastFinish = false;
+    raceId = null; restarting = false; stopMusic();
     for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
     ui.hub.hidden = false; ui.hud.hidden = true;
     ui['join-button'].focus();
@@ -112,6 +152,7 @@
       if (inRace && enabled) ui.canvas.focus();
     });
   }
+  ui['result-dialog'].addEventListener('cancel', event => event.preventDefault());
   ui['join-button'].addEventListener('click', join);
   ui['profile-button'].addEventListener('click', () => openDialog(ui['profile-dialog']));
   $('menu-button').addEventListener('click', () => openDialog(ui['menu-dialog']));
@@ -119,7 +160,11 @@
   $('recover-button').addEventListener('click', () => { send({type:'recover'}); ui['menu-dialog'].close(); });
   for (const id of ['exit-button','result-exit','disconnect-exit']) $(id).addEventListener('click', leave);
   $('reconnect-button').addEventListener('click', () => lastState?.status === 'update_required' ? window.location.reload() : join());
-  $('restart-button').addEventListener('click', () => { restarting = true; send({type:'restart'}); ui['result-dialog'].close(); });
+  $('restart-button').addEventListener('click', () => {
+    if (!lastState?.canRestart || restarting) return;
+    unlockMusic(); restarting = true; $('restart-button').disabled = true;
+    send({type:'restart', race_id:lastState.raceId});
+  });
   $('fullscreen-button').addEventListener('click', async () => {
     try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { /* Optional browser capability. */ }
   });
@@ -142,7 +187,7 @@
     } catch(error) { $('profile-feedback').textContent = messageFor(error); $('merge-button').disabled = false; }
     finally { busy = false; updateReady(); }
   });
-  document.addEventListener('visibilitychange', () => send({type:'focus', visible:!document.hidden}));
+  document.addEventListener('visibilitychange', () => { send({type:'focus', visible:!document.hidden}); updateMusic(); });
   window.addEventListener('blur', () => send({type:'focus', visible:false}));
   window.addEventListener('focus', () => send({type:'focus', visible:!document.hidden}));
   document.addEventListener('keydown', event => {
@@ -174,14 +219,20 @@
   function render(state) {
     lastState = state;
     if (!inRace) return;
+    if (state.raceId !== raceId) {
+      raceId = state.raceId; lastFinish = false; restarting = false;
+      ui['result-dialog'].close(); stopMusic();
+    }
     $('participant-count').textContent = String(state.players.length).padStart(2,'0');
     $('speed').textContent = Math.round(state.speed).toString();
     $('lap').textContent = `${state.lap} / 3`;
     $('time').textContent = formatTime(state.elapsed);
     $('ping').textContent = `${state.ping} мс`;
-    const healthy = ['connected','countdown','racing','finished'].includes(state.status);
+    const healthy = ['connected','countdown','racing','finished','results','spectating'].includes(state.status);
     $('network-status').textContent = healthy ? 'На связи' : state.status === 'connecting' ? 'Подключение' : 'Нет связи';
     const disconnected = !healthy && state.status !== 'connecting';
+    if (disconnected && ui['result-dialog'].open) { ui['result-dialog'].close(); lastFinish = false; }
+    $('race-status').textContent = state.spectating ? 'ОЖИДАНИЕ ЗАЕЗДА' : 'НА ТРАССЕ';
     $('disconnect').hidden = !disconnected;
     $('disconnect-title').textContent = state.status === 'update_required' ? 'Нужна новая версия игры' : 'Соединение прервано';
     $('reconnect-button').textContent = state.status === 'update_required' ? 'ОБНОВИТЬ ИГРУ' : 'ПЕРЕПОДКЛЮЧИТЬСЯ';
@@ -199,14 +250,32 @@
       row.className = player.id === state.playerId ? 'self' : '';
       const number = document.createElement('span'), name = document.createElement('span'), mark = document.createElement('em');
       number.textContent = String(player.position).padStart(2,'0'); name.textContent = player.name;
-      mark.textContent = player.id === state.playerId ? 'ВЫ' : player.connected ? '' : 'OFF';
+      mark.textContent = player.id === state.playerId ? 'ВЫ' : player.isBot ? 'БОТ' : player.connected ? '' : 'OFF';
       row.append(number,name,mark); return row;
     }));
     drawMap(state.players,state.playerId,state.track);
-    if (!state.finished) { lastFinish = false; restarting = false; }
-    if (state.finished && !lastFinish && !restarting) {
-      lastFinish = true; $('finish-time').textContent = formatTime(state.elapsed); openDialog(ui['result-dialog']);
+    const finished = state.finished || state.phase === 'results';
+    if (!finished) { lastFinish = false; restarting = false; }
+    if (finished) {
+      const complete = state.phase === 'results';
+      $('result-title').textContent = complete ? 'Результаты заезда' : 'Вы финишировали';
+      $('finish-time').textContent = state.spectating ? 'Следующий заезд' : currentPlayer?.dnf ? 'Без финиша' : formatTime(state.elapsed);
+      $('result-status').textContent = state.spectating ? 'Ожидаем готовности участников' : !complete ? 'Остальные участники продолжают гонку' : state.repeatReady ? 'Готовы. Ожидаем остальных игроков' : 'Заезд завершён';
+      if (state.repeatReady) restarting = false;
+      $('restart-button').disabled = !state.canRestart || restarting || disconnected;
+      $('restart-button').textContent = state.repeatReady ? 'ГОТОВЫ К СТАРТУ' : restarting ? 'ПОДТВЕРЖДЕНИЕ...' : 'ЕЩЁ ЗАЕЗД';
+      $('result-racers').replaceChildren(...state.players.map(player => {
+        const row = document.createElement('li'); row.className = player.id === state.playerId ? 'self' : '';
+        const place = document.createElement('span'), name = document.createElement('span'), result = document.createElement('span');
+        place.textContent = String(player.position).padStart(2,'0');
+        name.textContent = `${player.name}${player.isBot ? ' · БОТ' : player.id === state.playerId ? ' · ВЫ' : ''}`;
+        result.textContent = player.dnf ? 'НФ' : player.finished ? formatTime(player.elapsed) : 'В гонке';
+        if (complete && player.ready && !player.isBot) result.textContent += ' · Готов';
+        row.append(place,name,result); return row;
+      }));
+      if (!lastFinish && !disconnected) { lastFinish = true; openDialog(ui['result-dialog']); }
     }
+    updateMusic();
   }
   window.GnomHost = {
     register(callback) { receiver = callback; engineReady = true; applyGraphics(); $('load-state').hidden = true; updateReady(); },

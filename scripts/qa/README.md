@@ -55,11 +55,16 @@ GNOM_DRIVER_LAPS=1 GNOM_DRIVER_SECONDS=90 node scripts/qa/browser-driver.cjs
 The second command is a bounded one-lap smoke check, not a full race finish.
 Optional `GNOM_DRIVER_SPEED` sets the upper target speed in metres per second
 (default `24`); `GNOM_DRIVER_SECONDS` defaults to `240`.
+`GNOM_DRIVER_REPEAT=1` additionally waits for the terminal ten-car result, checks
+nine bots in a fresh single-human race, clicks the repeat button and verifies a
+new generation/countdown with lap, elapsed time and result dialog reset. It
+requires the default three-lap finish; use a fresh worker with no other humans.
 `GNOM_DRIVER_TRACE=1` additionally records the test player's physical snapshots
 and input commands to `physics-trace.json`, without handshake tickets or cookies.
 This diagnostic capture adds overhead; do not use it as performance evidence.
 
-`art-stage.cjs` checks two development profiles, movement, keyboard drift/boost,
+`art-stage.cjs` preloads two development profiles and joins both during the
+countdown, then checks two humans plus eight bots, movement, keyboard drift/boost,
 recovery, look-back, a seven-second CDP freeze/resume during acceleration,
 graphics toggles, preference persistence after reload, unchanged racing identity,
 responsive HUD/menu bounds, accessible controls and an isolated incompatible

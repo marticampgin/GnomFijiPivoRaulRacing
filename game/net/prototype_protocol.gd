@@ -2,7 +2,7 @@ class_name PrototypeProtocol
 extends RefCounted
 
 const Vehicle = preload("res://vehicle/racing_vehicle.gd")
-const WIRE_VERSION: int = 2
+const WIRE_VERSION: int = 3
 const TICKET_VERSION: int = 2
 const VEHICLE_STATE_VERSION: int = Vehicle.STATE_VERSION
 const TRACK_SCHEMA_VERSION: int = 1

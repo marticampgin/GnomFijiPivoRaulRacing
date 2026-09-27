@@ -10,6 +10,7 @@ const requiredLaps = Number(process.env.GNOM_DRIVER_LAPS || 3);
 const durationSeconds = Number(process.env.GNOM_DRIVER_SECONDS || 240);
 const maximumSpeed = Number(process.env.GNOM_DRIVER_SPEED || 24);
 const tracePhysics = process.env.GNOM_DRIVER_TRACE === '1';
+const verifyRepeat = process.env.GNOM_DRIVER_REPEAT === '1';
 const viewport = { width: 1600, height: 900 };
 const sourcePackage = path.resolve(__dirname, '../../game/track/baked/castle_waterfalls.json');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -108,8 +109,8 @@ async function main() {
   const state = () => page.evaluate(() => {
     const value = window.GnomHost?.state;
     if (!value) return null;
-    const { status, worldPosition, forward, speed, lap, finished, elapsed, countdown, ping, correction, fps, serverTick, track, playerId, players } = value;
-    return { status, worldPosition, forward, speed, lap, finished, elapsed, countdown, ping, correction, fps, serverTick, track, playerId, players };
+    const { status, worldPosition, forward, speed, lap, finished, elapsed, countdown, ping, correction, fps, serverTick, track, playerId, players, raceId, phase, canRestart, repeatReady } = value;
+    return { status, worldPosition, forward, speed, lap, finished, elapsed, countdown, ping, correction, fps, serverTick, track, playerId, players, raceId, phase, canRestart, repeatReady };
   });
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -219,6 +220,26 @@ async function main() {
     report.checks.changedCanvas = { ratio, colors: after.colors };
     assert.ok(ratio > 0.005, 'Canvas did not change');
     assert.equal(anchorsCaptured.size, 4, 'Four route anchor screenshots are required');
+    if (verifyRepeat) {
+      assert.equal(requiredLaps, 3, 'Repeat verification requires a full race');
+      await page.waitForFunction(() => window.GnomHost.state.phase === 'results' && window.GnomHost.state.canRestart, undefined, { timeout: 45000 });
+      const result = await state();
+      report.terminalResult = result;
+      assert.equal(result.players.length, 10, 'Result must contain the full grid');
+      assert.equal(result.players.filter(player => player.isBot).length, 9, 'Fresh single-human race must have nine bots');
+      assert.ok(result.players.every(player => player.finished || player.dnf), 'Every racer must have a terminal result');
+      await page.screenshot({ path: path.join(output, 'results-grid.png') });
+      await page.locator('#restart-button').click();
+      await page.waitForFunction(id => window.GnomHost.state.raceId > id && window.GnomHost.state.phase === 'countdown', result.raceId, { timeout: 10000 });
+      const repeated = await state();
+      assert.equal(repeated.raceId, result.raceId + 1, 'One readiness action starts exactly one new generation');
+      assert.equal(repeated.lap, 1);
+      assert.equal(repeated.finished, false);
+      assert.equal(repeated.elapsed, 0);
+      assert.equal(await page.locator('#result-dialog').evaluate(dialog => dialog.open), false);
+      await page.screenshot({ path: path.join(output, 'repeat-countdown.png') });
+      report.checks.repeat = { previousRaceId: result.raceId, nextRaceId: repeated.raceId, racers: result.players.length, bots: 9 };
+    }
     assert.deepEqual(errors, []);
     report.passed = true;
   } catch (error) {

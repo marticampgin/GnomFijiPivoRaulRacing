@@ -5,6 +5,7 @@ const Track = preload("res://track/authored_track.gd")
 const Protocol = preload("res://net/prototype_protocol.gd")
 const Transport = preload("res://net/prototype_socket_server.gd")
 const Driver = preload("res://input/driver_input.gd")
+const BotDriver = preload("res://ai/racing_bot_driver.gd")
 const HERO_COLOR: Color = Color("2e9d99")
 const MAX_PLAYERS: int = 10
 const PHYSICS_DT: float = 1.0 / 60.0
@@ -24,6 +25,10 @@ var _used_tickets: Dictionary = {}
 var _tick: int = 0
 var _countdown: int = -1
 var _finish_count: int = 0
+var _race_id: int = 0
+var _phase: String = "waiting"
+var _race_elapsed: float = 0.0
+var _finish_remaining: float = -1.0
 
 var _socket: WebSocketPeer
 var _ticket: String = ""
@@ -119,7 +124,7 @@ func _physics_process(delta: float) -> void:
 			_send(command)
 			if _local == null:
 				return
-		_local.step(command if _client_countdown <= 0.0 and not _hud.get("finished", false) else Protocol.NEUTRAL, delta)
+		_local.step(command if _can_drive() else Protocol.NEUTRAL, delta)
 		_client_countdown = maxf(0.0, _client_countdown - delta)
 	_update_camera(delta)
 
@@ -166,30 +171,53 @@ func _step_server(delta: float) -> void:
 	_tick += 1
 	if _countdown > 0:
 		_countdown -= 1
+		if _countdown == 0:
+			_phase = "racing"
+	if _phase == "racing":
+		_race_elapsed += delta
+		if _finish_remaining >= 0.0:
+			_finish_remaining = maxf(0.0, _finish_remaining - delta)
 	var now: int = Time.get_ticks_msec()
 	for id: String in _players.keys():
 		var player: Dictionary = _players[id]
-		if not player["connected"] and now - int(player["disconnected_at"]) > RECONNECT_MS:
-			player["vehicle"].queue_free()
-			_players.erase(id)
-			continue
+		if not player["is_bot"] and not player["connected"] and now - int(player["disconnected_at"]) > RECONNECT_MS:
+			player["expired"] = true
 		var queue: Array = player["queue"]
 		if not queue.is_empty():
 			player["input"] = queue.pop_front()
 			player["ack"] = int(player["input"]["sequence"])
 		var command: Dictionary = player["input"]
-		if not player["connected"] or now - int(player["last_input_at"]) > INPUT_TIMEOUT_MS or _countdown > 0 or player["finished"]:
+		if player["is_bot"] and _phase == "racing" and not player["finished"]:
+			command = player["driver"].sample(player["vehicle"], player["progress"], delta)
+		if (not player["is_bot"] and (not player["connected"] or now - int(player["last_input_at"]) > INPUT_TIMEOUT_MS)) or _phase != "racing" or player["finished"] or player["spectator"]:
 			command = Protocol.NEUTRAL
 		player["previous_position"] = player["vehicle"].global_position
 		player["vehicle"].step(command, delta)
-		if _countdown == 0 and not player["finished"]:
+		if _phase == "racing" and not player["finished"] and not player["spectator"]:
 			player["elapsed"] += delta
 			_update_progress(player)
-		if _track.needs_recovery(player["vehicle"].global_position) or not bool(player["progress"]["interval_valid"]):
+		if _track.needs_recovery(player["vehicle"].global_position) or not bool(player["progress"]["interval_valid"]) or (player["is_bot"] and player["driver"].needs_recovery()):
 			_recover(player)
-	if _players.is_empty():
+	_remove_expired_waiters()
+	if _human_count() == 0:
+		for player: Dictionary in _players.values():
+			player["vehicle"].queue_free()
+		_players.clear()
 		_countdown = -1
 		_finish_count = 0
+		_phase = "waiting"
+	elif _phase == "racing":
+		var all_done: bool = true
+		for player: Dictionary in _players.values():
+			if not player["spectator"] and not player["finished"]:
+				all_done = false
+		if all_done or _race_elapsed >= 180.0 or _finish_remaining == 0.0:
+			_phase = "results"
+			for player: Dictionary in _players.values():
+				player["dnf"] = not player["spectator"] and not player["finished"]
+				player["result_progress"] = _race_progress(player)
+	elif _phase == "results":
+		_try_repeat()
 	if _tick % 3 == 0:
 		_broadcast_snapshot()
 	if _tick % 600 == 0:
@@ -226,13 +254,16 @@ func _on_packet(peer_id: int, data: Dictionary) -> void:
 				_server.close_peer(peer_id, "invalid_ping")
 				return
 			_server.send_to(peer_id, {"type": "pong", "sent": data["sent"]})
-		"recover", "restart":
+		"restart":
+			if data.size() != 2 or not Protocol._number(data.get("race_id")) or data["race_id"] != _race_id or _phase != "results" or player["spectator"]:
+				return
+			player["ready"] = true
+			_try_repeat()
+		"recover":
 			if data.size() != 1 or Time.get_ticks_msec() - int(player["last_recover_at"]) < 1000:
 				return
 			player["last_recover_at"] = Time.get_ticks_msec()
-			if data["type"] == "restart":
-				_reset_race(player)
-			else:
+			if _phase == "racing" and not player["finished"] and not player["spectator"]:
 				_recover(player)
 		_:
 			_server.close_peer(peer_id, "unknown_packet")
@@ -244,27 +275,30 @@ func _join_server(peer_id: int, ticket: String) -> void:
 		_server.close_peer(peer_id, "invalid_ticket")
 		return
 	var id: String = claims["player_id"]
-	if not _players.has(id) and _players.size() >= MAX_PLAYERS:
+	if id.begins_with("bot:"):
+		_server.close_peer(peer_id, "invalid_ticket")
+		return
+	if (not _players.has(id) or _players[id].get("expired", false)) and _human_count() >= MAX_PLAYERS:
 		_server.close_peer(peer_id, "lobby_full")
 		return
 	_used_tickets[claims["jti"]] = claims["expires_at"]
 	if not _players.has(id):
+		var spectator: bool = _phase in ["racing", "results"]
+		_remove_expired_waiters()
+		if not spectator:
+			_remove_one_bot()
 		var occupied: Array = []
 		for other: Dictionary in _players.values():
-			occupied.append(other["slot"])
+			if not other["spectator"]:
+				occupied.append(other["slot"])
 		var slot: int = 0
 		while slot in occupied:
 			slot += 1
-		var vehicle: CharacterBody3D = _create_vehicle(slot, false)
-		_players[id] = {"id": id, "name": claims["display_name"], "slot": slot, "vehicle": vehicle,
-			"peer_id": peer_id, "connected": true, "disconnected_at": 0, "last_input_at": 0,
-			"accepted": 0, "ack": 0, "queue": [], "input": Protocol.NEUTRAL.duplicate(),
-			"lap": 1, "progress": _track.initial_progress(), "previous_position": Vector3.ZERO, "finished": false, "finish_order": 0,
-			"elapsed": 0.0, "last_recover_at": -1000, "epoch": 0}
-		vehicle.reset_at(_track.spawn_transform(slot))
-		_players[id]["previous_position"] = vehicle.global_position
+		_players[id] = _new_player(id, claims["display_name"], mini(slot, MAX_PLAYERS - 1), false)
+		_players[id]["peer_id"] = peer_id
+		_players[id]["spectator"] = spectator
 		if _countdown < 0:
-			_countdown = 180
+			_start_race()
 	var player: Dictionary = _players[id]
 	var previous_peer: int = int(player["peer_id"])
 	if previous_peer != peer_id:
@@ -272,6 +306,7 @@ func _join_server(peer_id: int, ticket: String) -> void:
 		_server.close_peer(previous_peer, "replaced")
 	player["peer_id"] = peer_id
 	player["connected"] = true
+	player["expired"] = false
 	player["queue"].clear()
 	player["input"] = Protocol.NEUTRAL.duplicate()
 	player["accepted"] = player["ack"]
@@ -295,6 +330,84 @@ func _on_disconnect(peer_id: int) -> void:
 		player["input"] = Protocol.NEUTRAL.duplicate()
 
 
+func _human_count() -> int:
+	var count: int = 0
+	for player: Dictionary in _players.values():
+		if not player["is_bot"] and not player.get("expired", false):
+			count += 1
+	return count
+
+
+func _new_player(id: String, display_name: String, slot: int, bot: bool) -> Dictionary:
+	var vehicle: CharacterBody3D = _create_vehicle(slot, false)
+	vehicle.reset_at(_track.spawn_transform(slot))
+	return {"id": id, "name": display_name, "slot": slot, "vehicle": vehicle,
+		"is_bot": bot, "driver": BotDriver.new(_track, slot) if bot else null,
+		"spectator": false, "ready": bot, "dnf": false,
+		"peer_id": 0, "connected": true, "disconnected_at": 0, "last_input_at": 0,
+		"accepted": 0, "ack": 0, "queue": [], "input": Protocol.NEUTRAL.duplicate(),
+		"lap": 1, "progress": _track.initial_progress(), "previous_position": vehicle.global_position,
+		"finished": false, "finish_order": 0, "elapsed": 0.0, "last_recover_at": -1000, "epoch": 0}
+
+
+func _remove_one_bot() -> void:
+	# Vacant human slots take precedence over bot replacement during preparation.
+	for id: String in _players.keys():
+		if _players[id].get("expired", false):
+			_players[id]["vehicle"].queue_free()
+			_players.erase(id)
+			return
+	for id: String in _players.keys():
+		if _players[id]["is_bot"]:
+			_players[id]["vehicle"].queue_free()
+			_players.erase(id)
+			return
+
+
+func _remove_expired_waiters() -> void:
+	for id: String in _players.keys():
+		if _players[id]["spectator"] and _players[id].get("expired", false):
+			_players[id]["vehicle"].queue_free()
+			_players.erase(id)
+
+
+func _start_race() -> void:
+	for id: String in _players.keys():
+		if _players[id]["is_bot"] or _players[id].get("expired", false):
+			_players[id]["vehicle"].queue_free()
+			_players.erase(id)
+	var slot: int = 0
+	for player: Dictionary in _players.values():
+		player["slot"] = slot
+		player["spectator"] = false
+		_reset_race(player)
+		slot += 1
+	while slot < MAX_PLAYERS:
+		var id: String = "bot:%d" % slot
+		_players[id] = _new_player(id, "Bot %02d" % (slot + 1), slot, true)
+		slot += 1
+	_race_id += 1
+	_phase = "countdown"
+	_countdown = 300
+	_finish_count = 0
+	_race_elapsed = 0.0
+	_finish_remaining = -1.0
+
+
+func _try_repeat() -> void:
+	if _phase != "results":
+		return
+	var eligible: int = 0
+	for player: Dictionary in _players.values():
+		if player["is_bot"] or not player["connected"]:
+			continue
+		eligible += 1
+		if not player["spectator"] and not player["ready"]:
+			return
+	if eligible > 0:
+		_start_race()
+
+
 func _update_progress(player: Dictionary) -> void:
 	var events: Array = _track.advance_progress(player["progress"], player["previous_position"], player["vehicle"].global_position)
 	player["lap"] = int(player["progress"]["lap"]) + 1
@@ -303,6 +416,8 @@ func _update_progress(player: Dictionary) -> void:
 			_finish_count += 1
 			player["finished"] = true
 			player["finish_order"] = _finish_count
+			if _finish_remaining < 0.0:
+				_finish_remaining = 30.0
 
 
 func _recover(player: Dictionary) -> void:
@@ -313,6 +428,8 @@ func _recover(player: Dictionary) -> void:
 	player["input"] = Protocol.NEUTRAL.duplicate()
 	player["ack"] = player["accepted"]
 	player["epoch"] += 1
+	if player["is_bot"]:
+		player["driver"].reset()
 
 
 func _reset_race(player: Dictionary) -> void:
@@ -321,24 +438,34 @@ func _reset_race(player: Dictionary) -> void:
 	player["finished"] = false
 	player["finish_order"] = 0
 	player["elapsed"] = 0.0
+	player["dnf"] = false
+	player["ready"] = player["is_bot"]
 	_recover(player)
 	player["vehicle"].reset_at(_track.spawn_transform(int(player["slot"])))
+	player["previous_position"] = player["vehicle"].global_position
 
 
 func _broadcast_snapshot() -> void:
-	var standings: Array = _players.values()
+	var standings: Array = _players.values().filter(func(player: Dictionary) -> bool: return not player["spectator"])
 	standings.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		if a["finished"] or b["finished"]:
 			return int(a["finish_order"]) < int(b["finish_order"]) if a["finished"] and b["finished"] else a["finished"]
-		return _race_progress(a) > _race_progress(b))
+		var distance_a: float = a.get("result_progress", 0.0) if _phase == "results" else _race_progress(a)
+		var distance_b: float = b.get("result_progress", 0.0) if _phase == "results" else _race_progress(b)
+		return int(a["slot"]) < int(b["slot"]) if is_equal_approx(distance_a, distance_b) else distance_a > distance_b)
+	# Spectators receive an authoritative camera anchor but do not occupy race positions.
+	standings.append_array(_players.values().filter(func(player: Dictionary) -> bool: return player["spectator"]))
 	var entries: Array = []
 	for index: int in standings.size():
 		var player: Dictionary = standings[index]
 		entries.append({"id": player["id"], "name": player["name"], "slot": player["slot"],
-			"position": index + 1, "lap": mini(RACE_LAPS, int(player["lap"])), "finished": player["finished"],
+			"position": 0 if player["spectator"] else index + 1, "lap": mini(RACE_LAPS, int(player["lap"])), "finished": player["finished"],
+			"is_bot": player["is_bot"], "spectator": player["spectator"], "ready": player["ready"], "dnf": player["dnf"],
 			"connected": player["connected"], "elapsed": player["elapsed"], "ack": player["ack"], "epoch": player["epoch"],
 			"state": Protocol.pack_state(player["vehicle"].capture_state())})
-	var packet: Dictionary = {"type": "snapshot", "tick": _tick, "countdown": maxf(0.0, float(_countdown) / 60.0), "players": entries}
+	var packet: Dictionary = {"type": "snapshot", "tick": _tick, "race_id": _race_id, "phase": _phase,
+		"finish_remaining": _finish_remaining, "race_remaining": maxf(0.0, 180.0 - _race_elapsed),
+		"countdown": maxf(0.0, float(_countdown) / 60.0), "players": entries}
 	for peer_id: int in _peer_players:
 		_server.send_to(peer_id, packet, true)
 
@@ -446,7 +573,10 @@ func _on_host_message(arguments: Array) -> void:
 				_release_inputs()
 		"recover", "restart":
 			if _joined:
-				_send({"type": data["type"]})
+				if data["type"] == "restart":
+					_send({"type": "restart", "race_id": data.get("race_id", -1)})
+				else:
+					_send({"type": "recover"})
 
 
 func _connect_client(url: String, ticket: String) -> void:
@@ -517,6 +647,11 @@ func _apply_snapshot(packet: Dictionary) -> void:
 	if server_tick <= _tick:
 		return
 	_tick = server_tick
+	var generation_changed: bool = _race_id != int(packet.get("race_id", 0))
+	_race_id = int(packet.get("race_id", 0))
+	_phase = str(packet.get("phase", "waiting"))
+	_finish_remaining = float(packet.get("finish_remaining", -1.0))
+	_race_elapsed = 180.0 - float(packet.get("race_remaining", 180.0))
 	_client_countdown = float(packet.get("countdown", 0.0))
 	var public_players: Array = []
 	var seen: Array[String] = []
@@ -527,9 +662,13 @@ func _apply_snapshot(packet: Dictionary) -> void:
 		if state.is_empty():
 			continue
 		var id: String = str(entry.get("id", ""))
+		if entry.get("spectator", false) and id != _player_id:
+			continue
 		seen.append(id)
 		var location: Vector3 = state["transform"].origin
-		public_players.append({"id": id, "name": entry.get("name", ""), "lap": entry.get("lap", 1), "position": entry.get("position", 1), "connected": entry.get("connected", true), "worldPosition": [location.x, location.y, location.z]})
+		if not entry.get("spectator", false):
+			public_players.append({"id": id, "name": entry.get("name", ""), "lap": entry.get("lap", 1), "position": entry.get("position", 1), "connected": entry.get("connected", true), "worldPosition": [location.x, location.y, location.z],
+				"isBot": entry.get("is_bot", false), "ready": entry.get("ready", false), "dnf": entry.get("dnf", false), "finished": entry.get("finished", false), "elapsed": entry.get("elapsed", 0.0)})
 		if id == _player_id:
 			if _local == null:
 				_local = _create_vehicle(int(entry.get("slot", 0)), true)
@@ -541,13 +680,13 @@ func _apply_snapshot(packet: Dictionary) -> void:
 			if epoch_changed:
 				_pending.clear()
 			for command: Dictionary in _pending:
-				_local.step(command if _client_countdown <= 0.0 and not entry.get("finished", false) else Protocol.NEUTRAL, PHYSICS_DT)
+				_local.step(command if _phase == "racing" and not entry.get("finished", false) and not entry.get("spectator", false) else Protocol.NEUTRAL, PHYSICS_DT)
 			if epoch_changed and _race_camera != null:
 				_race_camera.reset(_local)
 			_correction = before.distance_to(_local.global_position)
 			_hud = entry.duplicate()
 			_hud.erase("state")
-			_status = "finished" if entry.get("finished", false) else ("countdown" if _client_countdown > 0.0 else "racing")
+			_status = "spectating" if entry.get("spectator", false) else ("finished" if entry.get("finished", false) else ("results" if _phase == "results" else _phase))
 		else:
 			if not _remotes.has(id):
 				var visual: Node3D = _create_kart_visual()
@@ -555,6 +694,10 @@ func _apply_snapshot(packet: Dictionary) -> void:
 				visual.global_transform = state["transform"]
 				_remotes[id] = {"node": visual, "samples": []}
 			var samples: Array = _remotes[id]["samples"]
+			if generation_changed or int(_remotes[id].get("epoch", -1)) != int(entry.get("epoch", 0)):
+				samples.clear()
+				_remotes[id]["node"].global_transform = state["transform"]
+			_remotes[id]["epoch"] = int(entry.get("epoch", 0))
 			samples.append({"at": Time.get_ticks_msec(), "transform": state["transform"],
 				"speed": state["velocity"].slide(state["up_direction"]).length(), "steering": state["steering_amount"],
 				"drifting": state["is_drifting"], "boost": state["boost_remaining"]})
@@ -565,6 +708,10 @@ func _apply_snapshot(packet: Dictionary) -> void:
 			_remotes[id]["node"].queue_free()
 			_remotes.erase(id)
 	_hud["players"] = public_players
+
+
+func _can_drive() -> bool:
+	return _status == "practice" or (_phase == "racing" and not _hud.get("finished", false) and not _hud.get("spectator", false))
 
 
 func _interpolate_remotes(delta: float) -> void:
@@ -610,6 +757,9 @@ func _leave(status: String) -> void:
 	_player_id = ""
 	_sequence = 0
 	_tick = 0
+	_race_id = 0
+	_phase = "waiting"
+	_client_countdown = 0.0
 	_hud.clear()
 	_status = status
 	if _local != null:
@@ -627,6 +777,10 @@ func _publish_hud() -> void:
 	var location: Vector3 = Vector3.ZERO if _local == null else _local.global_position
 	var forward: Vector3 = Vector3.FORWARD if _local == null else -_local.global_basis.z
 	var data: Dictionary = {"status": _status, "playerId": _player_id, "players": _hud.get("players", []),
+		"raceId": _race_id, "phase": _phase, "spectating": _hud.get("spectator", false),
+		"repeatReady": _hud.get("ready", false), "dnf": _hud.get("dnf", false),
+		"canRestart": _phase == "results" and not _hud.get("ready", false) and not _hud.get("spectator", false),
+		"finishRemaining": _finish_remaining, "raceRemaining": maxf(0.0, 180.0 - _race_elapsed),
 		"graphics": {"quality": _quality, "reducedEffects": _reduced_effects, "renderScale": get_viewport().scaling_3d_scale},
 		"track": _track.descriptor() if _track != null else {},
 		"worldPosition": [location.x, location.y, location.z],

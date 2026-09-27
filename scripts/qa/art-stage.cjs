@@ -246,7 +246,17 @@ async function menuAccessibility(page, width, height) {
     report.title = await page.title(); assert.match(report.title, /GNOM FIJI/i);
     assert.equal(new URL(page.url()).origin, new URL(url).origin);
     report.checks.pageIdentity = true;
-    await join(page); await page.waitForTimeout(1500);
+    // Load both clients before the shared start; late arrivals now spectate this race.
+    const p2 = scope === 'full' ? await open(1 - profileFirst) : null;
+    if (p2) {
+      await page.locator('#join-button').click();
+      await p2.locator('#join-button').click();
+      await page.waitForFunction(() => window.GnomHost.state?.status === 'racing', undefined, { timeout: 30000 });
+      await p2.waitForFunction(() => window.GnomHost.state?.status === 'racing', undefined, { timeout: 30000 });
+    } else {
+      await join(page);
+    }
+    await page.bringToFront(); await page.waitForTimeout(1500);
     const first = await page.evaluate(() => window.GnomHost.state);
     assert.equal(first.track.track_id, 'castle-waterfalls');
     report.track = first.track;
@@ -275,11 +285,14 @@ async function menuAccessibility(page, width, height) {
       console.log(JSON.stringify({ output: out, scope, passed: true, elapsedSeconds: (Date.now() - started) / 1000 }));
       return;
     }
-    const p2 = await open(1 - profileFirst); await join(p2);
     await page.bringToFront();
-    await page.waitForFunction(() => window.GnomHost.state.players.filter(p => p.connected).length === 2);
-    report.checks.twoProfiles = await page.evaluate(() => window.GnomHost.state.players.filter(player => player.connected).map(player => ({ id: player.id, name: player.name, worldPosition: player.worldPosition })));
+    await page.waitForFunction(() => window.GnomHost.state.players.filter(p => p.connected && !p.isBot).length === 2);
+    report.checks.twoProfiles = await page.evaluate(() => window.GnomHost.state.players.filter(player => player.connected && !player.isBot).map(player => ({ id: player.id, name: player.name, worldPosition: player.worldPosition })));
     assert.notEqual(report.checks.twoProfiles[0].id, report.checks.twoProfiles[1].id);
+    const grid = await page.evaluate(() => ({ count: window.GnomHost.state.players.length, bots: window.GnomHost.state.players.filter(player => player.isBot).length, spectating: window.GnomHost.state.spectating }));
+    assert.deepEqual(grid, { count: 10, bots: 8, spectating: false }, 'Both humans must enter before start, with bots filling the remaining grid');
+    assert.equal(await p2.evaluate(() => window.GnomHost.state.spectating), false);
+    report.checks.botFilledGrid = grid;
     await page.screenshot({ path: `${out}/desktop-two-profiles.png` });
     await page.keyboard.down('c'); await page.waitForTimeout(500);
     await page.screenshot({ path: `${out}/desktop-front.png` });
