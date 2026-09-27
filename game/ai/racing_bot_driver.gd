@@ -39,6 +39,12 @@ func needs_recovery() -> bool:
 	return _stalled_seconds >= 4.0
 
 
+func sample_countdown(seconds_left: float) -> Dictionary:
+	# Timing is a pedal decision; the shared countdown judge still grants or rejects it.
+	var press_at: float = 0.85 - float(_slot % 3) * 0.15 if difficulty == "easy" else (0.7 - float(_slot % 4) * 0.12 if difficulty == "normal" else 0.45 - float(_slot % 3) * 0.05)
+	return {"steering": 0.0, "throttle": 1.0 if seconds_left <= press_at else 0.0, "brake": 0.0, "drift": false}
+
+
 func sample(vehicle: CharacterBody3D, progress: Dictionary, delta: float) -> Dictionary:
 	if bool(progress.get("finished", false)):
 		return {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false, "drive_blocked": true}

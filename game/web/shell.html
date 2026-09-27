@@ -47,9 +47,10 @@
     <div class="minimap hud-panel"><small>ТРАССА 01</small><canvas id="minimap" width="240" height="150" aria-label="Положение участников на трассе"></canvas></div>
     <div class="race-tools"><button id="fullscreen-button" class="icon-button" aria-label="Полный экран" title="Полный экран"><img src="/assets/icons/maximize.svg" alt=""></button><button id="menu-button" class="icon-button" aria-label="Меню гонки" title="Меню гонки"><img src="/assets/icons/pause.svg" alt=""></button></div>
     <div class="connection hud-panel"><small>СОЕДИНЕНИЕ</small><strong id="network-status">Подключение</strong><span id="ping">0 мс</span></div>
-    <div class="drift hud-panel"><div><strong>ДРИФТ</strong><span id="boost-label">ЗАРЯД</span></div><div class="drift-track"><div id="drift-fill"></div></div></div>
+    <div class="drift hud-panel"><div><strong>ДРИФТ <span id="drift-level"></span></strong><span id="boost-label">ЗАРЯД</span></div><div class="network-drift-segments"><progress max="1" value="0" aria-label="Дрифт I"></progress><progress max="1" value="0" aria-label="Дрифт II"></progress><progress max="1" value="0" aria-label="Дрифт III"></progress></div></div>
     <div class="speed hud-panel"><b id="reverse" hidden aria-label="Задний ход">R</b><strong id="speed">0</strong><span>км/ч</span></div>
     <div class="combat-hud">
+      <div class="network-crystals"><img src="/assets/icons/crystal-shard.svg" alt="Осколки"><strong id="shards">0</strong></div>
       <div class="health-meter" role="meter" aria-label="Прочность" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span id="health-fill"></span><strong id="health-value">100</strong></div>
       <div class="item-slots" aria-label="Предметы">
         <button id="item-slot-0" class="item-slot" disabled aria-label="Пустой слот 1"><img alt="" hidden><span class="empty-slot" aria-hidden="true">+</span></button>

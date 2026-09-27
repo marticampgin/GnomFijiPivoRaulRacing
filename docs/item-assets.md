@@ -13,6 +13,9 @@ Six original low-poly props share the fantasy kart's teal, gold and crystal voca
 
 ## Source And Reproduction
 
+- Race-only `engine_shard`: native Godot faceted turquoise crystal from `create_shard()`, shared road/scatter visuals with authoritative IDs. It is not an inventory item or shop currency.
+- Crystal HUD icon: `web/assets/icons/crystal-shard.svg`, exported from the accepted Figma HUD file `OejURNEY5ZRhWWOBicFNYP`, screen `18:4`. Unlike the procedural 3D props, this is a downloaded project design asset, kept at its intrinsic dimensions.
+
 - Geometry/material source: `game/items/item_art.gd`.
 - Pickup crate: teal cube, gold bands, floating crystal. No collision or authority is encoded in the asset.
 - Stroh projectiles reuse the bottle; BFG fires a separate green energy bolt, not the weapon model. Short explosion spheres use orange or green, scaled to authoritative event radius. Reduced effects decreases their size and motion.

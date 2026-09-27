@@ -32,7 +32,7 @@ func _run() -> void:
 		var broken: Dictionary = item_command.duplicate()
 		broken.erase(key)
 		_check(Protocol.validate_item_command(broken).is_empty(), "reject missing item field %s" % key)
-	var combat: Dictionary = {"health": 100.0, "max_health": 100.0, "slots": ["", "fanta"], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0}
+	var combat: Dictionary = {"health": 100.0, "max_health": 100.0, "slots": ["", "fanta"], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0, "shards": 0}
 	_check(not Protocol.validate_combat(combat).is_empty(), "valid combat state")
 	for item_id: String in ["fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k"]:
 		var equipped: Dictionary = combat.duplicate(true)

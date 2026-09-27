@@ -96,8 +96,11 @@ the parent OpenSpec proposal, design, four specs and tasks, then implementation.
 The local runtime now includes all five gameplay layouts and the accepted hierarchy
 for existing items, health, rank, lap, drift charge and effects. The prior HUD remains
 in the network prototype. Reverse now has a live R indicator in both HUDs;
-the local setup includes three bot difficulties. New shards, three drift levels and attack warnings
-are pending their mechanics; they are not populated with illustrative mockup values.
+the local setup includes three bot difficulties. Shards, three drift segments and
+start/slipstream statuses now use live simulation state in both HUDs. Attack warnings
+remain pending their mechanics, without illustrative mockup values. The original
+crystal icon from accepted Figma screen `18:4` (component `17:40`) is stored at
+`web/assets/icons/crystal-shard.svg`, preserving its intrinsic 28 x 34.1694 size.
 Physical-controller and four-camera performance acceptance remain open.
 
 ## Verification And Handoff

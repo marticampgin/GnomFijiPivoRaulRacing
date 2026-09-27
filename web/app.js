@@ -338,9 +338,12 @@
     $('reconnect-button').textContent = state.status === 'update_required' ? 'ОБНОВИТЬ ИГРУ' : 'ПЕРЕПОДКЛЮЧИТЬСЯ';
     $('countdown').hidden = state.countdown <= 0 || disconnected;
     $('countdown').textContent = state.countdown > 0 ? Math.ceil(state.countdown) : '';
-    $('drift-fill').style.width = `${Math.round(Math.min(1, state.boost > 0 ? state.boost/2 : state.drift)*100)}%`;
+    $('shards').textContent=String(state.shards||0);
+    $('drift-level').textContent=['','I','II','III'][Math.max(0,Math.min(3,state.driftLevel||0))];
+    document.querySelectorAll('.network-drift-segments progress').forEach((bar,index)=>bar.value=state.driftSegments?.[index]||0);
     document.querySelector('.drift').classList.toggle('boost', state.boost > 0);
-    $('boost-label').textContent = state.boost > 0 ? 'УСКОРЕНИЕ' : 'ЗАРЯД';
+    const driving=state.driving||{};
+    $('boost-label').textContent = driving.start_boost_remaining>0?'СТАРТ':driving.slipstream_boost_remaining>0?'ПОТОК':state.boost>0?'УСКОРЕНИЕ':driving.slipstream_charge>0?`ПОТОК ${Math.round(driving.slipstream_charge*100)}%`:'ЗАРЯД';
     const rowLimit = matchMedia('(max-height:520px) and (orientation:landscape)').matches ? 3 : 4;
     const leaders = state.players.slice(0,rowLimit);
     const currentPlayer = state.players.find(player => player.id === state.playerId);

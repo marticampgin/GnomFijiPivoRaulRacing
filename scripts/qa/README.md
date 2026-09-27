@@ -7,7 +7,7 @@ is `http://127.0.0.1:8788/`.
 
 ## Prerequisites
 
-Short native checks for the v8 driving/items milestone (no full laps):
+Short native checks for the v8/v9 driving/items milestones (no full laps):
 
 ```sh
 godot --headless --path game --script res://tests/reverse_probe.gd
@@ -15,6 +15,10 @@ godot --headless --path game --script res://tests/reverse_gates_probe.gd
 godot --headless --path game --script res://tests/bot_difficulty_probe.gd
 godot --headless --path game --script res://tests/gifts_probe.gd
 godot --headless --path game --script res://tests/local_app_probe.gd
+godot --headless --path game --script res://tests/shards_probe.gd
+godot --headless --path game --script res://tests/race_techniques_probe.gd
+godot --headless --path game --script res://tests/racing_snapshot_boundary_probe.gd
+godot --headless --path game --script res://tests/local_view_probe.gd
 ```
 
 Local browser flow: choose easy/normal/hard in local setup, start, hold brake
@@ -24,6 +28,14 @@ gamepad and a 390x844 HUD as well as desktop. Virtual controllers verify softwar
 routing, not real hardware compatibility. Shared gift arbitration/2-second respawn
 and full inventory refusal use deterministic native fixtures; do not drive three
 laps to test these rules. Baseline values are in `docs/playtest-balance.md`.
+
+For v9, press throttle during the final 0.65–0.15 seconds of countdown and hold it
+to verify a real start boost; collect road crystals and check the owning HUD.
+Native probes cover slipstream awards, all three drift tiers, stacking and loss/reset
+rules. Separate HUD-only fixtures may supply rare combinations of these states to
+check layout/icon loading at 1600x900 and 390x844; label them as presentation tests,
+not evidence of gameplay awards. Four-camera checks share one pickup world and
+verify pause freezes pickup timers. No full-lap or hardware performance claim.
 
 - Node.js with `playwright` and `sharp` resolvable by `require()`.
 - Playwright's Chromium already available and a graphical desktop session.

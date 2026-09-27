@@ -6,6 +6,7 @@ const Protocol = preload("res://net/prototype_protocol.gd")
 const BotDriver = preload("res://ai/racing_bot_driver.gd")
 const VehicleContacts = preload("res://vehicle/vehicle_contacts.gd")
 const Items = preload("res://items/race_items.gd")
+const Techniques = preload("res://race/race_techniques.gd")
 const MAX_PLAYERS: int = 10
 const RACE_LAPS: int = 3
 
@@ -20,6 +21,7 @@ var _race_elapsed: float = 0.0
 var _finish_remaining: float = -1.0
 var _items: RefCounted = Items.new()
 var _bot_difficulty: String = "normal"
+var _techniques: RefCounted = Techniques.new()
 
 
 func _create_vehicle(_slot: int, _visuals: bool) -> CharacterBody3D:
@@ -40,6 +42,7 @@ func _human_input_available(_player: Dictionary) -> bool:
 
 func _step_session(delta: float) -> void:
 	_tick += 1
+	var was_countdown: bool = _phase == "countdown"
 	if _countdown > 0:
 		_countdown -= 1
 		if _countdown == 0:
@@ -51,6 +54,7 @@ func _step_session(delta: float) -> void:
 			_items.restore(_players[id])
 		if _finish_remaining >= 0.0:
 			_finish_remaining = maxf(0.0, _finish_remaining - delta)
+		_techniques.step(_players, delta)
 	var contact_bodies: Array = []
 	var previous_transforms: Dictionary = {}
 	var impact_damage: Dictionary = {}
@@ -69,8 +73,13 @@ func _step_session(delta: float) -> void:
 			player["input"] = queue.pop_front()
 			player["ack"] = int(player["input"]["sequence"])
 		var command: Dictionary = player["input"]
-		if player["is_bot"] and _phase == "racing" and not player["finished"]:
+		if player["is_bot"] and was_countdown:
+			command = player["driver"].sample_countdown(float(_countdown) / 60.0)
+		elif player["is_bot"] and _phase == "racing" and not player["finished"]:
 			command = player["driver"].sample(player["vehicle"], player["progress"], delta)
+		if was_countdown:
+			var start_command: Dictionary = command if player["is_bot"] or _human_input_available(player) else Protocol.BLOCKED
+			_techniques.countdown(player, start_command, float(_countdown) / 60.0, _phase == "racing")
 		if (not player["is_bot"] and not _human_input_available(player)) or _phase != "racing" or player["finished"] or player["spectator"]:
 			command = Protocol.BLOCKED
 		player["previous_position"] = player["vehicle"].global_position
@@ -101,7 +110,7 @@ func _step_session(delta: float) -> void:
 				if player["vehicle"] == impact["a"] or player["vehicle"] == impact["b"]:
 					impact_damage[player["id"]] = maxf(float(impact_damage.get(player["id"], 0.0)), _contact_damage(float(impact["closing"])))
 	for id: String in impact_damage:
-		_items.apply_damage(_players[id], float(impact_damage[id]))
+		_items.apply_damage(_players[id], float(impact_damage[id]), {}, "contact")
 	# Checkpoints observe the final contact-corrected pose, never an unresolved overlap.
 	for player: Dictionary in _players.values():
 		if _phase == "racing" and not player["finished"] and not player["spectator"]:
@@ -155,6 +164,7 @@ func _new_player(id: String, display_name: String, slot: int, bot: bool, style_i
 		"lap": 1, "progress": _track.initial_progress(), "previous_position": vehicle.global_position,
 		"finished": false, "finish_order": 0, "elapsed": 0.0, "last_recover_at": -1000, "epoch": 0}
 	_items.init_player(player)
+	player["driving"] = Techniques.new_state()
 	return player
 
 
@@ -219,6 +229,7 @@ func _update_progress(player: Dictionary) -> void:
 
 
 func _recover(player: Dictionary) -> void:
+	player["driving"] = Techniques.new_state()
 	player["vehicle"].reset_at(_track.recovery_transform(player["progress"]))
 	_track.mark_recovered(player["progress"])
 	player["previous_position"] = player["vehicle"].global_position

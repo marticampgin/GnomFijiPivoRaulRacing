@@ -39,6 +39,8 @@ static func crystal(root: Node3D, position: Vector3, color: Color, size: float =
 	node.rotation.z = 0.2
 
 static func create_item(id: String) -> Node3D:
+	if id == "engine_shard":
+		return create_shard()
 	var root := Node3D.new()
 	root.name = id
 	var dark := Color("193737")
@@ -79,6 +81,24 @@ static func create_item(id: String) -> Node3D:
 		else:
 			box(root, Vector3(0.16, 0.16, 0.035), Vector3(0, -0.07, -0.28), Color("d64332")).rotation.z = PI / 4.0
 			box(root, Vector3(0.2, 0.1, 0.12), Vector3(0.08, 0.74, 0), dark).rotation.z = -0.4
+	return root
+
+
+static func create_shard() -> Node3D:
+	var root := Node3D.new()
+	root.name = "TurquoiseEngineShard"
+	var upper := CylinderMesh.new()
+	upper.bottom_radius = 0.25
+	upper.top_radius = 0.0
+	upper.height = 0.6
+	upper.radial_segments = 5
+	part(root, upper, Vector3(0, 0.15, 0), Color("56e8dc"), 0.45)
+	var lower := CylinderMesh.new()
+	lower.bottom_radius = 0.0
+	lower.top_radius = 0.25
+	lower.height = 0.3
+	lower.radial_segments = 5
+	part(root, lower, Vector3(0, -0.3, 0), Color("168e99"), 0.25)
 	return root
 
 static func create_projectile(id: String) -> Node3D:

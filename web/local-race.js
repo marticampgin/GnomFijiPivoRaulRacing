@@ -80,13 +80,15 @@
       const lap = element('div','local-lap'), lapValue=element('strong'), clock=element('span'); lap.append(element('span','','КРУГ'),lapValue,clock);
       const rank = element('div','local-rank'), rankValue=element('strong'), total=element('span'); rank.append(rankValue,total,element('small','','МЕСТО'));
       const health = element('div','local-health'), healthValue=element('strong'), healthBar=element('progress'); healthBar.max=100; healthBar.setAttribute('aria-label',`Прочность P${index+1}`); health.append(element('span','','ПРОЧНОСТЬ'),healthValue,healthBar);
-      const drift = element('div','local-drift'), driftLabel=element('span','','ДРИФТ'), driftBar=element('progress'); driftBar.max=1; driftBar.setAttribute('aria-label',`Заряд дрифта P${index+1}`); drift.append(driftLabel,driftBar);
+      const crystals=element('div','local-crystals'), crystalIcon=element('img'), crystalValue=element('strong','',0); crystalIcon.src='/assets/icons/crystal-shard.svg';crystalIcon.alt='';crystals.append(crystalIcon,crystalValue);crystals.setAttribute('aria-label',`Осколки P${index+1}`);
+      const drift = element('div','local-drift'), driftLabel=element('span','','ДРИФТ'), driftTrack=element('div','local-drift-segments');
+      const driftBars=[0,1,2].map(level=>{const bar=element('progress');bar.max=1;bar.setAttribute('aria-label',`Дрифт P${index+1}, уровень ${level+1}`);driftTrack.append(bar);return bar;});drift.append(driftLabel,driftTrack);
       const speed = element('div','local-speed'), speedValue=element('strong'), reverse=element('b','local-reverse','R'); reverse.hidden=true;reverse.setAttribute('aria-label','Задний ход');speed.append(reverse,speedValue,element('span','','км/ч'));
       const effects=element('div','local-effects'), map=element('canvas','local-map'); map.width=160;map.height=160;map.setAttribute('aria-label',`Карта P${index+1}`);
       const countdown=element('div','local-countdown'), finish=element('div','local-finish'), finishTitle=element('strong'),finishTime=element('span');
       const ready=button('Ещё заезд',()=>send({type:'local_ready',seat:index}),'rotate-ccw'); finish.append(finishTitle,finishTime,ready); finish.hidden=true;
-      pane.append(blur,identity,inventory,lap,rank,health,drift,speed,effects,map,countdown,finish);
-      return {pane,blur,identity,slots,lapValue,clock,rankValue,total,healthValue,healthBar,driftLabel,driftBar,speedValue,reverse,effects,map,countdown,finish,finishTitle,finishTime,ready};
+      pane.append(blur,identity,inventory,crystals,lap,rank,health,drift,speed,effects,map,countdown,finish);
+      return {pane,blur,identity,slots,crystals,crystalValue,lapValue,clock,rankValue,total,healthValue,healthBar,driftLabel,driftBars,speedValue,reverse,effects,map,countdown,finish,finishTitle,finishTime,ready};
     }
     function drawMap(canvas, descriptor, players, id) {
       const ctx=canvas.getContext('2d'); if(!ctx)return; ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -129,11 +131,18 @@
         p.blur.style.backdropFilter=`blur(${clamp(seat.blurIntensity,0,1)*(next.graphics?.reducedEffects?.6:3)}px)`;
         p.lapValue.textContent=`${seat.lap || 1} / ${seat.laps || 3}`;p.clock.textContent=time(seat.elapsed);p.rankValue.textContent=seat.rank || '-';p.total.textContent=`/ ${next.players?.length || 10}`;
         p.healthValue.textContent=Math.ceil(clamp(seat.health,0,seat.maxHealth || 100));p.healthBar.max=seat.maxHealth || 100;p.healthBar.value=clamp(seat.health,0,p.healthBar.max);p.healthBar.classList.toggle('critical',p.healthBar.value/p.healthBar.max<.35);
-        p.speedValue.textContent=Math.round(Number(seat.speed)||0);p.reverse.hidden=!seat.reverse;p.driftBar.value=clamp(seat.drift,0,1);p.driftLabel.textContent=seat.boost>0?'УСКОРЕНИЕ':'ДРИФТ';
+        p.speedValue.textContent=Math.round(Number(seat.speed)||0);p.reverse.hidden=!seat.reverse;
+        p.crystalValue.textContent=clamp(seat.shards,0,seat.shardCap||20);p.crystals.title=`Осколки: ${p.crystalValue.textContent} / ${seat.shardCap||20}`;
+        p.driftBars.forEach((bar,level)=>bar.value=clamp(seat.driftSegments?.[level],0,1));p.driftLabel.textContent=`ДРИФТ ${['','I','II','III'][clamp(seat.driftLevel,0,3)]}`;
         p.slots.forEach(({node,img,key,empty},slot)=> { const item=seat.items?.[slot];const valid=Object.hasOwn(items,item);img.hidden=!valid;empty.hidden=valid;if(valid && img.dataset.item!==item){img.src=`/assets/items/${item}.png`;img.dataset.item=item;}key.textContent=seat.device===-1?['Q','E'][slot]:['LB','RB'][slot];node.disabled=!valid||!seat.canUseItems||next.paused;node.title=valid?items[item]:'Пусто';node.setAttribute('aria-label',`P${index+1}, предмет ${slot+1}: ${valid?items[item]:'пусто'}`); });
         const labels={...items,burn:'Горение',invulnerable:'Защита',recovery:'Восстановление'};
         const effects={...seat.effects};if(seat.invulnerableRemaining>0)effects.invulnerable=seat.invulnerableRemaining;if(seat.destroyedRemaining>0)effects.recovery=seat.destroyedRemaining;
         p.effects.replaceChildren(...Object.entries(effects).filter(([key,value])=>labels[key]&&Number(value?.remaining ?? value)>0).map(([key,value])=>element('span',`local-effect ${key}`,`${labels[key]} ${Math.ceil(Number(value?.remaining ?? value))} с`)));
+        const driving=seat.driving||{};
+        if(driving.start_boost_remaining>0)p.effects.prepend(element('span','local-effect start-boost','СТАРТ'));
+        if(driving.slipstream_boost_remaining>0)p.effects.prepend(element('span','local-effect slipstream','ПОТОК'));
+        else if(driving.slipstream_charge>0)p.effects.prepend(element('span','local-effect slipstream',`ПОТОК ${Math.round(clamp(driving.slipstream_charge,0,1)*100)}%`));
+        if(seat.boost>0&&!(driving.start_boost_remaining>0)&&!(driving.slipstream_boost_remaining>0))p.effects.prepend(element('span','local-effect drift-boost','УСКОРЕНИЕ'));
         const results=next.phase==='results';
         p.countdown.textContent=next.countdown>0?Math.ceil(next.countdown):'';p.finish.hidden=!seat.finished&&!results;p.finishTitle.textContent=seat.dnf?'DNF':`${seat.rank || '-'} МЕСТО`;p.finishTime.textContent=time(seat.elapsed);p.ready.textContent=!results?'Ждём остальных':seat.ready?'Готов':'Ещё заезд';p.ready.disabled=!results||Boolean(seat.ready)||next.paused;
         drawMap(p.map,next.trackDescriptor,next.players || [],seat.id);

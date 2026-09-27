@@ -2,6 +2,7 @@ extends Node3D
 
 const Art = preload("res://items/item_art.gd")
 var _pickups: Dictionary = {}
+var _shards: Dictionary = {}
 var _projectiles: Dictionary = {}
 var _events: Dictionary = {}
 var _seen_events: Dictionary = {}
@@ -12,6 +13,7 @@ func clear() -> void:
 	for child in get_children():
 		child.queue_free()
 	_pickups.clear()
+	_shards.clear()
 	_projectiles.clear()
 	_events.clear()
 	_seen_events.clear()
@@ -26,6 +28,7 @@ func _position(value: Array) -> Vector3:
 	return Vector3(float(value[0]), float(value[1]), float(value[2])) if value.size() == 3 else Vector3.ZERO
 
 func apply_world(world: Dictionary) -> void:
+	_sync_shards(world.get("shards", []))
 	_sync(world.get("pickups", []), _pickups, true)
 	_sync(world.get("projectiles", []), _projectiles, false)
 	for event in world.get("events", []):
@@ -40,6 +43,26 @@ func apply_world(world: Dictionary) -> void:
 		add_child(node)
 		node.position = _position(event.get("position", []))
 		_events[id] = {"node": node, "age": 0.0, "radius": clampf(float(event.get("radius", 2.0)), 0.1, 12.0)}
+
+
+func _sync_shards(values: Array) -> void:
+	var alive: Dictionary = {}
+	for entry: Dictionary in values:
+		var id: String = str(entry.id)
+		alive[id] = true
+		if not _shards.has(id):
+			var shard: Node3D = Art.create_shard()
+			add_child(shard)
+			_shards[id] = shard
+		var visual: Node3D = _shards[id]
+		visual.position = _position(entry.position)
+		visual.set_meta("base_position", visual.position)
+		# Unarmed scattered shards remain visible so racers can anticipate collection.
+		visual.visible = bool(entry.available) or bool(entry.scattered)
+	for id: String in _shards.keys():
+		if not alive.has(id):
+			_shards[id].queue_free()
+			_shards.erase(id)
 
 func _sync(values: Array, existing: Dictionary, pickup: bool) -> void:
 	var alive: Dictionary = {}
@@ -66,6 +89,9 @@ func _sync(values: Array, existing: Dictionary, pickup: bool) -> void:
 
 func _process(delta: float) -> void:
 	_clock += delta
+	for shard: Node3D in _shards.values():
+		shard.rotation.y += delta * (0.25 if _reduced else 1.2)
+		shard.position.y = shard.get_meta("base_position").y + (0.0 if _reduced else sin(_clock * 2.0 + shard.position.x) * 0.08)
 	for node in _pickups.values():
 		node.rotation.y += delta * (0.25 if _reduced else 0.8)
 		node.position.y = node.get_meta("base_position").y + (0.0 if _reduced else sin(_clock * 2.0 + node.position.x) * 0.12)

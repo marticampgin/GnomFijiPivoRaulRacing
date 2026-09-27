@@ -3,12 +3,13 @@ extends RefCounted
 
 const Vehicle = preload("res://vehicle/racing_vehicle.gd")
 const Styles = preload("res://vehicle/driving_styles.gd")
-const WIRE_VERSION: int = 5
+const Catalog = preload("res://items/item_catalog.gd")
+const WIRE_VERSION: int = 6
 const TICKET_VERSION: int = 3
 const VEHICLE_STATE_VERSION: int = Vehicle.STATE_VERSION
 const TRACK_SCHEMA_VERSION: int = 1
 const MATCH_ID: String = "prototype-1"
-const LOADOUT_HASH: String = "prototype-v8"
+const LOADOUT_HASH: String = "prototype-v9"
 const NEUTRAL: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 0.0, "drift": false}
 # Simulation-only parking command; never serialized as a player input packet.
 const BLOCKED: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false, "drive_blocked": true}
@@ -44,7 +45,9 @@ static func validate_item_command(data: Dictionary) -> Dictionary:
 
 
 static func validate_combat(data: Variant) -> Dictionary:
-	if not data is Dictionary or data.size() != 7:
+	if not data is Dictionary or data.size() != 8:
+		return {}
+	if not _integer(data.get("shards"), 0) or int(data["shards"]) > Catalog.SHARD_CAP:
 		return {}
 	if not _bounded(data.get("health"), 0.0, 100.0) or not _number(data.get("max_health")) or data["max_health"] != 100.0:
 		return {}
@@ -76,6 +79,50 @@ static func validate_combat(data: Variant) -> Dictionary:
 
 static func _bounded(value: Variant, minimum: float, maximum: float) -> bool:
 	return _number(value) and float(value) >= minimum and float(value) <= maximum
+
+
+static func validate_driving(data: Variant) -> Dictionary:
+	if not data is Dictionary or data.size() != 4:
+		return {}
+	for field: String in ["start_boost_remaining", "slipstream_charge", "slipstream_boost_remaining"]:
+		if not _bounded(data.get(field), 0.0, 1.0):
+			return {}
+	if not data.get("slipstream_target") is String or data.slipstream_target.length() > 128:
+		return {}
+	return data.duplicate(true)
+
+
+static func validate_items_world(data: Variant) -> Dictionary:
+	if not data is Dictionary or data.size() != 4:
+		return {}
+	var serials: Dictionary = {}
+	for category: String in ["pickups", "projectiles", "events", "shards"]:
+		var entries: Variant = data.get(category)
+		var limit: int = Catalog.SHARD_WORLD_LIMIT if category == "shards" else 256
+		if not entries is Array or entries.size() > limit:
+			return {}
+		var ids: Dictionary = {} if category == "pickups" else serials
+		for entry: Variant in entries:
+			if not entry is Dictionary or not _integer(entry.get("id"), 0 if category == "pickups" else 1) or not _vector_valid(entry.get("position")):
+				return {}
+			var id: int = int(entry.id)
+			if ids.has(id):
+				return {}
+			ids[id] = true
+			if category == "pickups" or category == "shards":
+				if entry.size() != (4 if category == "shards" else 3) or not entry.get("available") is bool:
+					return {}
+				if category == "shards" and not entry.get("scattered") is bool:
+					return {}
+			elif category == "projectiles":
+				if entry.size() != 3 or not entry.get("kind") in ["stroh80", "bfg10k"]:
+					return {}
+			else:
+				if entry.size() != 4 or not entry.get("kind") is String or not _bounded(entry.get("radius"), 0.0, 20.0):
+					return {}
+				if not entry.kind in ["pickup", "destroyed", "blast_stroh80", "blast_bfg10k", "use_fanta", "use_mermaid_rum", "use_ice_rum", "use_stroh80", "use_lays_crab", "use_bfg10k"]:
+					return {}
+	return data.duplicate(true)
 
 
 static func track_identity(manifest: Dictionary) -> Dictionary:

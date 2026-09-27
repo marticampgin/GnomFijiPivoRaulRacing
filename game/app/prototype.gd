@@ -348,7 +348,7 @@ func _broadcast_snapshot() -> void:
 	for index: int in standings.size():
 		var player: Dictionary = standings[index]
 		entries.append({"id": player["id"], "name": player["name"], "slot": player["slot"],
-			"combat": _items.player_state(player),
+			"combat": _items.player_state(player), "driving": Techniques.presentation(player),
 			"style_id": player["style_id"], "next_style_id": player["next_style_id"],
 			"position": 0 if player["spectator"] else index + 1, "lap": mini(RACE_LAPS, int(player["lap"])), "finished": player["finished"],
 			"is_bot": player["is_bot"], "spectator": player["spectator"], "ready": player["ready"], "dnf": player["dnf"],
@@ -582,6 +582,14 @@ func _apply_snapshot(packet: Dictionary) -> void:
 	var server_tick: int = int(packet.get("tick", 0))
 	if server_tick <= _tick:
 		return
+	var item_world: Dictionary = Protocol.validate_items_world(packet.get("items_world"))
+	if item_world.is_empty():
+		_leave("update_required")
+		return
+	for entry: Variant in packet["players"]:
+		if not entry is Dictionary or Protocol.validate_driving(entry.get("driving")).is_empty() or Protocol.validate_combat(entry.get("combat")).is_empty():
+			_leave("update_required")
+			return
 	_tick = server_tick
 	var generation_changed: bool = _race_id != int(packet.get("race_id", 0))
 	_race_id = int(packet.get("race_id", 0))
@@ -592,7 +600,7 @@ func _apply_snapshot(packet: Dictionary) -> void:
 	if is_instance_valid(_item_visuals):
 		if generation_changed:
 			_item_visuals.clear()
-		_item_visuals.apply_world(packet.get("items_world", {}))
+		_item_visuals.apply_world(item_world)
 	var public_players: Array = []
 	var seen: Array[String] = []
 	for entry: Variant in packet["players"]:
@@ -810,6 +818,8 @@ func _publish_hud() -> void:
 	var forward: Vector3 = Vector3.FORWARD if _local == null else -_local.global_basis.z
 	var data: Dictionary = {"status": _status, "playerId": _player_id, "players": _hud.get("players", []),
 		"items": _client_combat.get("slots", ["", ""]), "health": _client_combat.get("health", 100.0), "maxHealth": _client_combat.get("max_health", 100.0),
+		"shards": _client_combat.get("shards", 0), "shardCap": _items.Catalog.SHARD_CAP,
+		"driving": _hud.get("driving", {}),
 		"effects": _client_combat.get("effects", {}), "itemAck": _client_combat.get("item_ack", 0),
 		"destroyedRemaining": _client_combat.get("destroyed_remaining", 0.0), "invulnerableRemaining": _client_combat.get("invulnerable_remaining", 0.0),
 		"canUseItems": _joined and _can_drive() and _focused and _input_enabled,
@@ -826,6 +836,8 @@ func _publish_hud() -> void:
 		"position": _hud.get("position", 1), "speed": 0.0 if _local == null else _local.speed_mps * 3.6,
 		"reverse": _local != null and _local.velocity.dot(-_local.global_basis.z) < -0.1,
 		"drift": 0.0 if _local == null else _local.drift_charge, "boost": 0.0 if _local == null else _local.boost_remaining,
+		"driftLevel": 0 if _local == null else _local.drift_level(),
+		"driftSegments": _drift_segments(0.0 if _local == null else _local.drift_charge),
 		"lap": _hud.get("lap", 1), "finished": _hud.get("finished", false), "elapsed": _hud.get("elapsed", 0.0),
 		"countdown": _client_countdown, "ping": _ping, "correction": _correction, "serverTick": _tick,
 		"pendingInputs": _pending.size(), "fps": Engine.get_frames_per_second()}
@@ -835,6 +847,15 @@ func _publish_hud() -> void:
 
 func _blur_intensity() -> float:
 	return _items.blur_intensity(_client_combat)
+
+
+func _drift_segments(charge: float) -> Array:
+	var segments: Array = []
+	var previous: float = 0.0
+	for threshold: float in Vehicle.DRIFT_LEVEL_THRESHOLDS:
+		segments.append(clampf((charge - previous) / (threshold - previous), 0.0, 1.0))
+		previous = threshold
+	return segments
 
 
 func _local_devices() -> Array:
@@ -861,10 +882,13 @@ func _local_hud_state() -> Dictionary:
 		var combat: Dictionary = entry.combat
 		var seat: Dictionary = row.duplicate()
 		seat.merge({"device": snapshot.devices[entry.slot], "styleId": entry.style_id,
+			"shards": combat.shards, "shardCap": _items.Catalog.SHARD_CAP, "driving": entry.driving,
 			"speed": vehicle.speed_mps * 3.6, "lap": entry.lap, "laps": RACE_LAPS,
 			"reverse": vehicle.velocity.dot(-vehicle.global_basis.z) < -0.1,
 			"health": combat.health, "maxHealth": combat.max_health, "items": combat.slots,
 			"effects": combat.effects, "drift": vehicle.drift_charge, "boost": vehicle.boost_remaining,
+			"driftLevel": vehicle.drift_level(),
+			"driftSegments": _drift_segments(vehicle.drift_charge),
 			"epoch": entry.epoch, "lookBack": _local_race.command_for_seat(entry.slot).get("look_back", false),
 			"canUseItems": snapshot.phase == "racing" and not snapshot.paused and not entry.finished and float(combat.destroyed_remaining) <= 0.0,
 			"blurIntensity": _local_race._items.blur_intensity(combat),

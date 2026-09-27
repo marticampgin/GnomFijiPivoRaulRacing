@@ -2,7 +2,7 @@ class_name RacingVehicle
 extends CharacterBody3D
 
 const STATE_VERSION: int = 1
-const BALANCE_VERSION: String = "vehicle-prototype-v8"
+const BALANCE_VERSION: String = "vehicle-prototype-v9"
 const COLLISION_SIZE: Vector3 = Vector3(2.18, 0.7, 2.696)
 const COLLISION_BEVEL: float = 0.1
 const DEFAULT_STATS: Dictionary = {
@@ -20,6 +20,9 @@ const DRIFT_MAX_SLIP: float = 1.2
 const BOOST_MIN_CHARGE: float = 0.25
 const REVERSE_MAX_SPEED: float = 8.0
 const REVERSE_ACCELERATION: float = 10.0
+const DRIFT_BALANCE_VERSION: int = 1
+const DRIFT_LEVEL_THRESHOLDS: Array[float] = [0.25, 0.6, 1.0]
+const DRIFT_BOOST_SECONDS: Array[float] = [1.1, 1.5, 2.0]
 
 var stats: Dictionary = DEFAULT_STATS.duplicate()
 var grounded: bool = false
@@ -105,8 +108,8 @@ func step(input: Dictionary, delta: float, gravity_up: Vector3 = Vector3.UP) -> 
 	boost_remaining = maxf(0.0, boost_remaining - dt)
 
 	if _drift_was_pressed and not drift_pressed:
-		if on_surface and is_drifting and drift_charge >= BOOST_MIN_CHARGE:
-			boost_remaining = 0.5 + drift_charge * 1.5
+		if on_surface and is_drifting and drift_level() > 0:
+			boost_remaining = maxf(boost_remaining, DRIFT_BOOST_SECONDS[drift_level() - 1])
 		drift_charge = 0.0
 	is_drifting = (drift_pressed and on_surface and forward_speed >= DRIFT_MIN_SPEED
 		and absf(steering) >= DRIFT_MIN_STEERING)
@@ -172,6 +175,14 @@ func step(input: Dictionary, delta: float, gravity_up: Vector3 = Vector3.UP) -> 
 		is_drifting = false
 		drift_charge = 0.0
 	speed_mps = velocity.slide(up_direction).length()
+
+
+func drift_level() -> int:
+	var level: int = 0
+	for threshold: float in DRIFT_LEVEL_THRESHOLDS:
+		if drift_charge >= threshold:
+			level += 1
+	return level
 
 
 func capture_state() -> Dictionary:

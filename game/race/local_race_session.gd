@@ -167,7 +167,7 @@ func presentation() -> Dictionary:
 			"lap": mini(RACE_LAPS, int(player.lap)), "finished": player.finished, "ready": player.ready,
 			"dnf": player.dnf, "is_bot": player.is_bot, "spectator": false, "connected": int(player.slot) not in _disconnected_seats,
 			"elapsed": player.elapsed, "epoch": player.epoch,
-			"combat": _items.player_state(player), "state": Protocol.pack_state(player.vehicle.capture_state())}
+			"combat": _items.player_state(player), "driving": Techniques.presentation(player), "state": Protocol.pack_state(player.vehicle.capture_state())}
 		entries.append(entry)
 		if not player.is_bot:
 			var seat: int = int(player.slot)

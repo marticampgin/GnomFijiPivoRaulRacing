@@ -4,6 +4,15 @@ extends RefCounted
 const IDS: Array[String] = ["fanta", "mermaid_rum", "ice_rum", "stroh80", "lays_crab", "bfg10k"]
 # Versioned MVP balance baseline, not a guaranteed comeback for trailing racers.
 const LOOT_VERSION: int = 1
+const SHARD_VERSION: int = 1
+const SHARD_CAP: int = 20
+const SHARD_TOP_SPEED_BONUS: float = 0.10
+const SHARD_LOSS_FRACTION: float = 0.25
+const SHARD_STRONG_CONTACT_DAMAGE: float = 12.0
+const SHARD_RESPAWN_SECONDS: float = 5.0
+const SHARD_SCATTER_SECONDS: float = 8.0
+const SHARD_SCATTER_ARM_SECONDS: float = 0.5
+const SHARD_WORLD_LIMIT: int = 256
 const LOOT_GAP_METERS: float = 150.0
 const TRAILING_WEIGHTS: Dictionary = {
 	"fanta": 1.40, "mermaid_rum": 1.05, "ice_rum": 1.20,

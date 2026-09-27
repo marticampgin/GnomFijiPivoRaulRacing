@@ -43,6 +43,13 @@ func _run() -> void:
 	session._phase = "racing"
 	session._countdown = 0
 	var player: Dictionary = session._players["local:0"]
+	player.combat.shards = 7
+	player.vehicle.drift_charge = 0.6
+	player.driving.slipstream_charge = 0.5
+	hud = app._local_hud_state()
+	_check(hud.seats[0].shards == 7 and hud.seats[0].shardCap == 20, "race-only shard reserve reaches owning HUD")
+	_check(hud.seats[0].driftLevel == 2 and hud.seats[0].driftSegments == [1.0, 1.0, 0.0], "HUD derives three drift segments from simulation thresholds")
+	_check(hud.seats[0].driving.slipstream_charge == 0.5, "authoritative technique state reaches owning HUD")
 	player.vehicle.velocity = player.vehicle.global_basis.z * 2.0
 	_check(app._local_hud_state().seats[0].reverse, "reverse indicator follows actual signed motion")
 	player.vehicle.velocity = -player.vehicle.global_basis.z * 2.0
@@ -69,6 +76,7 @@ func _run() -> void:
 	_check(session._race_id == race_id + 1 and session._phase == "countdown", "local result button starts one rematch")
 	_check(app._local_hud_state().botDifficulty == "hard", "rematch keeps chosen difficulty")
 	_check(app._local_hud_state().seats[0].items == ["", ""], "rematch clears projected inventory")
+	_check(app._local_hud_state().seats[0].shards == 0 and app._local_hud_state().seats[0].driving.slipstream_charge == 0.0, "rematch clears shards and technique HUD")
 	app._on_local_message({"type": "local_leave"})
 	_check(not is_instance_valid(app._local_race) and not is_instance_valid(app._local_view), "leave removes local authority and views")
 	_check(not root.disable_3d and app._camera.current, "leave restores network/practice rendering")
