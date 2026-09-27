@@ -7,6 +7,24 @@
   let mapProjection = null, mapHash = null;
   let raceId = null, musicContext = null, musicTimer = null, musicStep = 0;
   let musicEnabled = true;
+  const styleLabels = {handling:'Управляемость', acceleration:'Ускорение', speed:'Скорость', drift:'Дрифт'};
+  const validStyle = value => Object.hasOwn(styleLabels, value);
+  let selectedStyle = 'handling', joinedStyle = null;
+  try {
+    const saved = localStorage.getItem('gnom.style.v1');
+    if (validStyle(saved)) selectedStyle = saved;
+  } catch { /* Optional storage. */ }
+  function applyStyle(value) {
+    if (!validStyle(value)) return;
+    selectedStyle = value;
+    for (const input of document.querySelectorAll('input[name="driving-style"]')) input.checked = input.value === value;
+    $('selected-style').textContent = styleLabels[value];
+    try { localStorage.setItem('gnom.style.v1', value); } catch { /* Optional storage. */ }
+  }
+  for (const input of document.querySelectorAll('input[name="driving-style"]')) input.addEventListener('change', () => {
+    if (!busy && !inRace && input.checked) applyStyle(input.value);
+  });
+  applyStyle(selectedStyle);
   try { musicEnabled = localStorage.getItem('gnom.music.v1') !== 'off'; } catch { /* Optional storage. */ }
   $('music-enabled').checked = musicEnabled;
   function stopMusic() {
@@ -69,7 +87,11 @@
   $('reduced-effects').addEventListener('change', event => { graphics.reducedEffects = event.target.checked; saveGraphics(); });
   applyGraphics();
   function setError(message) { $('hub-error').textContent = message; $('hub-error').hidden = !message; }
-  function updateReady() { ui['join-button'].disabled = !engineReady || !session || busy; ui['profile-button'].disabled = !session || busy; }
+  function updateReady() {
+    ui['join-button'].disabled = !engineReady || !session || busy;
+    ui['profile-button'].disabled = !session || busy;
+    $('driving-style').disabled = busy || inRace;
+  }
   function messageFor(error) {
     const messages = { csrf_rejected:'Сессия изменилась. Обновите страницу.', origin_rejected:'Адрес игры не совпадает с адресом сервера.', attempt_invalid:'Попытка входа истекла. Повторите вход.', rate_limited:'Слишком много запросов. Попробуйте немного позже.', account_required:'Нужен вход в аккаунт.', unavailable:'Сервер временно недоступен.' };
     return messages[error.message] || 'Не удалось выполнить запрос. Повторите попытку.';
@@ -121,7 +143,12 @@
     busy = true; updateReady(); setError('');
     $('reconnect-button').disabled = true;
     try {
-      const connection = await api('/api/race/ticket', {});
+      const styleId = inRace ? (validStyle(lastState?.nextStyleId) ? lastState.nextStyleId : validStyle(lastState?.styleId) ? lastState.styleId : joinedStyle || selectedStyle) : selectedStyle;
+      const connection = await api('/api/race/ticket', {styleId});
+      joinedStyle = validStyle(connection.styleId) ? connection.styleId : styleId;
+      applyStyle(joinedStyle);
+      $('active-style').textContent = styleLabels[joinedStyle];
+      $('next-style').hidden = true;
       inRace = true; lastFinish = false; restarting = false; raceId = null;
       ui.hub.hidden = true; ui.hud.hidden = false;
       $('disconnect').hidden = true;
@@ -135,6 +162,7 @@
   function leave() {
     send({type:'leave'}); inRace = false; lastFinish = false;
     raceId = null; restarting = false; stopMusic();
+    joinedStyle = null; lastState = null; updateReady();
     for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
     ui.hub.hidden = false; ui.hud.hidden = true;
     ui['join-button'].focus();
@@ -219,6 +247,14 @@
   function render(state) {
     lastState = state;
     if (!inRace) return;
+    if (validStyle(state.styleId)) {
+      joinedStyle = state.styleId;
+      $('active-style').textContent = styleLabels[joinedStyle];
+      const nextStyle = validStyle(state.nextStyleId) ? state.nextStyleId : joinedStyle;
+      if (nextStyle !== selectedStyle) applyStyle(nextStyle);
+      $('next-style').hidden = nextStyle === joinedStyle;
+      $('next-style-name').textContent = styleLabels[nextStyle];
+    }
     if (state.raceId !== raceId) {
       raceId = state.raceId; lastFinish = false; restarting = false;
       ui['result-dialog'].close(); stopMusic();

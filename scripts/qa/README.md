@@ -49,6 +49,11 @@ server-side pack corrections from presentation jitter in a short simulation.
 
 ### Browser Scope
 
+Four-style changes also use `driving_styles_probe.gd` for measured acceleration,
+speed, turn and drift/boost differences. `race_lifecycle_probe.gd` verifies that
+queued styles apply only on the next race and survive recovery. The mixed-style
+bot race checks all four profiles without modifying the shared collision mass.
+
 Choose the scope to match the change. Hero-only geometry/material edits use the
 short smoke below, not the full race. Route/physics/progress/network changes
 still require their relevant integration checks and, when affected, a full finish.

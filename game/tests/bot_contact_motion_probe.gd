@@ -2,6 +2,7 @@ extends SceneTree
 
 const Track = preload("res://track/authored_track.gd")
 const Vehicle = preload("res://vehicle/racing_vehicle.gd")
+const Styles = preload("res://vehicle/driving_styles.gd")
 const Driver = preload("res://ai/racing_bot_driver.gd")
 const Contacts = preload("res://vehicle/vehicle_contacts.gd")
 const DT: float = 1.0 / 60.0
@@ -19,6 +20,7 @@ func _run() -> void:
 	var bodies: Array = []
 	for slot: int in 10:
 		var car: CharacterBody3D = _car(track.spawn_transform(slot))
+		car.configure(Styles.stats_for(Styles.IDS[slot % Styles.IDS.size()]))
 		bodies.append(car)
 		racers.append({"car": car, "driver": Driver.new(track, slot), "progress": track.initial_progress(), "last_correction": Vector3.ZERO})
 	var max_correction: float = 0.0

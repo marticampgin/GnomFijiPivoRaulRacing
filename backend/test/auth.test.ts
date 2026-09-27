@@ -12,7 +12,7 @@ import { readConfig, type Config } from '../src/config.js';
 import { migrate } from '../src/database.js';
 import { buildApp } from '../src/app.js';
 import { AuthService } from '../src/auth.js';
-import { loadTrackManifest, raceCompatibility, TICKET_VERSION } from '../src/race-compatibility.js';
+import { loadTrackManifest, raceCompatibility, STYLE_IDS, TICKET_VERSION } from '../src/race-compatibility.js';
 
 let local: Awaited<ReturnType<typeof startLocalDatabase>>;
 let directory: string;
@@ -160,6 +160,8 @@ test('ticket is signed, short-lived and issued only with session and CSRF', asyn
   const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
   assert.equal(payload.player_id, client.user.id);
   assert.equal(payload.match_id, 'prototype-1');
+  assert.equal(payload.style_id, 'handling');
+  assert.equal(result.styleId, 'handling');
   assert.ok(payload.expires_at <= Math.floor(Date.now() / 1000) + 60);
   assert.ok(payload.expires_at > Math.floor(Date.now() / 1000));
   const track = loadTrackManifest(config.trackManifestPath);
@@ -173,6 +175,45 @@ test('ticket is signed, short-lived and issued only with session and CSRF', asyn
   assert.equal(payload.track.track_id, track.track_id);
   const account = await login(client);
   assert.equal((await post(account, '/api/race/ticket', {})).json().playerId, account.user.id);
+});
+
+test('all four styles are signed without accepting client-owned vehicle stats', async () => {
+  const client = await guest();
+  for (const styleId of STYLE_IDS) {
+    const response = await post(client, '/api/race/ticket', { styleId });
+    assert.equal(response.statusCode, 200, response.body);
+    const result = response.json();
+    const [body, signature] = result.ticket.split('.');
+    assert.equal(signature, createHmac('sha256', config.raceTicketSecret!).update(body).digest('base64url'));
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString());
+    assert.equal(payload.style_id, styleId);
+    assert.equal(result.styleId, styleId);
+    assert.equal(payload.player_id, client.user.id);
+    assert.equal(payload.loadout_hash, 'prototype-v6');
+    assert.equal(payload.protocol_version, 4);
+    assert.equal(payload.v, 3);
+  }
+  for (const payload of [
+    { styleId: 'balanced' }, { styleId: '' }, { styleId: 'SPEED' },
+    { styleId: null }, { styleId: 1 }, { styleId: ['drift'] },
+    { styleId: 'speed', topSpeed: 999 }, { styleId: 'drift', stats: { grip: 999 } },
+    { style_id: 'speed' }, { loadout_hash: 'prototype-v6' },
+  ]) {
+    const response = await post(client, '/api/race/ticket', payload);
+    assert.equal(response.statusCode, 400, JSON.stringify(payload));
+    assert.equal(response.json().error, 'invalid_request');
+  }
+});
+
+test('style selection preserves origin, CSRF and session protections', async () => {
+  const client = await guest();
+  const payload = { styleId: 'drift' };
+  assert.equal((await app.inject({ method: 'POST', url: '/api/race/ticket', payload, headers: { origin: config.origin } })).statusCode, 401);
+  assert.equal((await post(client, '/api/race/ticket', payload, { origin: 'https://evil.example' })).statusCode, 403);
+  assert.equal((await post(client, '/api/race/ticket', payload, { 'x-csrf-token': 'invalid' })).statusCode, 403);
+  const account = await login(client);
+  assert.equal((await post(client, '/api/race/ticket', payload)).statusCode, 401);
+  assert.equal((await post(account, '/api/race/ticket', payload)).json().styleId, 'drift');
 });
 
 test('race startup fails closed for a missing or untrusted manifest path', () => {

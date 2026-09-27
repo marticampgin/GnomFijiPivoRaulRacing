@@ -81,7 +81,7 @@ func _run() -> void:
 
 
 func _snapshot(tick: int, ack: int, state: Dictionary) -> Dictionary:
-	return {"type": "snapshot", "tick": tick, "countdown": 0.0, "players": [{"id": "probe", "slot": 0, "ack": ack, "epoch": 0, "state": state}]}
+	return {"type": "snapshot", "tick": tick, "countdown": 0.0, "players": [{"id": "probe", "slot": 0, "ack": ack, "epoch": 0, "style_id": "handling", "state": state}]}
 
 
 func _check(condition: bool, label: String) -> void:

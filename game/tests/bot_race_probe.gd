@@ -2,6 +2,7 @@ extends SceneTree
 
 const Track = preload("res://track/authored_track.gd")
 const Vehicle = preload("res://vehicle/racing_vehicle.gd")
+const Styles = preload("res://vehicle/driving_styles.gd")
 const Driver = preload("res://ai/racing_bot_driver.gd")
 const Contacts = preload("res://vehicle/vehicle_contacts.gd")
 
@@ -22,6 +23,7 @@ func _run() -> void:
 	var racers: Array = []
 	for slot: int in 10:
 		var car := Vehicle.new()
+		car.configure(Styles.stats_for(Styles.IDS[slot % Styles.IDS.size()]))
 		var collider := CollisionShape3D.new()
 		collider.shape = Vehicle.create_collision_shape()
 		car.add_child(collider)
@@ -74,7 +76,7 @@ func _run() -> void:
 		passed = passed and racer.recoveries == 0 and racer.finish_events == 1 and racer.progress.lap == 3
 		var stopped: Dictionary = racer.driver.sample(racer.car, racer.progress, 1.0 / 60.0)
 		passed = passed and stopped.throttle == 0.0 and stopped.brake == 1.0
-		report.append({"slot": slot, "seconds": racer.finish_tick / 60.0, "laps": racer.progress.lap,
+		report.append({"slot": slot, "style": Styles.IDS[slot % Styles.IDS.size()], "seconds": racer.finish_tick / 60.0, "laps": racer.progress.lap,
 			"recoveries": racer.recoveries, "finish_events": racer.finish_events})
 		# A restart must not retain a stalled driver's recovery request.
 		racer.car.reset_at(track.spawn_transform(slot))

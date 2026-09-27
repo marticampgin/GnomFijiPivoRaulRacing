@@ -3,7 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 import type { Config } from './config.js';
 import { transaction } from './database.js';
 import { DEV_PROFILES, DevIdentityProvider } from './identity.js';
-import { loadTrackManifest, raceCompatibility, TICKET_VERSION, type TrackManifest } from './race-compatibility.js';
+import { loadTrackManifest, raceCompatibility, STYLE_IDS, TICKET_VERSION, type StyleId, type TrackManifest } from './race-compatibility.js';
 
 export class AuthError extends Error {
   constructor(public statusCode: number, public code: string) { super(code); }
@@ -151,16 +151,17 @@ export class AuthService {
     });
   }
 
-  async ticket(token: string) {
+  async ticket(token: string, styleId: StyleId = 'handling') {
+    if (!STYLE_IDS.includes(styleId)) throw new AuthError(400, 'invalid_request');
     if (!this.config.raceTicketSecret || !this.config.websocketUrl || !this.trackManifest) throw new AuthError(503, 'race_unavailable');
     const profile = await this.bootstrap(token);
     const compatibility = raceCompatibility(this.trackManifest);
     const payload = {
-      v: TICKET_VERSION, match_id: 'prototype-1', player_id: profile.user.id, display_name: profile.user.displayName,
+      v: TICKET_VERSION, match_id: 'prototype-1', player_id: profile.user.id, display_name: profile.user.displayName, style_id: styleId,
       ...compatibility, expires_at: Math.floor(Date.now() / 1000) + 60, jti: randomUUID(),
     };
     const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
     const signature = createHmac('sha256', this.config.raceTicketSecret).update(body).digest('base64url');
-    return { ticket: `${body}.${signature}`, websocketUrl: this.config.websocketUrl, matchId: payload.match_id, playerId: payload.player_id, compatibility, track: this.trackManifest };
+    return { ticket: `${body}.${signature}`, websocketUrl: this.config.websocketUrl, matchId: payload.match_id, playerId: payload.player_id, styleId, compatibility, track: this.trackManifest };
   }
 }

@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(resolve(root, 'shared/track-manifest.json'), 'utf8'));
 const { track_id, schema_version, simulation_revision, simulation_hash, art_revision } = manifest;
-const compatibility = { protocol_version: 3, vehicle_state_version: 1, loadout_hash: 'prototype-v5', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
+const compatibility = { protocol_version: 4, vehicle_state_version: 1, loadout_hash: 'prototype-v6', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
 const secret = 'network-probe-only-not-a-deployment-secret-2026';
 const port = Number(process.env.NETWORK_TEST_PORT || 19080);
 const url = `ws://127.0.0.1:${port}`;
@@ -26,7 +26,7 @@ worker.stderr.on('data', value => { output += value; });
 worker.on('error', error => { output += error.message; });
 
 function ticket(id, changes = {}) {
-  const payload = Buffer.from(JSON.stringify({ v: 2, ...compatibility, match_id: 'prototype-1', expires_at: Math.floor(Date.now() / 1000) + 60, player_id: id, display_name: `Probe ${id}`, jti: randomUUID(), ...changes })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({ v: 3, ...compatibility, style_id: 'handling', match_id: 'prototype-1', expires_at: Math.floor(Date.now() / 1000) + 60, player_id: id, display_name: `Probe ${id}`, jti: randomUUID(), ...changes })).toString('base64url');
   return `${payload}.${createHmac('sha256', secret).update(payload).digest('base64url')}`;
 }
 
@@ -89,6 +89,9 @@ try {
   await rejectTicket(ticket('wrong-match', { match_id: 'other' }), 'wrong match rejected');
   await rejectTicket(ticket('old-protocol', { protocol_version: 1 }), 'signed stale wire protocol rejected');
   await rejectTicket(ticket('previous-protocol', { protocol_version: 2 }), 'pre-lifecycle wire protocol rejected');
+  await rejectTicket(ticket('pre-styles', { protocol_version: 3 }), 'pre-style wire protocol rejected');
+  await rejectTicket(ticket('bad-style', { style_id: 'faster' }), 'unknown signed style rejected');
+  await rejectTicket(ticket('missing-style', { style_id: undefined }), 'missing signed style rejected');
   await rejectTicket(ticket('bot:1'), 'reserved bot identity rejected');
   await rejectTicket(ticket('wrong-state', { vehicle_state_version: 999 }), 'signed unsupported vehicle state schema rejected');
   await rejectTicket(ticket('old-vehicle', { loadout_hash: 'prototype-v1' }), 'signed old vehicle simulation rejected');
@@ -115,6 +118,7 @@ try {
   const grid = await waitFor(() => first.messages.find(message => message.type === 'snapshot' && message.players.length === 10 && message.players.filter(player => !player.is_bot).length === 2), 'two humans and eight bots');
   verify(true, 'two real WebSocket clients share authoritative snapshot');
   verify(new Set(grid.players.map(player => player.slot)).size === 10, 'ten racers have distinct grid slots');
+  verify(new Set(grid.players.filter(player => player.is_bot).map(player => player.style_id)).size === 4, 'bots use all four authoritative styles');
   await waitFor(() => first.messages.find(message => message.type === 'snapshot' && message.countdown === 0), 'countdown complete', 8000);
   const before = ownState(first, 'driver-a').state.position;
   let sequence = first.ack;
@@ -136,9 +140,10 @@ try {
   verify(true, 'stale input brakes authoritative car after external pushes settle');
   first.socket.close();
   await waitFor(() => first.closed, 'disconnect');
-  const resumed = await joined('driver-a');
+  const resumed = await joined('driver-a', ticket('driver-a', { style_id: 'drift' }));
   verify(resumed.ack === sequence, 'new signed ticket reconnects with acknowledged sequence');
   const resumedState = await waitFor(() => ownState(resumed, 'driver-a'), 'resumed snapshot');
+  verify(resumedState.style_id === 'handling' && resumedState.next_style_id === 'drift', 'reconnect locks current style and queues next race style');
   verify(Math.hypot(...resumedState.state.position.map((value, index) => value - stopped.state.position[index])) < 0.5, 'reconnect preserves server position');
   resumed.socket.send(JSON.stringify({ type: 'input', sequence, steering: 0, throttle: 1, brake: 0, drift: false }));
   await waitFor(() => resumed.closed, 'sequence replay close');

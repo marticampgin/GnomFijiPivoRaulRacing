@@ -78,12 +78,17 @@ func run() -> void:
 	race._players["waiting"] = race._new_player("waiting", "Waiting", 9, false)
 	race._players["waiting"]["spectator"] = true
 	race._players["a"]["accepted"] = 22
+	race._players["a"]["next_style_id"] = "drift"
+	check(race._players["a"]["style_id"] == "handling", "queued build does not modify completed race")
 	race._players["a"]["queue"].append({"sequence": 22})
 	var epoch: int = race._players["a"]["epoch"]
 	race._on_packet(2, {"type": "restart", "race_id": 1})
 	check(race._race_id == 2 and race._phase == "countdown", "all human votes start one new race")
+	check(race._players["a"]["style_id"] == "drift" and race._players["a"]["vehicle"].stats["drift"] == 1.5, "new race applies queued authoritative build")
 	check(race._players.size() == 10 and not race._players["waiting"]["spectator"], "waiting human promoted and bots refill remaining slots")
 	check(race._players["a"]["epoch"] == epoch + 1 and race._players["a"]["queue"].is_empty() and race._players["a"]["ack"] == 22, "reset clears pending commands and increments epoch")
+	race._recover(race._players["a"])
+	check(race._players["a"]["style_id"] == "drift" and race._players["a"]["vehicle"].stats["drift"] == 1.5, "recovery preserves selected build")
 	check(not race._players["a"]["finished"] and not race._players["a"]["ready"] and not race._players["b"]["dnf"], "prior result and ready state cleared")
 	check(race._players["a"]["previous_position"] == race._players["a"]["vehicle"].global_position, "reset sweep begins at actual spawn")
 	race._on_packet(2, {"type": "restart", "race_id": 1})

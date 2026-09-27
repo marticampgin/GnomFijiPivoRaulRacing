@@ -9,6 +9,7 @@ import type { Pool } from 'pg';
 import type { Config } from './config.js';
 import { assertDatabaseEnvironment } from './database.js';
 import { AuthError, AuthService, equal } from './auth.js';
+import { STYLE_IDS, type StyleId } from './race-compatibility.js';
 
 const uuid = { type: 'string', format: 'uuid' };
 const empty = { type: 'object', additionalProperties: false, properties: {} };
@@ -87,7 +88,10 @@ export async function buildApp(config: Config, pool: Pool, options: { staticRoot
     preHandler: protect,
     schema: { body: body({ targetAccountId: uuid, confirmed: { type: 'boolean' }, mergeId: uuid }, ['targetAccountId', 'confirmed', 'mergeId']) },
   }, async (request) => auth.merge(token(request)!, request.body));
-  app.post('/api/race/ticket', { preHandler: protect, schema: { body: empty } }, async (request) => auth.ticket(token(request)!));
+  app.post<{ Body: { styleId?: StyleId } }>('/api/race/ticket', {
+    preHandler: protect,
+    schema: { body: body({ styleId: { type: 'string', enum: STYLE_IDS } }, []) },
+  }, async (request) => auth.ticket(token(request)!, request.body.styleId));
 
   if (options.staticRoot !== false) {
     const root = options.staticRoot ?? fileURLToPath(new URL('../../', import.meta.url));

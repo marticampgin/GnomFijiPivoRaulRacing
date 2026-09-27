@@ -45,7 +45,7 @@ func _run() -> void:
 	client._joined = true
 	client._player_id = "probe"
 	client._last_server_ms = Time.get_ticks_msec()
-	client._queue_snapshot({"type": "snapshot", "tick": 9, "countdown": 0.0, "players": [{"id": "probe", "slot": 0, "ack": 0, "epoch": 0, "state": state}]})
+	client._queue_snapshot({"type": "snapshot", "tick": 9, "countdown": 0.0, "players": [{"id": "probe", "slot": 0, "ack": 0, "epoch": 0, "style_id": "handling", "state": state}]})
 	_check(client._tick == 0 and client._local == null, "receive does not mutate physics body")
 	client._queue_snapshot({"type": "snapshot", "tick": 6, "countdown": 0.0, "players": []})
 	_check(client._queued_snapshot.get("tick") == 9, "buffer keeps latest snapshot")
@@ -53,6 +53,7 @@ func _run() -> void:
 	await process_frame
 	_check(client.applied_in_physics, "restore and replay execute inside physics callback")
 	_check(client._tick == 9 and client._local != null, "physics consumes queued snapshot")
+	_check(is_equal_approx(client._local.stats["handling"], 1.18), "client uses authoritative handling profile before replay")
 	if client._local == null:
 		client.free()
 		track.free()
@@ -62,14 +63,14 @@ func _run() -> void:
 	_check(client._queued_snapshot.is_empty(), "snapshot consumed once")
 	client._pending = [{"type": "input", "sequence": 1, "steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false}, {"type": "input", "sequence": 2, "steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false}]
 	client._sequence = 2
-	client._queue_snapshot({"type": "snapshot", "tick": 12, "countdown": 0.0, "players": [{"id": "probe", "slot": 0, "ack": 1, "epoch": 0, "state": state}]})
+	client._queue_snapshot({"type": "snapshot", "tick": 12, "countdown": 0.0, "players": [{"id": "probe", "slot": 0, "ack": 1, "epoch": 0, "style_id": "handling", "state": state}]})
 	await physics_frame
 	await process_frame
 	_check(client._pending.all(func(command: Dictionary) -> bool: return int(command["sequence"]) > 1), "acknowledged commands removed before replay")
 	_check(client._pending.any(func(command: Dictionary) -> bool: return int(command["sequence"]) == 2), "unacknowledged command retained and replayed")
 	client.set_process(false)
 	client._last_server_ms = Time.get_ticks_msec() - 7000
-	client.waiting_packet = {"type": "snapshot", "tick": 15, "countdown": 0.0, "players": [{"id": "probe", "slot": 0, "ack": client._sequence, "epoch": 0, "state": state}]}
+	client.waiting_packet = {"type": "snapshot", "tick": 15, "countdown": 0.0, "players": [{"id": "probe", "slot": 0, "ack": client._sequence, "epoch": 0, "style_id": "handling", "state": state}]}
 	await physics_frame
 	await process_frame
 	_check(client._joined and client._local != null, "resumed physics polls waiting packet before stale timeout")
@@ -79,9 +80,9 @@ func _run() -> void:
 	var moving_state: Dictionary = state.duplicate(true)
 	moving_state["velocity"] = [3.0, -20.0, 4.0]
 	client._queue_snapshot({"type": "snapshot", "tick": 16, "countdown": 0.0, "players": [
-		{"id": "probe", "slot": 0, "ack": client._sequence, "epoch": 0, "state": state},
-		{"id": "falling", "slot": 1, "state": falling_state},
-		{"id": "moving", "slot": 2, "state": moving_state},
+		{"id": "probe", "slot": 0, "ack": client._sequence, "epoch": 0, "style_id": "handling", "state": state},
+		{"id": "falling", "slot": 1, "style_id": "handling", "state": falling_state},
+		{"id": "moving", "slot": 2, "style_id": "handling", "state": moving_state},
 	]})
 	await physics_frame
 	await process_frame

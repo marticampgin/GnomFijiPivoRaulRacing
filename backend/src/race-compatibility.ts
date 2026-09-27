@@ -1,10 +1,12 @@
 import { readFileSync } from 'node:fs';
 
-export const WIRE_VERSION = 3;
-export const TICKET_VERSION = 2;
+export const WIRE_VERSION = 4;
+export const TICKET_VERSION = 3;
 export const VEHICLE_STATE_VERSION = 1;
 export const TRACK_SCHEMA_VERSION = 1;
-export const LOADOUT_HASH = 'prototype-v5';
+export const LOADOUT_HASH = 'prototype-v6';
+export const STYLE_IDS = ['handling', 'acceleration', 'speed', 'drift'] as const;
+export type StyleId = typeof STYLE_IDS[number];
 
 export interface TrackIdentity {
   track_id: string;

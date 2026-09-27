@@ -2,12 +2,13 @@ class_name PrototypeProtocol
 extends RefCounted
 
 const Vehicle = preload("res://vehicle/racing_vehicle.gd")
-const WIRE_VERSION: int = 3
-const TICKET_VERSION: int = 2
+const Styles = preload("res://vehicle/driving_styles.gd")
+const WIRE_VERSION: int = 4
+const TICKET_VERSION: int = 3
 const VEHICLE_STATE_VERSION: int = Vehicle.STATE_VERSION
 const TRACK_SCHEMA_VERSION: int = 1
 const MATCH_ID: String = "prototype-1"
-const LOADOUT_HASH: String = "prototype-v5"
+const LOADOUT_HASH: String = "prototype-v6"
 const NEUTRAL: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false}
 
 
@@ -115,6 +116,8 @@ static func verify_ticket(ticket: String, secret: String, now: int, expected_tra
 	if claims.get("v") != TICKET_VERSION or not compatible(claims, expected_track):
 		return {}
 	if claims.get("match_id") != MATCH_ID or claims.get("loadout_hash") != LOADOUT_HASH:
+		return {}
+	if not Styles.is_valid(claims.get("style_id")):
 		return {}
 	if not _number(claims.get("expires_at")) or float(claims["expires_at"]) != floorf(float(claims["expires_at"])):
 		return {}

@@ -22,11 +22,20 @@
       <h1>GNOM FIJI</h1>
       <p class="subtitle">P.I.V.O RAUL RACING</p>
       <div class="race-choice"><span class="eyebrow">ТВОЯ СЛЕДУЮЩАЯ ГОНКА</span><h2>Тестовый заезд</h2><p>Трасса 01 <span>·</span> 3 круга <span>·</span> Без рейтинга</p></div>
+      <fieldset id="driving-style" class="style-settings">
+        <legend>Стиль вождения</legend>
+        <div class="style-options">
+          <label><input type="radio" name="driving-style" value="handling" checked><span>Управляемость</span></label>
+          <label><input type="radio" name="driving-style" value="acceleration"><span>Ускорение</span></label>
+          <label><input type="radio" name="driving-style" value="speed"><span>Скорость</span></label>
+          <label><input type="radio" name="driving-style" value="drift"><span>Дрифт</span></label>
+        </div>
+      </fieldset>
       <button id="join-button" class="primary" disabled><span>ВЫЙТИ НА ТРАССУ</span><img src="/assets/icons/arrow-up-right.svg" alt=""></button>
       <div id="load-state" class="load-state" role="status"><span id="load-label">Загрузка игры</span><progress id="load-progress" max="100" value="0"></progress></div>
       <p id="hub-error" class="error" role="alert" hidden></p>
     </section>
-    <aside class="selected-car"><span class="mode-tag secondary">ВЫБРАНО</span><h3>Машина 01</h3><p>Сборка: управляемость</p></aside>
+    <aside class="selected-car"><span class="mode-tag secondary">ВЫБРАНО</span><h3>Машина 01</h3><p>Сборка: <span id="selected-style">Управляемость</span></p></aside>
     <footer class="hub-footer"><span>GNOM FIJI / P.I.V.O RAUL RACING</span><span id="connection-label">Подключение</span></footer>
   </main>
   <section id="hud" class="hud" aria-label="Гоночные показатели" hidden>
@@ -51,6 +60,8 @@
   </dialog>
   <dialog id="menu-dialog" aria-labelledby="menu-title">
     <div class="dialog-heading"><h2 id="menu-title">Гонка продолжается</h2><button class="icon-button close-dialog" aria-label="Закрыть"><img src="/assets/icons/x.svg" alt=""></button></div>
+    <p class="active-style">Сборка: <span id="active-style">Управляемость</span></p>
+    <p id="next-style" class="active-style" hidden>Следующий заезд: <span id="next-style-name"></span></p>
     <button id="resume-button" class="primary">ПРОДОЛЖИТЬ</button>
     <button id="recover-button" class="secondary-button"><img src="/assets/icons/rotate-ccw.svg" alt="">Вернуть машину</button>
     <fieldset class="graphics-settings">

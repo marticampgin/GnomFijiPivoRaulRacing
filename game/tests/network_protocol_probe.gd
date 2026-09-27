@@ -30,10 +30,19 @@ func _run() -> void:
 	var manifest: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://track/baked/castle_waterfalls.json"))
 	var compatibility: Dictionary = Protocol.compatibility(manifest)
 	_check(not compatibility.is_empty(), "actual baked simulation has a valid compatibility descriptor")
-	var claims: Dictionary = {"v": Protocol.TICKET_VERSION, "match_id": "prototype-1", "expires_at": now + 60, "player_id": "test-player", "display_name": "Test Racer", "jti": "test-once"}
+	var claims: Dictionary = {"v": Protocol.TICKET_VERSION, "style_id": "handling", "match_id": "prototype-1", "expires_at": now + 60, "player_id": "test-player", "display_name": "Test Racer", "jti": "test-once"}
 	claims.merge(compatibility)
 	var ticket: String = _sign(claims, secret)
 	_check(not Protocol.verify_ticket(ticket, secret, now, manifest).is_empty(), "valid signed ticket")
+	for style: String in ["handling", "acceleration", "speed", "drift"]:
+		var styled: Dictionary = claims.duplicate(true)
+		styled["style_id"] = style
+		_check(Protocol.verify_ticket(_sign(styled, secret), secret, now, manifest).get("style_id") == style, "signed style %s" % style)
+	var invalid_style: Dictionary = claims.duplicate(true)
+	invalid_style["style_id"] = "cheat"
+	_check(Protocol.verify_ticket(_sign(invalid_style, secret), secret, now, manifest).is_empty(), "unknown style rejected")
+	invalid_style.erase("style_id")
+	_check(Protocol.verify_ticket(_sign(invalid_style, secret), secret, now, manifest).is_empty(), "missing style rejected")
 	_check(Protocol.verify_ticket(ticket, "wrong-secret-that-is-also-over-32-chars", now, manifest).is_empty(), "wrong signature")
 	_check(Protocol.verify_ticket(ticket, secret, now + 60, manifest).is_empty(), "expired ticket")
 	_check(Protocol.verify_ticket(ticket + "=", secret, now, manifest).is_empty(), "noncanonical signature")

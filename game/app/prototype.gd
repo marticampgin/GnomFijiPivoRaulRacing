@@ -1,6 +1,7 @@
 extends Node3D
 
 const Vehicle = preload("res://vehicle/racing_vehicle.gd")
+const Styles = preload("res://vehicle/driving_styles.gd")
 const Track = preload("res://track/authored_track.gd")
 const Protocol = preload("res://net/prototype_protocol.gd")
 const Transport = preload("res://net/prototype_socket_server.gd")
@@ -305,12 +306,14 @@ func _join_server(peer_id: int, ticket: String) -> void:
 		var slot: int = 0
 		while slot in occupied:
 			slot += 1
-		_players[id] = _new_player(id, claims["display_name"], mini(slot, MAX_PLAYERS - 1), false)
+		_players[id] = _new_player(id, claims["display_name"], mini(slot, MAX_PLAYERS - 1), false, claims["style_id"])
 		_players[id]["peer_id"] = peer_id
 		_players[id]["spectator"] = spectator
 		if _countdown < 0:
 			_start_race()
 	var player: Dictionary = _players[id]
+	# A fresh ticket may request the next build, never rewrite an active race.
+	player["next_style_id"] = claims["style_id"]
 	var previous_peer: int = int(player["peer_id"])
 	if previous_peer != peer_id:
 		_peer_players.erase(previous_peer)
@@ -349,10 +352,14 @@ func _human_count() -> int:
 	return count
 
 
-func _new_player(id: String, display_name: String, slot: int, bot: bool) -> Dictionary:
+func _new_player(id: String, display_name: String, slot: int, bot: bool, style_id: String = Styles.DEFAULT_ID) -> Dictionary:
 	var vehicle: CharacterBody3D = _create_vehicle(slot, false)
+	if bot:
+		style_id = Styles.IDS[slot % Styles.IDS.size()]
+	vehicle.configure(Styles.stats_for(style_id))
 	vehicle.reset_at(_track.spawn_transform(slot))
 	return {"id": id, "name": display_name, "slot": slot, "vehicle": vehicle,
+		"style_id": style_id, "next_style_id": style_id,
 		"is_bot": bot, "driver": BotDriver.new(_track, slot) if bot else null,
 		"spectator": false, "ready": bot, "dnf": false,
 		"peer_id": 0, "connected": true, "disconnected_at": 0, "last_input_at": 0,
@@ -444,6 +451,8 @@ func _recover(player: Dictionary) -> void:
 
 
 func _reset_race(player: Dictionary) -> void:
+	player["style_id"] = player.get("next_style_id", Styles.DEFAULT_ID)
+	player["vehicle"].configure(Styles.stats_for(player["style_id"]))
 	player["lap"] = 1
 	player["progress"] = _track.initial_progress()
 	player["finished"] = false
@@ -470,6 +479,7 @@ func _broadcast_snapshot() -> void:
 	for index: int in standings.size():
 		var player: Dictionary = standings[index]
 		entries.append({"id": player["id"], "name": player["name"], "slot": player["slot"],
+			"style_id": player["style_id"], "next_style_id": player["next_style_id"],
 			"position": 0 if player["spectator"] else index + 1, "lap": mini(RACE_LAPS, int(player["lap"])), "finished": player["finished"],
 			"is_bot": player["is_bot"], "spectator": player["spectator"], "ready": player["ready"], "dnf": player["dnf"],
 			"connected": player["connected"], "elapsed": player["elapsed"], "ack": player["ack"], "epoch": player["epoch"],
@@ -669,6 +679,9 @@ func _apply_snapshot(packet: Dictionary) -> void:
 	for entry: Variant in packet["players"]:
 		if not entry is Dictionary or not entry.get("state") is Dictionary:
 			continue
+		if not Styles.is_valid(entry.get("style_id")):
+			_leave("update_required")
+			return
 		var state: Dictionary = Protocol.unpack_state(entry["state"])
 		if state.is_empty():
 			continue
@@ -683,6 +696,7 @@ func _apply_snapshot(packet: Dictionary) -> void:
 		if id == _player_id:
 			if _local == null:
 				_local = _create_vehicle(int(entry.get("slot", 0)), true)
+			_local.configure(Styles.stats_for(entry["style_id"]))
 			var before: Vector3 = _local.global_position
 			var ack: int = int(entry.get("ack", 0))
 			_pending = _pending.filter(func(command: Dictionary) -> bool: return int(command["sequence"]) > ack)
@@ -846,6 +860,7 @@ func _publish_hud() -> void:
 	var location: Vector3 = Vector3.ZERO if _local == null else _local.global_position
 	var forward: Vector3 = Vector3.FORWARD if _local == null else -_local.global_basis.z
 	var data: Dictionary = {"status": _status, "playerId": _player_id, "players": _hud.get("players", []),
+		"styleId": _hud.get("style_id", Styles.DEFAULT_ID), "nextStyleId": _hud.get("next_style_id", Styles.DEFAULT_ID),
 		"raceId": _race_id, "phase": _phase, "spectating": _hud.get("spectator", false),
 		"repeatReady": _hud.get("ready", false), "dnf": _hud.get("dnf", false),
 		"canRestart": _phase == "results" and not _hud.get("ready", false) and not _hud.get("spectator", false),
