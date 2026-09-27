@@ -1,0 +1,13 @@
+.control-settings{position:relative;min-width:0;margin:20px 0 0;padding:16px 0 0;border:0;border-top:1px solid #3b4540;color:#f5f7f4;letter-spacing:0}
+.control-settings legend{padding:0 12px 0 0;font-size:16px;font-weight:700}
+.control-settings-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px 24px;padding-right:52px}
+.control-settings-row{display:grid;grid-template-columns:minmax(0,1fr) 52px;align-items:center;gap:8px 10px;min-width:0}
+.control-settings-row>label{grid-column:1/-1;font-size:14px;color:#b9c7bf;overflow-wrap:anywhere}
+.control-settings-row>select{grid-column:1/-1;width:100%;min-width:0;border:1px solid #617268;border-radius:4px;padding:10px;background:#242c27;color:#f5f7f4;font:inherit}
+.control-settings-row>input[type=range]{width:100%;min-width:0;height:32px;margin:0;accent-color:#64e3db;cursor:pointer}
+.control-settings-row>output{font-size:14px;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.control-settings-reset{position:absolute;right:0;top:16px;display:grid;place-items:center;width:40px;height:40px;padding:8px;border:1px solid #617268;border-radius:4px;background:#242c27;cursor:pointer}
+.control-settings-reset>img{width:20px;height:20px}
+.control-settings-reset:hover{background:#34483c}
+.control-settings :is(button,select,input):focus-visible{outline:2px solid #ffd36b;outline-offset:3px}
+@media(max-width:520px){.control-settings-grid{grid-template-columns:minmax(0,1fr);gap:16px;padding-right:0}.control-settings-row:first-child{padding-right:52px}}

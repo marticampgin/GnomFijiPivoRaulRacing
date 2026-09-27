@@ -1,0 +1,86 @@
+name: gnom-arm-stand
+
+services:
+  database:
+    image: ${POSTGRES_IMAGE:?Run node infra/arm/stand.mjs init}
+    platform: linux/arm64
+    network_mode: host
+    environment:
+      POSTGRES_USER: gnom_stand
+      POSTGRES_DB: gnom_stand
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?Missing generated stand secret}
+      PGDATA: /var/lib/postgresql/18/docker
+    command: ["postgres", "-c", "listen_addresses=127.0.0.1", "-c", "port=55432", "-c", "max_connections=30", "-c", "shared_buffers=128MB"]
+    volumes:
+      - database:/var/lib/postgresql
+    cpus: 1.0
+    mem_limit: 1g
+    pids_limit: 100
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-p", "55432", "-U", "gnom_stand", "-d", "gnom_stand"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/arm/api.Dockerfile
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:?Missing locked Node image}
+    platform: linux/arm64
+    network_mode: host
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DEPLOYMENT_ENV: test
+      DEV_AUTH_ENABLED: "true"
+      HOST: 127.0.0.1
+      PORT: "8787"
+      APP_ORIGIN: http://127.0.0.1:8787
+      DATABASE_URL: postgresql://gnom_stand:${DATABASE_PASSWORD:?Missing generated stand secret}@127.0.0.1:55432/gnom_stand
+      SESSION_SECRET: ${SESSION_SECRET:?Missing generated stand secret}
+      RACE_TICKET_SECRET: ${RACE_TICKET_SECRET:?Missing generated stand secret}
+      RACE_WEBSOCKET_URL: ws://127.0.0.1:9080
+    cpus: 1.0
+    mem_limit: 512m
+    pids_limit: 100
+    read_only: true
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/api/health').then(async r=>{if(!r.ok||(await r.json()).environment!=='test')process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  race:
+    build:
+      context: ../..
+      dockerfile: infra/arm/race.Dockerfile
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:?Missing locked Node image}
+    platform: linux/arm64
+    network_mode: host
+    environment:
+      RACE_TICKET_SECRET: ${RACE_TICKET_SECRET:?Missing generated stand secret}
+      RACE_PORT: "9080"
+      HOME: /tmp
+    cpus: ${RACE_CPUS:-2.0}
+    mem_limit: 1g
+    pids_limit: 100
+    read_only: true
+    tmpfs: ["/tmp:size=64m,mode=1777"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    stop_grace_period: 10s
+    healthcheck:
+      test: ["CMD", "node", "-e", "const s=require('node:net').connect(9080,'127.0.0.1');s.once('connect',()=>{s.destroy();process.exit(0)});s.once('error',()=>process.exit(1));setTimeout(()=>process.exit(1),2000)"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+volumes:
+  database:

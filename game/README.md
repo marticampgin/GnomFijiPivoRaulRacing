@@ -1,50 +1,73 @@
-# Основа Godot
+# Godot: технический прототип
 
-Проект на GDScript для Godot **4.7.2 stable**, Compatibility renderer.
-Это минимальная запускаемая заготовка, не игровой прототип: физика, гонки,
-сеть, сохранения, аккаунты и магазин ещё не реализованы.
+Godot **4.7.2 stable**, GDScript, Compatibility / WebGL 2.0, single-thread Web.
+Одна машина, три круга и цикл дрифта с ускорением. Текущие исходники используют
+авторский маршрут длиной 798 м с перепадом около 16 м; старый овал
+сохранён как отдельная regression fixture и в прежнем локальном стенде.
+В исходниках подключены внутренний environment study и Blender/GLB blockout:
+гном в красном колпаке, бирюзовый карт, каменная дорога, лес, мост, замок и водопады.
+Это проверка композиции и производства ассетов, не принятые финальные модели,
+UV/rig/LOD или окончательное направление окружения. Состав реально обновлённого
+браузерного стенда и его проверки фиксируются в [delivery](../docs/delivery.md).
+Источники и ограничения: [art/README](art/README.md).
 
 ## Запуск
 
-Откройте `project.godot` в Godot 4.7.2 и запустите главную сцену.
-Она показывает название проекта и статус подготовки.
+Полный браузерный путь с аккаунтом и headless-сервером описан в [README](../README.md#локальный-запуск).
+Web-экспорту нужна HTML-оболочка и API: простой статический сервер не заменяет этот путь.
 
-Проверка из корня репозитория при наличии Godot в PATH:
+Для самостоятельной проверки физики открыть `project.godot` в Godot 4.7.2 и запустить главную сцену.
+Native-preview создаёт локальную машину без авторизации, рейтинга и наград.
 
 ```sh
 godot --headless --path game --editor --import
-godot --headless --path game --quit-after 3
+godot --headless --path game --script res://tests/vehicle_probe.gd
+godot --headless --path game --script res://tests/track_probe.gd
+godot --headless --path game --script res://tests/authored_track_probe.gd
+godot --headless --path game --fixed-fps 60 --script res://tests/authored_drive_probe.gd
+godot --headless --path game --fixed-fps 60 --script res://tests/slope_drive_probe.gd
+godot --headless --path game --script res://tests/route_study_probe.gd
+godot --headless --path game --script res://tests/camera_probe.gd
+godot --headless --path game --script res://tests/authored_kart_probe.gd
+godot --headless --path game --script res://tests/graphics_settings_probe.gd
+godot --headless --path game --script res://tests/visual_asset_probe.gd
+godot --headless --path game --script res://tests/network_protocol_probe.gd
+godot --headless --path game --script res://tests/network_client_probe.gd
+godot --headless --path game --script res://tests/network_resume_probe.gd
 ```
 
-Проверено 2026-09-26 на macOS arm64 с официальной portable-сборкой
-`4.7.2.stable.official.ed1daf0bf`: импорт редактором и запуск главной сцены
-на два кадра завершились с кодом 0 без ошибок. Это headless-проверка;
-визуальный запуск и Web-экспорт ещё не проверены.
+Зафиксированные templates, контрольные суммы и Web/ARM64 export: [toolchain](../docs/toolchain.md).
+Серверные билеты, лимиты и запуск интеграционного теста: [сетевой прототип](../docs/network-prototype.md).
+Выбор контроллера, дрифт и локальная гравитация: [vehicle controller](../docs/vehicle-controller.md).
+Формат маршрута, bake, checkpoints и границы проверки: [authored route](track/AUTHORED_ROUTE.md).
+Редактируемый герой, GLB и ограничения blockout: [art source](../art-source/hero/README.md).
 
-## Экспорт в браузер
+## Визуальный этап
 
-Установите официальные export templates **той же версии 4.7.2**, затем:
+`authored_track_study.gd` строит визуальную сцену поверх того же bake. Непрозрачные
+скалы, архитектура и стволы получают одну client-only camera collision mesh:
+layer 4, mask 0. Машины используют mask 1; сервер этот набор не создаёт.
+Study проверен 58 assertions: совпадение дороги с коллизиями, направление всех
+36 шевронов, ориентиры, качество и неизменность simulation hash.
+Четыре native-ракурса проверяют композицию, но не заменяют браузерную приёмку.
 
-```sh
-mkdir -p build/web
-godot --headless --path game --export-release Web ../build/web/index.html
-python3 -m http.server 8080 --bind 127.0.0.1 --directory build/web
-```
+Камера вынесена в `view/race_camera.gd`: chase/look-back, реакция на уклон,
+сброс после teleport/recovery и защита камеры/near plane от дороги, барьеров
+и непрозрачного окружения. Вода, листва и другие машины не сокращают boom.
+Пять лучей проверяют центр и углы near plane; это не непрерывный sphere sweep
+и не окончательная приёмка камеры по всей ширине трассы.
+Поступательное движение отслеживается без накопления отставания на скорости;
+сглаживание применяется к относительному положению и направлению взгляда.
 
-Адрес локального экспорта: `http://127.0.0.1:8080`.
-Экспорт настроен без потоков и GDExtension, с WebGL 2.0 и сжатием текстур
-для desktop и mobile. Релиз для мобильных браузеров пока не заявлен.
-PWA и офлайн-кеширование пока отключены.
+В Web-меню реализованы Standard/Low и reduced-effects. Low уменьшает render scale,
+дальность теней и плотность/дальность листвы; reduced-effects приглушает водную
+анимацию и эффекты ускорения. Коллизии, checkpoints и физические параметры не
+меняются. Это не готовые LOD ассетов и не подтверждение бюджета десяти машин.
 
-## Граница управления
+## Управление
 
-`input/driver_input.gd` читает логические действия, не физические клавиши.
-Будущие сенсорные контролы передают те же действия через
-`Input.action_press()` / `Input.action_release()` либо `TouchScreenButton`.
-Виджеты управления не должны напрямую менять скорость, физику или инвентарь.
-Снимок ввода должен читаться один раз за физический тик; транспорт и серверная
-валидация появятся отдельно. Пауза относится к локальному UI и не останавливает
-онлайн-гонку.
+`input/driver_input.gd` читает логические действия один раз за physics tick.
+Будущий touch adapter должен передавать те же действия, не менять физику напрямую.
 
 | Действие | Клавиатура | Геймпад |
 | --- | --- | --- |
@@ -52,20 +75,24 @@ PWA и офлайн-кеширование пока отключены.
 | Газ | W, вверх | Правый триггер |
 | Тормоз | S, вниз | Левый триггер |
 | Дрифт | Пробел | A / нижняя кнопка |
-| Предмет 1 / 2 | Q / E | LB / RB |
-| Вид назад | C | Y / верхняя кнопка |
-| Меню | Escape | Start |
+| Вид назад | C | Пока не назначено |
+| Меню Web | Escape | Пока не подключено |
 
-Привязки зарегистрированы, но в стартовой сцене нет машины или предметов.
-Переназначение, touch UI, локализация строк и обработка потери фокуса входят
-в дальнейшую реализацию. Текст этой технической сцены пока задан напрямую.
+Предметы Q/E и соответствующие действия геймпада зарезервированы,
+но ещё не реализованы. В меню браузерного заезда доступны возврат на трассу и выход.
+Открытое меню и потеря фокуса снимают ввод; онлайн-гонка при этом не останавливается.
 
-## Источники и ограничения
+## Границы
 
-- [Официальная версия Godot](https://godotengine.org/download/macos/), проверена 2026-09-26.
-- [Экспорт для Web](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html):
-  GDScript, Compatibility/WebGL 2.0, ограничения браузерной сети и хранения.
+- Headless worker авторитетно считает физику на 60 Hz и отправляет снимки на 20 Hz.
+- Web-клиент предсказывает свою машину, сверяется с сервером и интерполирует соперников.
+- До 10 подключений ограничены протоколом; это не измеренная production-ёмкость сервера.
+- Машины пока не сталкиваются друг с другом; есть столкновения с трассой.
+- Нет предметов, ботов, разрушаемости, рейтинга, наград и постоянных результатов гонки.
+- Отработаны прыжок и отдельная локальная гравитация, но непрерывная трасса с 360-градусными участками ещё впереди.
+- Локальный WS допустим только для разработки. Сравнение WSS и WebRTC/native extension/TURN остаётся открытым.
+- ARM64 cross-export проверяет сборку, не запуск на Linux ARM и не FPS/CCU.
+- Мобильная компоновка оболочки не означает готовое сенсорное управление или поддержанную мобильную игру.
 
-Браузерная сборка не может использовать ENet/UDP напрямую. Сетевой транспорт
-должен быть WebSocket или WebRTC. Прогресс в IndexedDB может быть удалён
-браузером; покупки и рейтинговые результаты должны храниться на сервере.
+Источники: [Web export](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_web.html),
+[Godot](https://godotengine.org/). Секреты API и worker никогда не включаются в Web export.
