@@ -26,6 +26,8 @@ node scripts/qa/art-stage.cjs
 `browser-driver.cjs` joins as a fresh guest and drives with real keyboard input.
 Its default pass requires three laps, the authoritative `finished` flag, the
 result dialog, four route-anchor screenshots and a healthy browser console.
+It also rejects sudden unbraked speed losses near the road centre (more than
+75% in at most 250 ms from above 8 m/s), excluding long pauses and position jumps.
 Route geometry comes from the HUD descriptor; local camera anchors are used only
 when the baked simulation hash matches. No movement packets or teleport commands
 are injected.
@@ -38,6 +40,9 @@ GNOM_DRIVER_LAPS=1 GNOM_DRIVER_SECONDS=90 node scripts/qa/browser-driver.cjs
 The second command is a bounded one-lap smoke check, not a full race finish.
 Optional `GNOM_DRIVER_SPEED` sets the upper target speed in metres per second
 (default `24`); `GNOM_DRIVER_SECONDS` defaults to `240`.
+`GNOM_DRIVER_TRACE=1` additionally records the test player's physical snapshots
+and input commands to `physics-trace.json`, without handshake tickets or cookies.
+This diagnostic capture adds overhead; do not use it as performance evidence.
 
 `art-stage.cjs` checks two development profiles, movement, keyboard drift/boost,
 recovery, look-back, a seven-second CDP freeze/resume during acceleration,

@@ -17,6 +17,11 @@ test('backend manifest and Godot bake share authoritative simulation identity', 
   assert.equal(raceCompatibility(manifest).vehicle_state_version, VEHICLE_STATE_VERSION);
   assert.notEqual(WIRE_VERSION as number, VEHICLE_STATE_VERSION as number);
   assert.equal(raceCompatibility(manifest).track.schema_version, TRACK_SCHEMA_VERSION);
+  const protocolSource = readFileSync(new URL('../../game/net/prototype_protocol.gd', import.meta.url), 'utf8');
+  const vehicleSource = readFileSync(new URL('../../game/vehicle/racing_vehicle.gd', import.meta.url), 'utf8');
+  const loadout = raceCompatibility(manifest).loadout_hash;
+  assert.ok(protocolSource.includes(`const LOADOUT_HASH: String = "${loadout}"`));
+  assert.ok(vehicleSource.includes(`const BALANCE_VERSION: String = "vehicle-${loadout}"`));
 });
 
 test('manifest validation rejects malformed identity and runtime map', () => {

@@ -7,7 +7,7 @@ const TICKET_VERSION: int = 2
 const VEHICLE_STATE_VERSION: int = Vehicle.STATE_VERSION
 const TRACK_SCHEMA_VERSION: int = 1
 const MATCH_ID: String = "prototype-1"
-const LOADOUT_HASH: String = "prototype-v2"
+const LOADOUT_HASH: String = "prototype-v3"
 const NEUTRAL: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false}
 
 

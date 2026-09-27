@@ -25,6 +25,7 @@ godot --headless --path game --script res://tests/vehicle_probe.gd
 godot --headless --path game --script res://tests/track_probe.gd
 godot --headless --path game --script res://tests/authored_track_probe.gd
 godot --headless --path game --fixed-fps 60 --script res://tests/authored_drive_probe.gd
+godot --headless --path game --fixed-fps 60 --script res://tests/slope_drive_probe.gd
 godot --headless --path game --script res://tests/route_study_probe.gd
 godot --headless --path game --script res://tests/camera_probe.gd
 godot --headless --path game --script res://tests/authored_kart_probe.gd

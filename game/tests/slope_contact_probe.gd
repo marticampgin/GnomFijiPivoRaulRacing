@@ -20,9 +20,7 @@ func _run() -> void:
 	root.add_child(body)
 	var car := Vehicle.new()
 	var collider := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = Vector3(1.25, 0.7, 2.1)
-	collider.shape = shape
+	collider.shape = Vehicle.create_collision_shape()
 	car.add_child(collider)
 	root.add_child(car)
 	car.reset_at(Transform3D(Basis.IDENTITY, Vector3(0, 5.0 - 35.0 * tan(deg_to_rad(6.0)) + 1.0, 35)))

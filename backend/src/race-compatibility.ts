@@ -4,7 +4,7 @@ export const WIRE_VERSION = 2;
 export const TICKET_VERSION = 2;
 export const VEHICLE_STATE_VERSION = 1;
 export const TRACK_SCHEMA_VERSION = 1;
-export const LOADOUT_HASH = 'prototype-v2';
+export const LOADOUT_HASH = 'prototype-v3';
 
 export interface TrackIdentity {
   track_id: string;

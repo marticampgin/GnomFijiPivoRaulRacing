@@ -276,15 +276,22 @@ async function menuAccessibility(page, width, height) {
     assert.equal((await page.evaluate(() => window.GnomHost.state)).playerId, first.playerId);
     report.checks.rejoin = true;
     await page.locator('#menu-button').click(); await page.locator('#exit-button').click();
-    await page.route('**/api/race/ticket', async route => {
-      const response = await route.fetch(); const json = await response.json();
-      json.compatibility.protocol_version = 1;
-      await route.fulfill({ response, json });
-    });
-    await page.locator('#join-button').click();
-    await page.waitForFunction(() => window.GnomHost.state?.status === 'update_required');
-    assert.equal(await page.locator('#reconnect-button').innerText(), 'ОБНОВИТЬ ИГРУ');
-    await page.screenshot({ path: `${out}/version-rejection.png` });
+    report.checks.rejectedVersions = [];
+    for (const [name, incompatible] of [['wire-v1', { protocol_version: 1 }], ['collider-v2', { loadout_hash: 'prototype-v2' }]]) {
+      await page.reload(); await ready(page);
+      const handler = async route => {
+        const response = await route.fetch(); const json = await response.json();
+        Object.assign(json.compatibility, incompatible);
+        await route.fulfill({ response, json });
+      };
+      await page.route('**/api/race/ticket', handler);
+      await page.locator('#join-button').click();
+      await page.waitForFunction(() => window.GnomHost.state?.status === 'update_required');
+      assert.equal(await page.locator('#reconnect-button').innerText(), 'ОБНОВИТЬ ИГРУ');
+      await page.screenshot({ path: `${out}/version-rejection-${name}.png` });
+      report.checks.rejectedVersions.push(name);
+      await page.unroute('**/api/race/ticket', handler);
+    }
     report.checks.incompatibleLaunchRejected = true;
     assert.equal(await page.locator('vite-error-overlay, nextjs-portal, #webpack-dev-server-client-overlay').count(), 0);
     report.checks.noFrameworkOverlay = true;

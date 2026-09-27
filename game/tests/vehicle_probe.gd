@@ -98,8 +98,17 @@ func _character_probes() -> void:
 	vehicle.configure()
 	vehicle.reset_at(Transform3D(Basis.IDENTITY, Vector3(-100.0, 0.8, 0.0)))
 	await _steps(vehicle, 120, {"throttle": 1.0})
-	_check(vehicle.is_on_wall() and vehicle.speed_mps < 0.5, "head-on barrier stops the kart")
+	measurements["head_on_stop"] = {"speed": vehicle.speed_mps, "wall": vehicle.is_on_wall(), "position": [vehicle.position.x, vehicle.position.y, vehicle.position.z]}
 	var barrier_position: Vector3 = vehicle.position
+	var maximum_wall_motion: float = 0.0
+	var wall_contact: bool = vehicle.is_on_wall()
+	for tick: int in 120:
+		await _steps(vehicle, 1, {"throttle": 1.0})
+		maximum_wall_motion = maxf(maximum_wall_motion, vehicle.position.distance_to(barrier_position))
+		wall_contact = wall_contact or vehicle.is_on_wall()
+	# Solver margin can retain a small attempted velocity; verify actual motion.
+	measurements["head_on_hold_motion"] = maximum_wall_motion
+	_check(wall_contact and maximum_wall_motion < 0.03 and vehicle.position.z > -2.73, "head-on barrier holds the kart under sustained throttle")
 	await _steps(vehicle, 240, {"throttle": 1.0, "steering": 1.0})
 	measurements["head_on_escape_distance"] = absf(vehicle.position.x - barrier_position.x)
 	_check(absf(vehicle.position.x - barrier_position.x) > 2.0, "powered low-speed steering escapes a head-on stop")
@@ -160,9 +169,7 @@ func _native_probes() -> void:
 func _character(origin: Vector3) -> CharacterBody3D:
 	var vehicle: CharacterBody3D = VehicleScript.new()
 	var collider: CollisionShape3D = CollisionShape3D.new()
-	var shape: BoxShape3D = BoxShape3D.new()
-	shape.size = Vector3(1.5, 0.8, 2.4)
-	collider.shape = shape
+	collider.shape = VehicleScript.create_collision_shape()
 	vehicle.add_child(collider)
 	world.add_child(vehicle)
 	vehicle.reset_at(Transform3D(Basis.IDENTITY, origin))

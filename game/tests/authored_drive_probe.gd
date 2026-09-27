@@ -21,9 +21,7 @@ func _run() -> void:
 	track.build(false)
 	var car := Vehicle.new()
 	var collider := CollisionShape3D.new()
-	var shape := BoxShape3D.new()
-	shape.size = Vector3(1.25, 0.7, 2.1)
-	collider.shape = shape
+	collider.shape = Vehicle.create_collision_shape()
 	car.add_child(collider)
 	root.add_child(car)
 	car.reset_at(track.spawn_transform(0))

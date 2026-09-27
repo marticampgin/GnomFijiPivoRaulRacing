@@ -9,6 +9,7 @@ const output = process.env.GNOM_DRIVER_OUT || '/tmp/gnom-browser-driver-qa';
 const requiredLaps = Number(process.env.GNOM_DRIVER_LAPS || 3);
 const durationSeconds = Number(process.env.GNOM_DRIVER_SECONDS || 240);
 const maximumSpeed = Number(process.env.GNOM_DRIVER_SPEED || 24);
+const tracePhysics = process.env.GNOM_DRIVER_TRACE === '1';
 const viewport = { width: 1600, height: 900 };
 const sourcePackage = path.resolve(__dirname, '../../game/track/baked/castle_waterfalls.json');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -80,6 +81,23 @@ async function main() {
   const context = await browser.newContext({ viewport });
   const page = await context.newPage();
   const errors = [], samples = [], anchorsCaptured = new Set();
+  const physicsTrace = [];
+  let tracePlayerId;
+  if (tracePhysics) page.on('websocket', socket => {
+    socket.on('framesent', ({ payload }) => {
+      try {
+        const packet = JSON.parse(String(payload));
+        if (packet.type === 'input') physicsTrace.push({ at: Date.now(), input: packet });
+      } catch {}
+    });
+    socket.on('framereceived', ({ payload }) => {
+      try {
+        const packet = JSON.parse(String(payload));
+        const player = packet.players?.find(value => value.id === tracePlayerId);
+        if (player) physicsTrace.push({ at: Date.now(), tick: packet.tick, ack: player.ack, state: player.state });
+      } catch {}
+    });
+  });
   const report = { schemaVersion: 1, url, capturedAt: new Date().toISOString(), browser: browser.version(), viewport, browserRouting: 'Browser plugin not available; regular Playwright', scenario: 'Fresh guest, UI join, real keyboard-only route driving and observed authoritative HUD finish. No injected network inputs, teleportation, bot implementation or performance/capacity claim.', requiredLaps, durationSeconds, maximumSpeed, anchors: [], checks: {} };
   const held = new Set();
   const key = async (name, down) => {
@@ -107,6 +125,7 @@ async function main() {
     await page.bringToFront();
     await page.locator('#canvas').click({ position: { x: viewport.width / 2, y: viewport.height / 2 } });
     last = await state();
+    tracePlayerId = last.playerId;
     const route = routeFor(last.track);
     const initialLap = last.lap;
     report.initialState = last;
@@ -176,16 +195,29 @@ async function main() {
     report.serverFinish = report.finalState.finished === true;
     report.elapsedSeconds = (Date.now() - started) / 1000;
     report.completed = report.completed === true;
-    await page.screenshot({ path: path.join(output, report.serverFinish ? 'server-finish.png' : 'driver-end.png') });
-    const after = await canvasPixels(page);
-    const ratio = before.data.reduce((count, value, index) => count + (Math.abs(value - after.data[index]) > 10 ? 1 : 0), 0) / before.data.length;
-    report.checks.changedCanvas = { ratio, colors: after.colors };
-    assert.ok(ratio > 0.005, 'Canvas did not change');
     assert.ok(report.completed, `Driver did not complete ${requiredLaps} lap(s) within ${durationSeconds}s`);
+    const contactStops = samples.flatMap((sample, index) => {
+      const previous = samples[index - 1];
+      if (!previous) return [];
+      const gap = sample.elapsedMs - previous.elapsedMs;
+      const travel = Math.hypot(...sample.position.map((value, axis) => value - previous.position[axis]));
+      return gap > 0 && gap <= 250 && previous.speedMps > 8 && sample.speedMps < previous.speedMps * 0.25
+        && !previous.brake && !sample.brake && previous.centerError < 3.5 && sample.centerError < 3.5
+        && travel < 4 && previous.lap === sample.lap
+        ? [{ elapsedMs: sample.elapsedMs, s: sample.s, beforeMps: previous.speedMps, afterMps: sample.speedMps }]
+        : [];
+    });
+    report.checks.contactStops = contactStops;
+    assert.equal(contactStops.length, 0, 'Sudden unbraked speed loss near the road centre');
     if (requiredLaps === 3) {
       assert.equal(report.serverFinish, true, 'Three-lap test requires actual authoritative finish');
       await page.locator('#result-dialog[open]').waitFor({ timeout: 5000 });
     }
+    await page.screenshot({ path: path.join(output, report.serverFinish ? 'server-finish.png' : 'driver-end.png'), timeout: 90000 });
+    const after = await canvasPixels(page);
+    const ratio = before.data.reduce((count, value, index) => count + (Math.abs(value - after.data[index]) > 10 ? 1 : 0), 0) / before.data.length;
+    report.checks.changedCanvas = { ratio, colors: after.colors };
+    assert.ok(ratio > 0.005, 'Canvas did not change');
     assert.equal(anchorsCaptured.size, 4, 'Four route anchor screenshots are required');
     assert.deepEqual(errors, []);
     report.passed = true;
@@ -200,6 +232,7 @@ async function main() {
   } finally {
     report.errors = errors;
     report.samples = samples;
+    if (tracePhysics) await fs.writeFile(path.join(output, 'physics-trace.json'), JSON.stringify(physicsTrace));
     await fs.writeFile(path.join(output, 'result.json'), JSON.stringify(report, null, 2));
     await browser.close();
     console.log(JSON.stringify({ output, passed: report.passed, completed: report.completed, serverFinish: report.serverFinish, samples: samples.length, anchors: report.anchors, finalLap: report.finalState?.lap, errorCount: errors.length }));

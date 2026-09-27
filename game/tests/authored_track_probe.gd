@@ -184,9 +184,7 @@ func _test_collision(data: Dictionary) -> void:
 	for slot: int in 10:
 		var vehicle: CharacterBody3D = Vehicle.new()
 		var collider := CollisionShape3D.new()
-		var shape := BoxShape3D.new()
-		shape.size = Vector3(1.25, 0.7, 2.1)
-		collider.shape = shape
+		collider.shape = Vehicle.create_collision_shape()
 		vehicle.add_child(collider)
 		root.add_child(vehicle)
 		vehicle.reset_at(server.spawn_transform(slot))

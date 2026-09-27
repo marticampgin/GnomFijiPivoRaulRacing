@@ -44,6 +44,12 @@ func _run() -> void:
 		_check(Protocol.verify_ticket(_sign(broken, secret), secret, now, manifest).is_empty(), "reject claims %s" % str(changes))
 	var hello: Dictionary = {"type": "join", "ticket": ticket, "compatibility": compatibility}
 	var welcome: Dictionary = {"type": "welcome", "player_id": "test-player", "ack": 42, "compatibility": compatibility}
+	var sharp_box: Dictionary = claims.duplicate(true)
+	sharp_box["loadout_hash"] = "prototype-v2"
+	_check(Protocol.verify_ticket(_sign(sharp_box, secret), secret, now, manifest).is_empty(), "reject signed sharp-box simulation")
+	var old_hello: Dictionary = hello.duplicate(true)
+	old_hello["compatibility"]["loadout_hash"] = "prototype-v2"
+	_check(not Protocol.validate_hello(old_hello, manifest), "reject sharp-box client")
 	_check(Protocol.validate_hello(hello, manifest), "current hello compatibility")
 	_check(Protocol.validate_welcome(welcome, manifest), "compatible reconnect welcome preserves acknowledged sequence")
 	_check(not Protocol.validate_hello({"type": "join", "ticket": ticket}, manifest), "legacy hello rejected")
@@ -76,6 +82,9 @@ func _run() -> void:
 	vehicle.boost_remaining = 1.25
 	var state: Dictionary = JSON.parse_string(JSON.stringify(Protocol.pack_state(vehicle.capture_state())))
 	var unpacked: Dictionary = Protocol.unpack_state(state)
+	var sharp_box_state: Dictionary = state.duplicate(true)
+	sharp_box_state["balance_version"] = "vehicle-prototype-v2"
+	_check(Protocol.unpack_state(sharp_box_state).is_empty(), "reject sharp-box snapshot")
 	_check(not unpacked.is_empty(), "state JSON roundtrip")
 	_check(Protocol.WIRE_VERSION != Vehicle.STATE_VERSION and state["version"] == Vehicle.STATE_VERSION, "wire update does not change vehicle state schema")
 	_check(unpacked["transform"].is_equal_approx(vehicle.global_transform) and unpacked["velocity"].is_equal_approx(vehicle.velocity), "snapshot preserves transform and velocity")

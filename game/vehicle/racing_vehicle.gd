@@ -2,7 +2,9 @@ class_name RacingVehicle
 extends CharacterBody3D
 
 const STATE_VERSION: int = 1
-const BALANCE_VERSION: String = "vehicle-prototype-v2"
+const BALANCE_VERSION: String = "vehicle-prototype-v3"
+const COLLISION_SIZE: Vector3 = Vector3(1.25, 0.7, 2.1)
+const COLLISION_BEVEL: float = 0.1
 const DEFAULT_STATS: Dictionary = {
 	"top_speed": 34.0,
 	"acceleration": 17.0,
@@ -25,6 +27,22 @@ var boost_remaining: float = 0.0
 var speed_mps: float = 0.0
 var steering_amount: float = 0.0
 var _drift_was_pressed: bool = false
+
+
+static func create_collision_shape() -> ConvexPolygonShape3D:
+	# Chamfer the box edges so internal road triangles do not act as walls.
+	var half: Vector3 = COLLISION_SIZE * 0.5
+	var inset: Vector3 = half - Vector3.ONE * COLLISION_BEVEL
+	var points := PackedVector3Array()
+	for x: float in [-1.0, 1.0]:
+		for y: float in [-1.0, 1.0]:
+			for z: float in [-1.0, 1.0]:
+				points.append(Vector3(x * half.x, y * inset.y, z * inset.z))
+				points.append(Vector3(x * inset.x, y * half.y, z * inset.z))
+				points.append(Vector3(x * inset.x, y * inset.y, z * half.z))
+	var shape := ConvexPolygonShape3D.new()
+	shape.points = points
+	return shape
 
 
 func _ready() -> void:

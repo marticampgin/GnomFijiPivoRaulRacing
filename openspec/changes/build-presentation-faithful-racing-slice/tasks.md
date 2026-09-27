@@ -27,7 +27,7 @@
 - [x] 4.2 Перевести lap/standings/finish на подтверждённый interval и ограниченную 3D-проекцию; проверить старт перед линией, отсутствие прыжка на соседнюю дорогу и однократный окончательный финиш.
 - [x] 4.3 Перевести manual/automatic recover на разрешённые anchors/kill volumes с сохранением checkpoint/lap и сбросом speed/drift/boost/input epoch; проверить отсутствие прогресса при teleport через gates.
 - [x] 4.4 Добавить доверенную track identity в backend manifest/ticket/launch descriptor и handshake; разделить wire/ticket, vehicle-state и track schema versions, обновить fixtures подписанных tickets; проверить snapshot round-trip, отказ старому клиенту/неподдерживаемой state schema и совместимый reconnect.
-- [ ] 4.5 Обновить client prediction/replay/reconciliation для нового route/collision/state и проверить поверхности/уклоны, скрытую вкладку, возврат и отклонённый несовместимый пакет.
+- [x] 4.5 Обновить client prediction/replay/reconciliation для нового route/collision/state и проверить поверхности/уклоны, скрытую вкладку, возврат и отклонённый несовместимый пакет.
 - [x] 4.6 Перевести HTML-миникарту на descriptor, удалить runtime-дубли радиусов овала; проверить старт/маркеры/позиции всех контрольных участков и ошибку несовместимого descriptor.
 
 ## 5. Персонаж и карт

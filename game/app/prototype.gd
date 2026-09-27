@@ -141,9 +141,7 @@ func _process(delta: float) -> void:
 func _create_vehicle(_slot: int, visuals: bool) -> CharacterBody3D:
 	var vehicle: CharacterBody3D = Vehicle.new()
 	var collider: CollisionShape3D = CollisionShape3D.new()
-	var shape: BoxShape3D = BoxShape3D.new()
-	shape.size = Vector3(1.25, 0.7, 2.1)
-	collider.shape = shape
+	collider.shape = Vehicle.create_collision_shape()
 	vehicle.add_child(collider)
 	# The initial network probe excludes car-to-car collision prediction.
 	vehicle.collision_layer = 2
