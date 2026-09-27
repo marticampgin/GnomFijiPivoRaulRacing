@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 
-export const WIRE_VERSION = 7;
+export const WIRE_VERSION = 8;
 export const TICKET_VERSION = 3;
 export const VEHICLE_STATE_VERSION = 1;
 export const TRACK_SCHEMA_VERSION = 1;
-export const LOADOUT_HASH = 'prototype-v10';
+export const LOADOUT_HASH = 'prototype-v11';
 export const STYLE_IDS = ['handling', 'acceleration', 'speed', 'drift'] as const;
 export type StyleId = typeof STYLE_IDS[number];
 
@@ -20,6 +20,7 @@ export interface TrackManifest extends TrackIdentity {
   length: number;
   minimap: {
     polyline: [number, number][];
+    shortcuts?: [number, number][][];
     bounds: { min_x: number; max_x: number; min_z: number; max_z: number };
     world_to_map: { scale_x: number; scale_z: number; offset_x: number; offset_z: number };
     start: [number, number];
@@ -46,7 +47,10 @@ export function validateTrackManifest(value: unknown): TrackManifest {
     || bounds.min_x >= bounds.max_x || bounds.min_z >= bounds.max_z) return invalid();
   for (const key of ['scale_x', 'scale_z', 'offset_x', 'offset_z']) if (!finite(map.world_to_map[key])) return invalid();
   if ((map.world_to_map.scale_x as number) <= 0 || (map.world_to_map.scale_z as number) <= 0) return invalid();
-  for (const [x, z] of [map.start, ...map.polyline]) {
+  const shortcuts = map.shortcuts ?? [];
+  if (!Array.isArray(shortcuts) || shortcuts.length > 8 || !shortcuts.every(line => Array.isArray(line) && line.length >= 2 && line.length <= 4096 && line.every(point))
+    || shortcuts.reduce((total, line) => total + line.length, 0) > 4096) return invalid();
+  for (const [x, z] of [map.start, ...map.polyline, ...shortcuts.flat()]) {
     if (x < bounds.min_x - 0.001 || x > bounds.max_x + 0.001 || z < bounds.min_z - 0.001 || z > bounds.max_z + 0.001) return invalid();
   }
   return value as unknown as TrackManifest;

@@ -32,6 +32,7 @@
     }
     const layer = element('section','local-race'); layer.hidden = true; layer.id = 'local-race';
     const grid = element('div','local-grid'); layer.append(grid); document.body.append(layer);
+    const trackStatus=element('div','local-track-status');trackStatus.hidden=true;trackStatus.setAttribute('role','status');layer.append(trackStatus);
     const setup = element('dialog','local-dialog'); setup.id = 'local-setup';
     const setupHeading = element('h2','','Локальная гонка');
     const count = select([1,2,3,4].map(n => [n,`${n} ${n===1?'игрок':'игрока'}`]),1,'Количество игроков');
@@ -112,6 +113,7 @@
       const ctx=canvas.getContext('2d'); if(!ctx)return; ctx.clearRect(0,0,canvas.width,canvas.height);
       const projection=root.GnomTrackMap?.project(descriptor,canvas.width,canvas.height,12); if(!projection)return;
       ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();projection.points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.lineWidth=8;ctx.strokeStyle='#131715';ctx.stroke();ctx.lineWidth=3;ctx.strokeStyle='#f5f7f4';ctx.stroke();
+      ctx.lineWidth=2;ctx.strokeStyle='#64e3db';for(const route of projection.shortcuts){ctx.beginPath();route.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke();}
       const [from,to]=projection.points;const angle=Math.atan2(to[1]-from[1],to[0]-from[0]);
       ctx.save();ctx.translate(...from);ctx.rotate(angle);ctx.beginPath();ctx.moveTo(7,0);ctx.lineTo(-4,-4);ctx.lineTo(-4,4);ctx.closePath();ctx.fillStyle='#e5ff58';ctx.fill();ctx.restore();
       for(const player of players) { const pos=player.worldPosition || player.position; if(!Array.isArray(pos))continue;const point=projection.worldToMap(pos[0],pos.length===3?pos[2]:pos[1]);if(!point)continue;ctx.beginPath();ctx.arc(...point,player.id===id?5:3,0,Math.PI*2);ctx.fillStyle=player.id===id?'#e5ff58':colors[player.seat]||'#f5f7f4';ctx.fill(); }
@@ -139,6 +141,11 @@
       if(!Array.isArray(next.seats)||!next.seats.length)return;
       state=next;start.disabled=false;if(setup.open)setup.close();layer.hidden=false;
       const tutorial=next.tutorial||{};lesson.hidden=!tutorial.step;layer.classList.toggle('tutorial-active',!lesson.hidden);
+      const trackEvent=next.trackEvent||{},trackPhase=trackEvent.phase;
+      trackStatus.hidden=Boolean(tutorial.step)||!['warning','active'].includes(trackPhase);
+      layer.classList.toggle('track-event-visible',!trackStatus.hidden);
+      trackStatus.classList.toggle('warning',trackPhase==='warning');
+      trackStatus.textContent=trackStatus.hidden?'':trackPhase==='warning'?`ТРАССА МЕНЯЕТСЯ · ${Math.ceil(clamp(trackEvent.remaining,0,99))} с`:'НОВЫЕ ПРЕПЯТСТВИЯ';
       if(!lesson.hidden){
         const titles={drive:'Разгон',brake:'Остановка',reverse:'Задний ход',drift:'Дрифт I',items:'Два предмета'};
         lessonCount.textContent=`ОБУЧЕНИЕ ${Math.min(tutorial.stage+1,tutorial.total)} / ${tutorial.total}`;lessonTitle.textContent=tutorial.complete?'Готово к гонке':titles[tutorial.step]||'';

@@ -25,3 +25,22 @@ test('descriptor, coordinates and viewport are validated without oval fallback',
   assert.equal(project(manifest, 20, 20, 14), null);
   assert.equal(project(manifest).worldToMap(Infinity, 0), null);
 });
+
+test('shortcut routes use the main map projection and remain optional', () => {
+  const without = structuredClone(manifest); delete without.minimap.shortcuts;
+  assert.deepEqual(project(without).shortcuts, []);
+  const shortcuts = [[manifest.minimap.polyline[0], manifest.minimap.polyline[2], manifest.minimap.polyline[4]]];
+  const descriptor = { ...manifest, minimap: { ...manifest.minimap, shortcuts } };
+  const result = project(descriptor);
+  assert.deepEqual(result.shortcuts, shortcuts.map(route => route.map(point => result.worldToMap(...point))));
+  assert.deepEqual(result.points, project(without).points);
+  assert.deepEqual(result.start, project(without).start);
+});
+
+test('shortcut routes reject malformed, unbounded and excessive geometry', () => {
+  const p = manifest.minimap.polyline[0];
+  const outside = [manifest.minimap.bounds.max_x + 1, p[1]];
+  for (const shortcuts of [null, {}, [null], [[]], [[p]], [[p, [NaN, 0]]], [[p, [Infinity, 0]]], [[p, [0, '0']]], [[p, [0, 0, 0]]], [[p, outside]], Array(9).fill([p, p]), [Array(4097).fill(p)], [Array(3000).fill(p), Array(2000).fill(p)]]) {
+    assert.equal(project({ ...manifest, minimap: { ...manifest.minimap, shortcuts } }), null);
+  }
+});

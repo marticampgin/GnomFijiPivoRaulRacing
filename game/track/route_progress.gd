@@ -5,6 +5,7 @@ const Baker = preload("res://track/track_baker.gd")
 
 static var _prism_cache: Dictionary = {}
 static var _spatial_cache: Dictionary = {}
+static var _segment_cache: Dictionary = {}
 const CELL_SIZE: float = 24.0
 
 
@@ -70,16 +71,18 @@ static func project(data: Dictionary, location: Vector3, from_s: float, to_s: fl
 	var best: Dictionary = {"distance": INF, "s": from_s, "position": Vector3.ZERO, "lateral": INF, "height": INF, "width": 0.0}
 	if not location.is_finite():
 		return best
-	var samples: Array = data.samples
+	var segments: Array = _segments(data)
 	var indices: Array = []
 	if from_s <= 0.0 and to_s >= float(data.length):
 		indices = _spatial_indices(data, location, location)
 	else:
 		for index: int in range(_segment_at(data, from_s), _segment_at(data, to_s) + 1):
 			indices.append(index)
+		for index: int in range(data.samples.size() - 1, segments.size()):
+			indices.append(index)
 	for index: int in indices:
-		var a: Dictionary = samples[index]
-		var b: Dictionary = samples[index + 1]
+		var a: Dictionary = segments[index][0]
+		var b: Dictionary = segments[index][1]
 		if float(b.s) < from_s or float(a.s) > to_s:
 			continue
 		var start: Vector3 = Baker.vector(a.position)
@@ -164,9 +167,9 @@ static func _prisms(data: Dictionary) -> Array:
 	if _prism_cache.has(key):
 		return _prism_cache[key]
 	var result: Array = []
-	for index: int in data.samples.size() - 1:
-		var a: Dictionary = data.samples[index]
-		var b: Dictionary = data.samples[index + 1]
+	for segment: Array in _segments(data):
+		var a: Dictionary = segment[0]
+		var b: Dictionary = segment[1]
 		var origin: Vector3 = Baker.vector(a.position)
 		var edge: Vector3 = Baker.vector(b.position) - origin
 		var forward: Vector3 = edge.normalized()
@@ -190,13 +193,29 @@ static func _segment_at(data: Dictionary, s: float) -> int:
 	return mini(low, data.samples.size() - 2)
 
 
+static func _segments(data: Dictionary) -> Array:
+	var key: String = str(data.simulation_hash)
+	if _segment_cache.has(key):
+		return _segment_cache[key]
+	var segments: Array = []
+	var routes: Array = [data.samples]
+	for branch: Dictionary in data.get("shortcuts", []):
+		routes.append(branch.samples)
+	for samples: Array in routes:
+		for index: int in samples.size() - 1:
+			segments.append([samples[index], samples[index + 1]])
+	_segment_cache[key] = segments
+	return segments
+
+
 static func _spatial_indices(data: Dictionary, start: Vector3, finish: Vector3) -> Array:
 	var key: String = str(data.simulation_hash)
 	if not _spatial_cache.has(key):
 		var grid: Dictionary = {}
-		for index: int in data.samples.size() - 1:
-			var a: Dictionary = data.samples[index]
-			var b: Dictionary = data.samples[index + 1]
+		var segments: Array = _segments(data)
+		for index: int in segments.size():
+			var a: Dictionary = segments[index][0]
+			var b: Dictionary = segments[index][1]
 			var margin: float = maxf(float(a.width), float(b.width)) * 0.5 + 6.0
 			var minimum: Vector3 = Baker.vector(a.position).min(Baker.vector(b.position)) - Vector3(margin, 0, margin)
 			var maximum: Vector3 = Baker.vector(a.position).max(Baker.vector(b.position)) + Vector3(margin, 0, margin)

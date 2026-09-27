@@ -172,7 +172,7 @@ func _test_collision(data: Dictionary) -> void:
 	var client_shapes: Array[Node] = []
 	for shape_node: Node in client.find_children("*", "CollisionShape3D", true, false):
 		var body: CollisionObject3D = shape_node.get_parent()
-		if body.collision_layer & 1:
+		if body.collision_layer & 1 or body in client._event_bodies:
 			client_shapes.append(shape_node)
 		else:
 			_check(body.collision_layer == 4 and body.collision_mask == 0,
@@ -187,6 +187,10 @@ func _test_collision(data: Dictionary) -> void:
 		else:
 			parity = parity and server_shapes[index].shape.get_faces() == client_shapes[index].shape.get_faces()
 	_check(parity, "client and server collision faces and transforms match exactly")
+	var event: Dictionary = {"phase": "active", "remaining": 0.0, "active": [true, false], "trigger_tick": 1}
+	server.apply_event(event)
+	client.apply_event(event)
+	_check(server._event_bodies[0].collision_layer == 1 and client._event_bodies[0].collision_layer == 1 and server._event_bodies[1].collision_layer == 0 and client._event_bodies[1].collision_layer == 0, "client and server apply the same deferred obstacle mask")
 	client.queue_free()
 	await process_frame
 	var vehicles: Array[CharacterBody3D] = []

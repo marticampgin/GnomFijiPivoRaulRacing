@@ -47,6 +47,10 @@ func _step_session(delta: float) -> void:
 	super._step_session(delta)
 
 
+func _step_track_event(_delta: float) -> void:
+	pass
+
+
 func _update_progress(player: Dictionary) -> void:
 	super._update_progress(player)
 	player.finished = false

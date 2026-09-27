@@ -177,6 +177,7 @@ func presentation() -> Dictionary:
 			seats[seat]["look_back"] = bool(_last_commands.get(seat, {}).get("look_back", false))
 			seats[seat]["items_world"] = _items.world_state(player.id)
 	return {"tick": _tick, "race_id": _race_id, "phase": _phase, "players": entries, "seats": seats, "bot_difficulty": _bot_difficulty,
+		"track_event": _track_event.snapshot(),
 		"controls": inputs.profiles(),
 		"paused": inputs.is_suspended(), "focused": _focused, "devices": inputs.assignments(),
 		"pause_reason": "focus" if not _focused else ("device" if not _disconnected_seats.is_empty() else ("manual" if inputs.is_suspended() else "")),

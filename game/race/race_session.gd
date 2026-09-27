@@ -7,6 +7,7 @@ const BotDriver = preload("res://ai/racing_bot_driver.gd")
 const VehicleContacts = preload("res://vehicle/vehicle_contacts.gd")
 const Items = preload("res://items/race_items.gd")
 const Techniques = preload("res://race/race_techniques.gd")
+const TrackEvent = preload("res://race/track_event.gd")
 const MAX_PLAYERS: int = 10
 const RACE_LAPS: int = 3
 
@@ -22,6 +23,12 @@ var _finish_remaining: float = -1.0
 var _items: RefCounted = Items.new()
 var _bot_difficulty: String = "normal"
 var _techniques: RefCounted = Techniques.new()
+var _track_event: RefCounted = TrackEvent.new()
+
+
+func _step_track_event(delta: float) -> void:
+	_track_event.step(_players, _track, delta, _tick)
+	_track.apply_event(_track_event.snapshot())
 
 
 func _create_vehicle(_slot: int, _visuals: bool) -> CharacterBody3D:
@@ -49,6 +56,7 @@ func _step_session(delta: float) -> void:
 			_phase = "racing"
 	if _phase == "racing":
 		_race_elapsed += delta
+		_step_track_event(delta)
 		for id: String in _items.step(_players, delta):
 			_recover(_players[id])
 			_items.restore(_players[id])
@@ -176,6 +184,8 @@ func _remove_expired_waiters() -> void:
 
 
 func _start_race() -> void:
+	_track_event.reset()
+	_track.apply_event(_track_event.snapshot())
 	for id: String in _players.keys():
 		if _players[id]["is_bot"] or _players[id].get("expired", false):
 			_players[id]["vehicle"].queue_free()

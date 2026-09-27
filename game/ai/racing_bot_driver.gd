@@ -122,4 +122,5 @@ func _target_ahead(player: Dictionary, players: Dictionary, reach: float) -> boo
 func _point(distance: float) -> Vector3:
 	var sample_point: Dictionary = _track.sample_at(distance)
 	var tangent: Vector3 = Baker.vector(sample_point.tangent)
-	return Baker.vector(sample_point.position) + tangent.cross(Vector3.UP).normalized() * _lane
+	var lane: float = _track.event_lane(distance, _lane) if _track.has_method("event_lane") else _lane
+	return Baker.vector(sample_point.position) + tangent.cross(Vector3.UP).normalized() * lane

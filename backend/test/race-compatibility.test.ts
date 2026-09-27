@@ -32,6 +32,10 @@ test('manifest validation rejects malformed identity and runtime map', () => {
     { minimap: null }, { minimap: { ...manifest.minimap, polyline: [] } },
     { minimap: { ...manifest.minimap, polyline: [[NaN, 0], ...manifest.minimap.polyline] } },
     { minimap: { ...manifest.minimap, start: [1e9, 1e9] } },
+    { minimap: { ...manifest.minimap, shortcuts: [[[NaN, 0], [1, 2]]] } },
+    { minimap: { ...manifest.minimap, shortcuts: [[[0, 0], [1e9, 0]]] } },
+    { minimap: { ...manifest.minimap, shortcuts: [[[0, 0]]] } },
+    { minimap: { ...manifest.minimap, shortcuts: Array(9).fill([[0, 0], [1, 1]]) } },
     { minimap: { ...manifest.minimap, world_to_map: { ...manifest.minimap.world_to_map, scale_x: 0 } } },
   ]) assert.throws(() => validateTrackManifest({ ...manifest, ...changes }), /Invalid race track manifest/);
 });

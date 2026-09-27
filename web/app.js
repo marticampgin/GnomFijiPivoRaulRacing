@@ -300,6 +300,8 @@
     context.beginPath();
     mapProjection.points.forEach(([x,z], index) => index ? context.lineTo(x,z) : context.moveTo(x,z));
     context.closePath(); context.stroke();
+    context.strokeStyle='#64e3db';context.lineWidth=3;
+    for(const route of mapProjection.shortcuts){context.beginPath();route.forEach(([x,z],index)=>index?context.lineTo(x,z):context.moveTo(x,z));context.stroke();}
     context.fillStyle = '#f5f7f4';
     context.fillRect(mapProjection.start[0]-3, mapProjection.start[1]-5, 6, 10);
     for (const player of players) {
@@ -335,6 +337,11 @@
     const healthy = ['connected','countdown','racing','finished','results','spectating'].includes(state.status);
     $('network-status').textContent = healthy ? 'На связи' : state.status === 'connecting' ? 'Подключение' : 'Нет связи';
     const disconnected = !healthy && state.status !== 'connecting';
+    const trackEvent=state.trackEvent||{},trackPhase=trackEvent.phase,trackStatus=$('track-status');
+    trackStatus.hidden=disconnected||Boolean(state.tutorial?.step)||!['warning','active'].includes(trackPhase);
+    ui.hud.classList.toggle('track-event-visible',!trackStatus.hidden);
+    trackStatus.classList.toggle('warning',trackPhase==='warning');
+    trackStatus.textContent=trackStatus.hidden?'':trackPhase==='warning'?`ТРАССА МЕНЯЕТСЯ · ${Math.ceil(Math.max(0,Math.min(99,Number(trackEvent.remaining)||0)))} с`:'НОВЫЕ ПРЕПЯТСТВИЯ';
     if (disconnected && ui['result-dialog'].open) { ui['result-dialog'].close(); lastFinish = false; }
     $('race-status').textContent = state.spectating ? 'ОЖИДАНИЕ ЗАЕЗДА' : 'НА ТРАССЕ';
     $('disconnect').hidden = !disconnected;

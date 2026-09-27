@@ -7,6 +7,27 @@ is `http://127.0.0.1:8788/`.
 
 ## Prerequisites
 
+Track v11 checks use controlled short sections, not three-lap playthroughs:
+
+```sh
+godot --headless --path game --script res://tests/shortcut_probe.gd
+godot --headless --path game --fixed-fps 120 --script res://tests/track_event_probe.gd
+godot --headless --path game --fixed-fps 120 --script res://tests/track_event_session_probe.gd
+godot --headless --path game --script res://tests/authored_track_probe.gd
+godot --headless --path game --script res://tests/route_study_probe.gd
+node scripts/test-track-map.cjs
+node scripts/qa/track-event-hud.cjs
+```
+
+Shortcut checks drive its real collision joins and the main bend with four styles.
+Event checks seed a final-lap leader, then use the production session for warning,
+pause, reset and safe activation. Twelve isolated AI runners cover all difficulty
+and style pairs through both solid obstacles. These are not a full-race balance
+or multiplayer pile-up test. The Web HUD fixture checks phases, non-overlap and
+minimap pixels in 1–4 layouts at desktop/portrait/landscape sizes; it does not
+drive a browser player to the final lap. Artificial network-delay activation and
+physical controller compatibility remain separate checks.
+
 Short control/tutorial checks (no full laps):
 
 ```sh

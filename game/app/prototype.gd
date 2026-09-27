@@ -357,6 +357,7 @@ func _broadcast_snapshot() -> void:
 			"connected": player["connected"], "elapsed": player["elapsed"], "ack": player["ack"], "epoch": player["epoch"],
 			"state": Protocol.pack_state(player["vehicle"].capture_state())})
 	var packet: Dictionary = {"type": "snapshot", "tick": _tick, "race_id": _race_id, "phase": _phase,
+		"track_event": _track_event.snapshot(),
 		"items_world": _items.world_state(),
 		"finish_remaining": _finish_remaining, "race_remaining": maxf(0.0, 180.0 - _race_elapsed),
 		"countdown": maxf(0.0, float(_countdown) / 60.0), "players": entries}
@@ -585,7 +586,10 @@ func _apply_snapshot(packet: Dictionary) -> void:
 	if server_tick <= _tick:
 		return
 	var item_world: Dictionary = Protocol.validate_items_world(packet.get("items_world"))
-	if item_world.is_empty():
+	if item_world.is_empty() or not TrackEvent.validate_snapshot(packet.get("track_event")):
+		_leave("update_required")
+		return
+	if int(packet.track_event.trigger_tick) > server_tick:
 		_leave("update_required")
 		return
 	for entry: Variant in packet["players"]:
@@ -593,6 +597,7 @@ func _apply_snapshot(packet: Dictionary) -> void:
 			_leave("update_required")
 			return
 	_tick = server_tick
+	_track.apply_event(packet.track_event)
 	var generation_changed: bool = _race_id != int(packet.get("race_id", 0))
 	_race_id = int(packet.get("race_id", 0))
 	_phase = str(packet.get("phase", "waiting"))
@@ -672,6 +677,7 @@ func _apply_snapshot(packet: Dictionary) -> void:
 			_remotes[id]["node"].queue_free()
 			_remotes.erase(id)
 	_hud["players"] = public_players
+	_hud["track_event"] = packet.track_event.duplicate(true)
 	_hud["attack_warning"] = _attack_warning(item_world, _player_id, _local) if _can_drive() else ""
 
 
@@ -769,6 +775,9 @@ func _send(packet: Dictionary) -> void:
 
 
 func _leave(status: String) -> void:
+	_track_event.reset()
+	if is_instance_valid(_track):
+		_track.apply_event(_track_event.snapshot())
 	if is_instance_valid(_local_view):
 		_local_view.free()
 		_local_view = null
@@ -822,6 +831,7 @@ func _publish_hud() -> void:
 	var location: Vector3 = Vector3.ZERO if _local == null else _local.global_position
 	var forward: Vector3 = Vector3.FORWARD if _local == null else -_local.global_basis.z
 	var data: Dictionary = {"status": _status, "playerId": _player_id, "players": _hud.get("players", []),
+		"trackEvent": _hud.get("track_event", _track_event.snapshot()),
 		"items": _client_combat.get("slots", ["", ""]), "health": _client_combat.get("health", 100.0), "maxHealth": _client_combat.get("max_health", 100.0),
 		"shards": _client_combat.get("shards", 0), "shardCap": _items.Catalog.SHARD_CAP,
 		"driving": _hud.get("driving", {}),
@@ -923,6 +933,7 @@ func _local_hud_state() -> Dictionary:
 		seats.append(seat)
 	seats.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.seat) < int(b.seat))
 	return {"seats": seats, "players": players, "paused": snapshot.paused, "botDifficulty": snapshot.bot_difficulty,
+		"trackEvent": snapshot.track_event,
 		"tutorial": snapshot.get("tutorial", {}),
 		"disconnected": snapshot.disconnected_seats, "pauseReason": snapshot.pause_reason,
 		"countdown": snapshot.countdown, "status": snapshot.phase, "phase": snapshot.phase,

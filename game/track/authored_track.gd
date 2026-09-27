@@ -3,12 +3,17 @@ extends Node3D
 
 const Baker = preload("res://track/track_baker.gd")
 const Progress = preload("res://track/route_progress.gd")
+const Event = preload("res://race/track_event.gd")
 const PACKAGE_PATH: String = "res://track/baked/castle_waterfalls.json"
 
 var data: Dictionary = {}
 var load_errors: PackedStringArray = PackedStringArray()
 var _built: bool = false
 var _visual: Node3D
+var _event_bodies: Array[StaticBody3D] = []
+var _event_markers: Array[Node3D] = []
+var _event_meshes: Array[Node3D] = []
+var _event_state: Dictionary = {"phase": "idle", "remaining": 0.0, "active": [false, false], "trigger_tick": 0}
 
 
 func _init() -> void:
@@ -52,6 +57,71 @@ func build(visuals: bool) -> void:
 		_visual = visual_script.new()
 		add_child(_visual)
 		_visual.build(data)
+	_build_event(visuals)
+
+
+func _build_event(visuals: bool) -> void:
+	for definition: Dictionary in Event.definitions(self):
+		var body := StaticBody3D.new()
+		body.collision_layer = 0
+		body.transform = definition.transform
+		var collider := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = definition.size
+		collider.shape = shape
+		body.add_child(collider)
+		add_child(body)
+		_event_bodies.append(body)
+		if visuals:
+			var marker := Node3D.new()
+			add_child(marker)
+			marker.transform = definition.transform
+			for side: float in [-1.0, 1.0]:
+				_event_box(marker, Vector3(side * definition.size.x * 0.5, -definition.size.y * 0.5 + 0.04, 0), Vector3(0.12, 0.08, definition.size.z + 0.4), Color("ffd36b"))
+			var mesh_root := Node3D.new()
+			body.add_child(mesh_root)
+			_event_box(mesh_root, Vector3.ZERO, definition.size, Color("596561"))
+			_event_box(mesh_root, Vector3(0, definition.size.y * 0.3, -definition.size.z * 0.5 - 0.015), Vector3(definition.size.x, 0.22, 0.04), Color("64e3db"))
+			_event_box(mesh_root, Vector3(0, definition.size.y * 0.3, definition.size.z * 0.5 + 0.015), Vector3(definition.size.x, 0.22, 0.04), Color("64e3db"))
+			_event_meshes.append(mesh_root)
+			_event_markers.append(marker)
+	apply_event(_event_state)
+
+
+func _event_box(parent: Node3D, location: Vector3, size: Vector3, color: Color) -> void:
+	var mesh := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = size
+	mesh.mesh = box
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = 0.85
+	mesh.material_override = material
+	mesh.position = location
+	parent.add_child(mesh)
+
+
+func apply_event(state: Dictionary) -> void:
+	if not Event.validate_snapshot(state):
+		return
+	_event_state = state.duplicate(true)
+	for index: int in _event_bodies.size():
+		_event_bodies[index].collision_layer = 1 if state.active[index] else 0
+		if index < _event_meshes.size():
+			_event_meshes[index].visible = state.active[index]
+			_event_markers[index].visible = state.phase != "idle" and not state.active[index]
+
+
+func event_lane(distance: float, normal_lane: float) -> float:
+	if _event_state.phase == "idle":
+		return normal_lane
+	var s: float = fposmod(distance, float(data.length))
+	for definition: Dictionary in Event.definitions(self):
+		var offset: float = s - float(definition.s)
+		if offset >= -32.0 and offset <= 18.0:
+			var weight: float = smoothstep(-32.0, -16.0, offset) * (1.0 - smoothstep(8.0, 18.0, offset))
+			return lerpf(normal_lane, -signf(float(definition.lateral)) * 2.8, weight)
+	return normal_lane
 
 
 func set_quality(low: bool) -> void:

@@ -39,7 +39,7 @@ func _run() -> void:
 	_check(road != null, "stone road exists")
 	if road != null:
 		var vertices: PackedVector3Array = road.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
-		var matches: bool = vertices.size() == data.collision.road_faces.size()
+		var matches: bool = vertices.size() == (data.samples.size() - 1) * 6
 		for index: int in vertices.size():
 			matches = matches and vertices[index].is_equal_approx(Baker.vector(data.collision.road_faces[index]) + Vector3.UP * 0.012)
 		_check(matches, "visible road follows exact baked collision faces")
@@ -56,19 +56,21 @@ func _run() -> void:
 		total += visual.multimesh.instance_count
 		if visual.get_meta("study_foliage", false):
 			foliage_count += visual.multimesh.instance_count
-	for pose: Transform3D in study.direction_sign_poses:
-		var nearest: Dictionary = {}
-		var distance: float = INF
-		for sample: Dictionary in data.samples:
-			var candidate: float = Baker.vector(sample.position).distance_squared_to(pose.origin)
-			if candidate < distance:
-				distance = candidate
-				nearest = sample
-		var forward: Vector3 = Baker.vector(nearest.tangent).slide(Vector3.UP).normalized()
+	_check(study.direction_sign_stations.size() == study.direction_sign_poses.size(), "each main route arrow records its authored station")
+	for index: int in study.direction_sign_poses.size():
+		var pose: Transform3D = study.direction_sign_poses[index]
+		# A side-mounted board on a tight bend need not project to its source station.
+		var sample: Dictionary = Baker.sample_at(data, study.direction_sign_stations[index])
+		var forward: Vector3 = Baker.vector(sample.tangent).slide(Vector3.UP).normalized()
 		_check(pose.basis.x.normalized().dot(forward) > 0.98,
 			"road chevron tip follows increasing checkpoint direction")
 		chevrons += 1
 	_check(chevrons > 0, "route direction regression covers actual rendered arrows")
+	_check(study.shortcut_sign_poses.size() == 3, "shortcut has three actual rendered directional arrows")
+	var branch: Dictionary = data.shortcuts[0]
+	var branch_forward: Vector3 = (Baker.vector(branch.samples[-1].position) - Baker.vector(branch.samples[0].position)).slide(Vector3.UP).normalized()
+	for pose: Transform3D in study.shortcut_sign_poses:
+		_check(pose.basis.x.normalized().dot(branch_forward) > 0.98, "shortcut chevron tip follows entry to rejoin direction")
 	_check(foliage_count > 1000, "forest uses textured alpha-scissor foliage sample")
 	var nodes: int = study.find_children("*", "GeometryInstance3D", true, false).size()
 	study.set_quality(true)

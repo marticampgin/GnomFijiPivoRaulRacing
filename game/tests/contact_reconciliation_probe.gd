@@ -38,6 +38,8 @@ func _initialize() -> void:
 func _run() -> void:
 	var client := TestClient.new()
 	root.add_child(client)
+	client._track = preload("res://track/authored_track.gd").new()
+	client.add_child(client._track)
 	client.set_process(false)
 	client._joined = true
 	client._player_id = "contact-probe"
@@ -113,7 +115,7 @@ func _run() -> void:
 
 
 func _snapshot(tick: int, generation: int, ack: int, epoch: int, state: Dictionary) -> Dictionary:
-	return {"type": "snapshot", "items_world": {"pickups": [], "projectiles": [], "events": [], "shards": []}, "tick": tick, "race_id": generation, "phase": "racing", "countdown": 0.0, "players": [
+	return {"type": "snapshot", "track_event": {"phase": "idle", "remaining": 0.0, "active": [false, false], "trigger_tick": 0}, "items_world": {"pickups": [], "projectiles": [], "events": [], "shards": []}, "tick": tick, "race_id": generation, "phase": "racing", "countdown": 0.0, "players": [
 		{"id": "contact-probe", "slot": 0, "ack": ack, "epoch": epoch, "style_id": "handling", "driving": {"start_boost_remaining": 0.0, "slipstream_charge": 0.0, "slipstream_boost_remaining": 0.0, "slipstream_target": ""}, "combat": {"health": 100.0, "max_health": 100.0, "slots": ["", ""], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0, "shards": 0}, "state": state},
 		{"id": "other", "slot": 1, "epoch": epoch, "style_id": "handling", "driving": {"start_boost_remaining": 0.0, "slipstream_charge": 0.0, "slipstream_boost_remaining": 0.0, "slipstream_target": ""}, "combat": {"health": 100.0, "max_health": 100.0, "slots": ["", ""], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0, "shards": 0}, "state": state},
 	]}

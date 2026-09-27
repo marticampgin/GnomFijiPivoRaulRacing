@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(resolve(root, 'shared/track-manifest.json'), 'utf8'));
 const { track_id, schema_version, simulation_revision, simulation_hash, art_revision } = manifest;
-const compatibility = { protocol_version: 7, vehicle_state_version: 1, loadout_hash: 'prototype-v10', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
+const compatibility = { protocol_version: 8, vehicle_state_version: 1, loadout_hash: 'prototype-v11', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
 const secret = 'network-probe-only-not-a-deployment-secret-2026';
 const port = Number(process.env.NETWORK_TEST_PORT || 19080);
 const url = `ws://127.0.0.1:${port}`;
@@ -97,6 +97,8 @@ try {
   await rejectTicket(ticket('pre-shards-wire', { protocol_version: 5 }), 'pre-shards wire rejected');
   await rejectTicket(ticket('pre-counterplay-balance', { loadout_hash: 'prototype-v9' }), 'pre-counterplay balance rejected');
   await rejectTicket(ticket('pre-counterplay-wire', { protocol_version: 6 }), 'pre-counterplay wire rejected');
+  await rejectTicket(ticket('pre-track-event-balance', { loadout_hash: 'prototype-v10' }), 'pre-track-event balance rejected');
+  await rejectTicket(ticket('pre-track-event-wire', { protocol_version: 7 }), 'pre-track-event wire rejected');
   await rejectTicket(ticket('bad-style', { style_id: 'faster' }), 'unknown signed style rejected');
   await rejectTicket(ticket('missing-style', { style_id: undefined }), 'missing signed style rejected');
   await rejectTicket(ticket('bot:1'), 'reserved bot identity rejected');
@@ -115,6 +117,8 @@ try {
     ['pre-shards hello wire', { ...compatibility, protocol_version: 5 }],
     ['pre-counterplay hello balance', { ...compatibility, loadout_hash: 'prototype-v9' }],
     ['pre-counterplay hello wire', { ...compatibility, protocol_version: 6 }],
+    ['pre-track-event hello balance', { ...compatibility, loadout_hash: 'prototype-v10' }],
+    ['pre-track-event hello wire', { ...compatibility, protocol_version: 7 }],
     ['unsupported hello state schema', { ...compatibility, vehicle_state_version: 999 }],
     ['old hello vehicle simulation', { ...compatibility, loadout_hash: 'prototype-v1' }],
     ['sharp-box hello vehicle simulation', { ...compatibility, loadout_hash: 'prototype-v2' }],
@@ -131,6 +135,7 @@ try {
   const second = await joined('driver-b');
   const grid = await waitFor(() => first.messages.find(message => message.type === 'snapshot' && message.players.length === 10 && message.players.filter(player => !player.is_bot).length === 2), 'two humans and eight bots');
   verify(true, 'two real WebSocket clients share authoritative snapshot');
+  verify(grid.track_event?.phase === 'idle' && grid.track_event.trigger_tick === 0 && grid.track_event.active.length === 2 && grid.track_event.active.every(value => value === false), 'snapshot includes explicit authoritative initial track event');
   verify(new Set(grid.players.map(player => player.slot)).size === 10, 'ten racers have distinct grid slots');
   verify(new Set(grid.players.filter(player => player.is_bot).map(player => player.style_id)).size === 4, 'bots use all four authoritative styles');
   verify(grid.players.every(player => player.combat && player.combat.health === player.combat.max_health

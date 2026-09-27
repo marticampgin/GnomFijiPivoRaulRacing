@@ -11,10 +11,14 @@ extends Resource
 @export var gate_count: int = 16
 @export var shoulder_tolerance: float = 0.8
 @export var surface_id: String = "stone-dry"
+@export var shortcut_enabled: bool = true
+@export var shortcut_width: float = 4.5
 
 
 func validation_errors() -> PackedStringArray:
 	var errors := PackedStringArray()
+	if not is_finite(shortcut_width) or shortcut_width < 4.0 or shortcut_width > 6.0:
+		errors.append("shortcut_width: must be between 4 and 6 metres")
 	if track_id.is_empty() or schema_version != 1 or simulation_revision < 1 or art_revision < 1:
 		errors.append("identity: invalid id or unsupported version")
 	if not is_finite(road_width) or road_width < 10.0 or road_width > 24.0:
@@ -23,6 +27,8 @@ func validation_errors() -> PackedStringArray:
 		errors.append("sample_spacing: must be between 0.5 and 3 metres")
 	if gate_count < 4 or gate_count > 64:
 		errors.append("gate_count: must be between 4 and 64")
+	if shortcut_enabled and gate_count < 6:
+		errors.append("shortcut: requires checkpoint interval 4 to 5")
 	if not is_finite(shoulder_tolerance) or shoulder_tolerance < 0.0 or shoulder_tolerance > 2.0:
 		errors.append("shoulder_tolerance: must be between 0 and 2 metres")
 	if surface_id != "stone-dry":

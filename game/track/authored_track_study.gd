@@ -12,6 +12,8 @@ var _water: ShaderMaterial
 var _fall: ShaderMaterial
 var _built: bool = false
 var direction_sign_poses: Array[Transform3D] = []
+var direction_sign_stations: Array[float] = []
+var shortcut_sign_poses: Array[Transform3D] = []
 
 
 func build(data: Dictionary) -> void:
@@ -26,6 +28,7 @@ func build(data: Dictionary) -> void:
 	add_child(_kit)
 	_kit.prepare()
 	_road()
+	_shortcuts()
 	_shore_ribbons()
 	_water_features()
 	_castle_bridge()
@@ -72,6 +75,8 @@ func _road() -> void:
 		var base: Vector3 = Baker.vector(sample.position)
 		for sign_value: float in [-1.0, 1.0]:
 			var point: Vector3 = base + side * sign_value * 7.25
+			if Baker.shortcut_contains(_data, point, 2.0):
+				continue
 			_kit._box(point + Vector3.UP * 0.83, Vector3(1.05, 1.66, 1.05), _kit._materials.stone)
 			_kit._box(point + Vector3.UP * 1.68, Vector3(1.18, 0.2, 1.18), _kit._materials.cap)
 			if distance % 42 == 0:
@@ -79,6 +84,8 @@ func _road() -> void:
 				_kit._banner(point + Vector3.UP * 3.1, 0.7)
 		if distance > 105 and distance < 275:
 			var board: Vector3 = base - side * 6.92 + Vector3.UP * 0.82
+			if Baker.shortcut_contains(_data, board, 3.0):
+				continue
 			var facing := Basis(-forward.slide(Vector3.UP).normalized(), Vector3.UP, side)
 			_kit._box(board, Vector3(3.5, 0.65, 0.09), _kit._materials.red, facing)
 			# The board faces the road, but the chevron tip must follow route +s.
@@ -86,7 +93,38 @@ func _road() -> void:
 			for offset: float in [-1.0, 0.0, 1.0]:
 				var pose: Transform3D = _kit._pose(board + facing.x * offset + facing.z * 0.06, Vector3(0.9, 0.65, 1), arrow_facing)
 				direction_sign_poses.append(pose)
+				direction_sign_stations.append(float(distance))
 				_kit._place(_kit._chevron_mesh(), _kit._materials.white, pose, false)
+
+
+func _shortcuts() -> void:
+	for branch: Dictionary in _data.get("shortcuts", []):
+		var road := SurfaceTool.new()
+		road.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for index: int in branch.samples.size() - 1:
+			var a: Vector3 = Baker.vector(branch.samples[index].position)
+			var b: Vector3 = Baker.vector(branch.samples[index + 1].position)
+			var forward: Vector3 = (b - a).normalized()
+			var side: Vector3 = forward.cross(Vector3.UP).normalized() * float(branch.width) * 0.5
+			for point: Vector3 in [a - side, b - side, a + side, b - side, b + side, a + side]:
+				road.set_normal(Vector3.UP)
+				road.set_uv(Vector2(point.x, point.z) * 0.25)
+				road.add_vertex(point + Vector3.UP * 0.025)
+		_kit._node_mesh("ForestShortcutRoad", road.commit(), _kit._materials.road)
+		var start: Vector3 = Baker.vector(branch.samples[0].position)
+		var end: Vector3 = Baker.vector(branch.samples[-1].position)
+		var forward: Vector3 = (end - start).slide(Vector3.UP).normalized()
+		var right: Vector3 = forward.cross(Vector3.UP).normalized()
+		# Low gold edging distinguishes the unguarded narrow path from the main road.
+		for index: int in range(2, branch.samples.size() - 2, 2):
+			var at: Vector3 = Baker.vector(branch.samples[index].position)
+			for side: float in [-1.0, 1.0]:
+				_kit._box(at + right * side * (float(branch.width) * 0.5 - 0.15) + Vector3.UP * 0.045, Vector3(0.16, 0.04, 1.1), _kit._materials.gold, Basis.looking_at(forward))
+		var arrow_basis := Basis(forward, -right, Vector3.UP)
+		for distance: float in [3.0, 7.0, 11.0]:
+			var pose: Transform3D = _kit._pose(start.lerp(end, distance / float(branch.length)) + Vector3.UP * 0.055, Vector3(1.8, 1.3, 1), arrow_basis)
+			shortcut_sign_poses.append(pose)
+			_kit._place(_kit._chevron_mesh(), _kit._materials.gold, pose, false)
 
 
 func _shore_ribbons() -> void:
@@ -103,14 +141,29 @@ func _shore_ribbons() -> void:
 				continue
 			populated = true
 			for side: float in [-1.0, 1.0]:
+				if _shortcut_bank_gap(a, side) or _shortcut_bank_gap(b, side):
+					continue
 				var rings_a: Array[Vector3] = _bank(a, side)
 				var rings_b: Array[Vector3] = _bank(b, side)
+				if Baker.shortcut_contains(_data, rings_a[0], 4.0) or Baker.shortcut_contains(_data, rings_b[0], 4.0):
+					continue
 				for ring: int in 3:
 					var color: Color = Color("68864e").lightened(0.03 * sin(float(index) * 0.3))
 					_kit._quad(turf if ring == 0 else cliff, rings_a[ring], rings_b[ring], rings_b[ring + 1], rings_a[ring + 1], Vector3.UP if ring == 0 else (rings_a[ring] - rings_a[ring + 1]).normalized(), color if ring == 0 else Color("d3d6cc"))
 		if populated:
 			_kit._node_mesh("StudyBankTurf_%d" % chunk, turf.commit(), _kit._materials.terrain)
 			_kit._node_mesh("StudyBankCliff_%d" % chunk, cliff.commit(), _kit._materials.cliff)
+
+
+func _shortcut_bank_gap(sample: Dictionary, side: float) -> bool:
+	for branch: Dictionary in _data.get("shortcuts", []):
+		if float(sample.s) < float(branch.from_s) - 12.0 or float(sample.s) > float(branch.to_s) + 12.0:
+			continue
+		var midpoint: Vector3 = Baker.vector(branch.samples[branch.samples.size() / 2].position)
+		var right: Vector3 = Baker.vector(sample.tangent).cross(Vector3.UP).normalized()
+		if (midpoint - Baker.vector(sample.position)).dot(right) * side > 0.0:
+			return true
+	return false
 
 
 func _bank(sample: Dictionary, sign_value: float) -> Array[Vector3]:
@@ -185,10 +238,15 @@ func _forest() -> void:
 		var p: Vector3 = Baker.vector(sample.position)
 		var right: Vector3 = Baker.vector(sample.tangent).cross(Vector3.UP).normalized()
 		for side: float in [-1.0, 1.0]:
+			if _shortcut_bank_gap(sample, side):
+				continue
 			var at: Vector3 = p + right * side * (13.3 + 2.1 * sin(distance * 0.21))
-			_kit._tree(at - Vector3.UP * 0.2, 1.05 + 0.2 * sin(distance * 0.4), distance)
+			if not Baker.shortcut_contains(_data, at, 4.0):
+				_kit._tree(at - Vector3.UP * 0.2, 1.05 + 0.2 * sin(distance * 0.4), distance)
 			for shrub: int in 2:
 				var shrub_at: Vector3 = p + right * side * (10.1 + shrub * 2.0) + Vector3.UP * 0.4
+				if Baker.shortcut_contains(_data, shrub_at, 2.5):
+					continue
 				_kit._place(_kit._leaf_mesh(), _kit._materials["leaf%d" % ((distance + shrub) % 4)], _kit._pose(shrub_at, Vector3(1.7, 0.65, 1.2)), false)
 	for distance: int in [15, 38, 306, 334, 461, 494, 706, 731, 758]:
 		var sample: Dictionary = Baker.sample_at(_data, distance)

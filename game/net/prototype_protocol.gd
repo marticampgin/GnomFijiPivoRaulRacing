@@ -4,12 +4,12 @@ extends RefCounted
 const Vehicle = preload("res://vehicle/racing_vehicle.gd")
 const Styles = preload("res://vehicle/driving_styles.gd")
 const Catalog = preload("res://items/item_catalog.gd")
-const WIRE_VERSION: int = 7
+const WIRE_VERSION: int = 8
 const TICKET_VERSION: int = 3
 const VEHICLE_STATE_VERSION: int = Vehicle.STATE_VERSION
 const TRACK_SCHEMA_VERSION: int = 1
 const MATCH_ID: String = "prototype-1"
-const LOADOUT_HASH: String = "prototype-v10"
+const LOADOUT_HASH: String = "prototype-v11"
 const NEUTRAL: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 0.0, "drift": false}
 # Simulation-only parking command; never serialized as a player input packet.
 const BLOCKED: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false, "drive_blocked": true}

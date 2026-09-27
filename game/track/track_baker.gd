@@ -86,6 +86,9 @@ static func bake(definition: Resource) -> Dictionary:
 		data.starts.append({"slot": slot, "s": start_sample.s, "position": vec(vector(start_sample.position) + right * lane + Vector3.UP * 0.65), "forward": start_sample.tangent})
 	var initial: Dictionary = sample_at(data, length - 6.0)
 	data.recovery.push_front({"confirmed_gate": -1, "s": initial.s, "position": vec(vector(initial.position) + Vector3.UP * 0.65), "forward": initial.tangent})
+	data.shortcuts = []
+	if definition.shortcut_enabled:
+		_bake_shortcut(data, definition.shortcut_width)
 	data.kill_volumes = [{"id": "world-floor", "min": vec(minimum - Vector3(30, 100, 30)), "max": vec(Vector3(maximum.x + 30, minimum.y - 6, maximum.z + 30))}]
 	for index: int in 4:
 		var anchor: Dictionary = sample_at(data, length * [0.02, 0.23, 0.50, 0.77][index])
@@ -94,12 +97,55 @@ static func bake(definition: Resource) -> Dictionary:
 	for sample: Dictionary in samples:
 		polyline.append([sample.position[0], sample.position[2]])
 	data.minimap = {"polyline": polyline, "bounds": {"min_x": rounded(minimum.x), "max_x": rounded(maximum.x), "min_z": rounded(minimum.z), "max_z": rounded(maximum.z)}, "world_to_map": {"scale_x": rounded(1.0 / (maximum.x - minimum.x)), "scale_z": rounded(1.0 / (maximum.z - minimum.z)), "offset_x": rounded(-minimum.x / (maximum.x - minimum.x)), "offset_z": rounded(-minimum.z / (maximum.z - minimum.z))}, "start": polyline[0]}
+	data.minimap.shortcuts = []
+	for shortcut: Dictionary in data.shortcuts:
+		var line: Array = []
+		for sample: Dictionary in shortcut.samples:
+			line.append([sample.position[0], sample.position[2]])
+		data.minimap.shortcuts.append(line)
 	if not errors.is_empty():
 		return {"errors": errors}
 	# Scenery and presentation metadata are deliberately outside this payload.
 	data.simulation_hash = simulation_hash(data)
 	data.art_revision = definition.art_revision
 	return {"data": data, "errors": PackedStringArray()}
+
+
+static func _bake_shortcut(data: Dictionary, width: float) -> void:
+	# The branch is wholly inside one ordered checkpoint interval.
+	var from_s: float = float(data.gates[4].s) + 2.0
+	var to_s: float = float(data.gates[5].s) - 2.0
+	var start: Vector3 = vector(sample_at(data, from_s).position)
+	var finish: Vector3 = vector(sample_at(data, to_s).position)
+	var forward: Vector3 = (finish - start).normalized()
+	var side: Vector3 = forward.cross(Vector3.UP).normalized()
+	var samples: Array = []
+	var count: int = ceili(start.distance_to(finish) / 2.0)
+	for index: int in count + 1:
+		var weight: float = float(index) / count
+		samples.append({"position": vec(start.lerp(finish, weight)), "s": rounded(lerpf(from_s, to_s, weight)), "tangent": vec(forward), "width": width})
+	data.shortcuts.append({"id": "forest-cut", "from_gate": 4, "to_gate": 5, "from_s": from_s, "to_s": to_s, "length": rounded(start.distance_to(finish)), "width": width, "samples": samples})
+	for index: int in count:
+		var a: Vector3 = vector(samples[index].position)
+		var b: Vector3 = vector(samples[index + 1].position)
+		for vertex: Vector3 in [a - side * width * 0.5, b - side * width * 0.5, a + side * width * 0.5, b - side * width * 0.5, b + side * width * 0.5, a + side * width * 0.5]:
+			data.collision.road_faces.append(vec(vertex))
+	var barriers: Array = []
+	for barrier: Dictionary in data.collision.barriers:
+		if not shortcut_contains(data, vector(barrier.position), 1.8):
+			barriers.append(barrier)
+	data.collision.barriers = barriers
+
+
+static func shortcut_contains(data: Dictionary, point: Vector3, margin: float = 0.0) -> bool:
+	for branch: Dictionary in data.get("shortcuts", []):
+		var a: Vector3 = vector(branch.samples[0].position)
+		var b: Vector3 = vector(branch.samples[-1].position)
+		var edge: Vector3 = (b - a).slide(Vector3.UP)
+		var t: float = clampf((point - a).dot(edge) / edge.length_squared(), 0.0, 1.0)
+		if (point - a.lerp(b, t)).slide(Vector3.UP).length() <= float(branch.width) * 0.5 + margin:
+			return true
+	return false
 
 
 static func sample_at(data: Dictionary, offset: float) -> Dictionary:
@@ -223,6 +269,26 @@ static func package_errors(data: Dictionary) -> PackedStringArray:
 	for volume: Variant in data.kill_volumes:
 		if not volume is Dictionary or not _vector_valid(volume.get("min")) or not _vector_valid(volume.get("max")):
 			errors.append("package.kill_volumes: invalid bounds")
+	if not data.get("shortcuts", []) is Array:
+		errors.append("package.shortcuts: array required")
+	else:
+		for branch: Variant in data.get("shortcuts", []):
+			if not branch is Dictionary or not branch.get("samples") is Array or branch.samples.size() < 2 or not _finite_number(branch.get("width")) or not _finite_number(branch.get("length")) or not _finite_number(branch.get("from_s")) or not _finite_number(branch.get("to_s")):
+				errors.append("package.shortcuts: invalid branch")
+				continue
+			if branch.get("from_gate") != 4 or branch.get("to_gate") != 5 or data.gates.size() < 6 or float(branch.width) < 4.0 or float(branch.width) > 6.0 or float(branch.length) <= 0.0 or float(branch.length) >= float(branch.to_s) - float(branch.from_s):
+				errors.append("package.shortcuts: unsupported or non-shorter branch")
+				continue
+			if float(branch.from_s) <= float(data.gates[4].s) or float(branch.to_s) >= float(data.gates[5].s):
+				errors.append("package.shortcuts: branch may not bypass checkpoints")
+			var previous_s: float = float(branch.from_s) - 0.01
+			for sample: Variant in branch.samples:
+				if not sample is Dictionary or not _vector_valid(sample.get("position")) or not _vector_valid(sample.get("tangent")) or not _finite_number(sample.get("s")) or not _finite_number(sample.get("width")):
+					errors.append("package.shortcuts: invalid sample")
+					continue
+				if float(sample.s) <= previous_s or float(sample.width) != float(branch.width):
+					errors.append("package.shortcuts: invalid sample progress or width")
+				previous_s = float(sample.s)
 	if errors.is_empty() and simulation_hash(data) != data.simulation_hash:
 		errors.append("package.simulation_hash: baked simulation payload was modified")
 	return errors

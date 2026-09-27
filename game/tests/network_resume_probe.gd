@@ -81,7 +81,7 @@ func _run() -> void:
 
 
 func _snapshot(tick: int, ack: int, state: Dictionary) -> Dictionary:
-	return {"type": "snapshot", "items_world": {"pickups": [], "projectiles": [], "events": [], "shards": []}, "tick": tick, "countdown": 0.0, "players": [{"id": "probe", "slot": 0, "ack": ack, "epoch": 0, "style_id": "handling", "driving": {"start_boost_remaining": 0.0, "slipstream_charge": 0.0, "slipstream_boost_remaining": 0.0, "slipstream_target": ""}, "combat": {"health": 100.0, "max_health": 100.0, "slots": ["", ""], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0, "shards": 0}, "state": state}]}
+	return {"type": "snapshot", "track_event": {"phase": "idle", "remaining": 0.0, "active": [false, false], "trigger_tick": 0}, "items_world": {"pickups": [], "projectiles": [], "events": [], "shards": []}, "tick": tick, "countdown": 0.0, "players": [{"id": "probe", "slot": 0, "ack": ack, "epoch": 0, "style_id": "handling", "driving": {"start_boost_remaining": 0.0, "slipstream_charge": 0.0, "slipstream_boost_remaining": 0.0, "slipstream_target": ""}, "combat": {"health": 100.0, "max_health": 100.0, "slots": ["", ""], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0, "shards": 0}, "state": state}]}
 
 
 func _check(condition: bool, label: String) -> void:
