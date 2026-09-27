@@ -56,6 +56,7 @@ track.minimap.shortcuts = [[track.minimap.polyline[0], track.minimap.polyline[Ma
       }
     }
     await page.evaluate(() => localFixture.destroy());
+    await page.locator('#online-button').click();
     await page.locator('#join-button').click();
     await page.waitForFunction(() => !document.querySelector('#hud').hidden);
     for (const [width, height] of sizes) {

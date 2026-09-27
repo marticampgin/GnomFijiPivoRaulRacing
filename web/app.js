@@ -166,7 +166,13 @@
   });
   $('reduced-effects').addEventListener('change', event => { graphics.reducedEffects = event.target.checked; saveGraphics(); });
   applyGraphics();
-  function setError(message) { $('hub-error').textContent = message; $('hub-error').hidden = !message; }
+  function setError(message) {
+    const target = $('online-setup').open ? 'online-error' : inRace && !localMode ? 'disconnect-feedback' : 'hub-error';
+    for (const id of ['hub-error', 'online-error', 'disconnect-feedback']) {
+      $(id).textContent = id === target ? message : '';
+      $(id).hidden = id !== target || !message;
+    }
+  }
   function updateReady() {
     ui['join-button'].disabled = !engineReady || busy;
     ui['profile-button'].disabled = busy;
@@ -383,6 +389,10 @@
     if (disconnected && ui['result-dialog'].open) { ui['result-dialog'].close(); lastFinish = false; }
     $('race-status').textContent = state.spectating ? 'ОЖИДАНИЕ ЗАЕЗДА' : 'НА ТРАССЕ';
     $('disconnect').hidden = !disconnected;
+    if ((!disconnected || state.status === 'update_required') && !$('disconnect-feedback').hidden) {
+      $('disconnect-feedback').hidden = true;
+      $('disconnect-feedback').textContent = '';
+    }
     $('disconnect-title').textContent = state.status === 'update_required' ? 'Нужна новая версия игры' : 'Соединение прервано';
     $('reconnect-button').textContent = state.status === 'update_required' ? 'ОБНОВИТЬ ИГРУ' : 'ПЕРЕПОДКЛЮЧИТЬСЯ';
     $('countdown').hidden = state.countdown <= 0 || disconnected;
@@ -458,14 +468,14 @@
     get state() { return lastState; },
     async boot(config) {
       const missing = Engine.getMissingFeatures({threads:false});
-      if (missing.length) { $('load-label').textContent = 'Браузер не поддерживает WebGL 2.0'; setError('Игра недоступна в этом браузере.'); return; }
+      if (missing.length) { $('load-state').hidden = true; setError('Браузер не поддерживает WebGL 2.0. Игра недоступна.'); return; }
       const engine = new Engine({...config, focusCanvas:false, ensureCrossOriginIsolationHeaders:false});
       try {
         await engine.startGame({canvas:ui.canvas, onProgress:(current,total) => {
           const percentage = total ? Math.round(current/total*100) : 0;
           $('load-progress').value = percentage; $('load-label').textContent = `Загрузка игры · ${percentage}%`;
         }});
-      } catch(error) { engineReady = false; updateReady(); setError('Не удалось загрузить игру. Обновите страницу.'); console.error(error); }
+      } catch(error) { engineReady = false; updateReady(); $('load-state').hidden = true; setError('Не удалось загрузить игру. Обновите страницу.'); console.error(error); }
     },
   };
   $('connection-label').textContent = 'Локальная игра';

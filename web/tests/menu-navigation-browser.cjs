@@ -73,6 +73,8 @@ const {chromium} = require('playwright');
     await page.addStyleTag({path:path.resolve(__dirname,'../app.css')});
     await page.addStyleTag({path:path.resolve(__dirname,'../local-race.css')});
     await page.addStyleTag({path:path.resolve(__dirname,'../race-lobby.css')});
+    await page.addStyleTag({path:path.resolve(__dirname,'../ui-theme.css')});
+    await page.addStyleTag({path:path.resolve(__dirname,'../race-overlays.css')});
     await page.addScriptTag({path:path.resolve(__dirname,'../race-lobby.js')});
     await page.addScriptTag({path:path.resolve(__dirname,'../local-race.js')});
     await page.evaluate(()=>{

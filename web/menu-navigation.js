@@ -76,7 +76,8 @@
       if (container.id !== 'hub') entries.push([source === 'gamepad' ? 'B' : 'Esc', results ? 'В меню · P1' : 'Назад']);
       hints.replaceChildren(...entries.map(([key, label]) => {
         const span = doc.createElement('span'), glyph = doc.createElement('kbd');
-        glyph.textContent = key; span.append(glyph, doc.createTextNode(label)); return span;
+        glyph.textContent = key; glyph.dataset.key = key;
+        span.append(glyph, doc.createTextNode(label)); return span;
       }));
       if (hints.parentElement !== container) container.append(hints);
     }

@@ -3,36 +3,36 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#131715">
+  <meta name="theme-color" content="#f7fbfe">
   <title>GNOM FIJI · P.I.V.O RAUL RACING</title>
   <link rel="stylesheet" href="/app.css">
   <link rel="stylesheet" href="/local-race.css">
   <link rel="stylesheet" href="/race-lobby.css">
   <link rel="stylesheet" href="/control-settings.css">
+  <link rel="stylesheet" href="/ui-theme.css">
+  <link rel="stylesheet" href="/race-overlays.css">
   $GODOT_HEAD_INCLUDE
 </head>
 <body>
   <canvas id="canvas" tabindex="0" aria-label="Гоночная трасса Godot"></canvas>
   <main id="hub" class="hub">
-    <img class="hub-art" src="/assets/race-concept.jpg" alt="">
+    <img class="hub-art" src="/assets/lobby-paddock.jpg" alt="">
+    <img class="hub-kart" src="/assets/lobby-kart.png" alt="Гном в красном колпаке за рулём бирюзового карта">
     <header class="topbar">
-      <div class="wordmark">GNOM FIJI<span>P.I.V.O RAUL RACING</span></div>
-      <span class="active-tab">ГОНКА</span>
-      <button id="profile-button" class="profile-button" disabled><span class="avatar">01</span><span id="profile-name">Гость</span><img src="/assets/icons/user-round.svg" alt=""></button>
+      <button id="profile-button" class="profile-button" disabled><img src="/assets/icons/user-round.svg" alt=""><span id="profile-name">Гость</span></button>
     </header>
     <section class="hub-content">
-      <span class="mode-tag">ПОЛИГОН</span>
-      <h1>GNOM FIJI</h1>
-      <p class="subtitle">P.I.V.O RAUL RACING</p>
-      <div class="race-choice"><span class="eyebrow">ТВОЯ СЛЕДУЮЩАЯ ГОНКА</span><h2>Тестовый заезд</h2><p>Трасса 01 <span>·</span> 3 круга <span>·</span> Без рейтинга</p></div>
-      <button id="local-button" class="primary" data-menu-default disabled><span>ЛОКАЛЬНАЯ ГОНКА</span><img src="/assets/icons/arrow-up-right.svg" alt=""></button>
-      <button id="training-button" class="secondary-button" disabled>Обучение</button>
-      <button id="settings-button" class="secondary-button">Настройки</button>
-      <button id="online-button" class="text-button" disabled>Сетевой полигон</button>
-      <div id="load-state" class="load-state" role="status"><span id="load-label">Загрузка игры</span><progress id="load-progress" max="100" value="0"></progress></div>
-      <p id="hub-error" class="error" role="alert" hidden></p>
+      <div class="hub-brand"><h1>GNOM FIJI</h1><p class="subtitle">P.I.V.O RAUL RACING</p></div>
+      <nav class="hub-menu" aria-label="Главное меню">
+        <button id="local-button" class="primary hub-command" data-menu-default disabled><img src="/assets/icons/flag.svg" alt=""><span>Локальная гонка</span><img class="command-arrow" src="/assets/icons/arrow-right.svg" alt=""></button>
+        <button id="training-button" class="secondary-button hub-command" disabled><img src="/assets/icons/graduation-cap.svg" alt=""><span>Обучение</span><img class="command-arrow" src="/assets/icons/arrow-right.svg" alt=""></button>
+        <button id="settings-button" class="secondary-button hub-command"><img src="/assets/icons/settings-2.svg" alt=""><span>Настройки</span><img class="command-arrow" src="/assets/icons/arrow-right.svg" alt=""></button>
+        <button id="online-button" class="secondary-button hub-command hub-command-secondary" disabled><img src="/assets/icons/wifi.svg" alt=""><span>Сетевой полигон</span><img class="command-arrow" src="/assets/icons/arrow-right.svg" alt=""></button>
+        <div id="load-state" class="load-state" role="status"><span id="load-label">Загрузка игры</span><progress id="load-progress" max="100" value="0"></progress></div>
+        <p id="hub-error" class="error" role="alert" hidden></p>
+      </nav>
     </section>
-    <footer class="hub-footer"><span>GNOM FIJI / P.I.V.O RAUL RACING</span><span id="connection-label">Подключение</span></footer>
+    <footer class="hub-footer"><img src="/assets/icons/flag.svg" alt=""><span id="connection-label">Локальная игра</span></footer>
   </main>
   <section id="hud" class="hud" aria-label="Гоночные показатели" hidden>
     <div id="track-status" class="track-status" role="status" hidden></div>
@@ -56,7 +56,7 @@
     <div id="destroyed-status" class="destroyed-status" role="status" hidden></div>
     <div id="attack-warning" class="attack-warning" role="status" hidden></div>
     <div id="countdown" class="countdown" role="status" hidden></div>
-    <div id="disconnect" class="disconnect hud-panel" hidden><h2 id="disconnect-title">Соединение прервано</h2><button id="reconnect-button" class="primary">ПЕРЕПОДКЛЮЧИТЬСЯ</button><button id="disconnect-exit" class="text-button">Вернуться в меню</button></div>
+    <div id="disconnect" class="disconnect hud-panel" hidden><h2 id="disconnect-title">Соединение прервано</h2><p id="disconnect-feedback" class="error" role="alert" hidden></p><button id="reconnect-button" class="primary">ПЕРЕПОДКЛЮЧИТЬСЯ</button><button id="disconnect-exit" class="text-button">Вернуться в меню</button></div>
   </section>
   <dialog id="online-setup" aria-labelledby="online-title">
     <div class="dialog-heading"><h2 id="online-title">Сетевой полигон</h2><button class="icon-button close-dialog" aria-label="Назад"><img src="/assets/icons/x.svg" alt=""></button></div>
@@ -70,6 +70,7 @@
       </div>
     </fieldset>
     <p class="active-style">Сборка: <span id="selected-style">Управляемость</span></p>
+    <p id="online-error" class="error" role="alert" hidden></p>
     <button id="join-button" class="primary" data-menu-default disabled>НА ТРАССУ</button>
   </dialog>
   <dialog id="settings-dialog" aria-labelledby="settings-title">
@@ -101,7 +102,7 @@
     <label class="effects-option"><input id="music-enabled" type="checkbox" checked><span>Музыка финального круга</span></label>
     <button id="exit-button" class="text-button">Вернуться в меню</button>
   </dialog>
-  <dialog id="result-dialog" aria-labelledby="result-title"><span class="mode-tag">ФИНИШ</span><h2 id="result-title">Результаты заезда</h2><p id="finish-time" class="finish-time"></p><p id="result-status" role="status"></p><ol id="result-racers" class="result-racers" aria-label="Результаты участников"></ol><button id="restart-button" class="primary" disabled>ЕЩЁ ЗАЕЗД</button><button id="result-exit" class="text-button">Вернуться в меню</button></dialog>
+  <dialog id="result-dialog" aria-labelledby="result-title"><h2 id="result-title">Результаты заезда</h2><p id="finish-time" class="finish-time"></p><p id="result-status" role="status"></p><ol id="result-racers" class="result-racers" aria-label="Результаты участников"></ol><button id="restart-button" class="primary" data-menu-default disabled>ЕЩЁ ЗАЕЗД</button><button id="result-exit" class="text-button">Вернуться в меню</button></dialog>
   <noscript>Для запуска игры нужен JavaScript.</noscript>
   <script src="/track-map.js"></script>
   <script src="/control-settings.js"></script>

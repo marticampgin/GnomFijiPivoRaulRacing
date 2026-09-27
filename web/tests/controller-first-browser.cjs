@@ -11,7 +11,7 @@ const {chromium} = require('playwright');
     const page = await browser.newPage({viewport:{width:1280,height:800}});
     page.on('pageerror', error => errors.push(error.message));
     await page.setContent('<!doctype html><html lang="ru"><head><base href="http://127.0.0.1:8787/"></head><body><main id="hub"><button id="play" data-menu-default>Гонка</button><button id="settings">Настройки</button></main></body></html>');
-    for (const file of ['app.css','local-race.css','control-settings.css','race-lobby.css']) await page.addStyleTag({path:path.resolve(__dirname,'..',file)});
+    for (const file of ['app.css','local-race.css','race-lobby.css','control-settings.css','ui-theme.css','race-overlays.css']) await page.addStyleTag({path:path.resolve(__dirname,'..',file)});
     for (const file of ['control-settings.js','race-lobby.js','local-race.js','menu-navigation.js']) await page.addScriptTag({path:path.resolve(__dirname,'..',file)});
     await page.addStyleTag({content:'#hub{display:grid;gap:16px;width:320px;padding:20px}#hub>button{height:48px}'});
     await page.evaluate(() => {

@@ -5,7 +5,7 @@ The following SVG files are unmodified assets from the official
 
 `gamepad-2`, `keyboard`, `gauge`, `zap`, `route`, `users`, `bot`, `settings-2`,
 `chevron-left`, `chevron-right`, `arrow-left`, `arrow-right`, `plus`, `flag`,
-`circle-dot`.
+`circle-dot`, `graduation-cap`, `wifi`.
 
 Source URL pattern:
 `https://raw.githubusercontent.com/lucide-icons/lucide/0.468.0/icons/<name>.svg`

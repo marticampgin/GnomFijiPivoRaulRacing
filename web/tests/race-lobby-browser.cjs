@@ -12,7 +12,7 @@ const {chromium} = require('playwright');
     page.on('pageerror', error => errors.push(error.message));
     page.on('response', response => { if (response.status() >= 400) failed.push(response.url()); });
     await page.setContent('<!doctype html><html lang="ru"><head><base href="http://127.0.0.1:8787/"></head><body></body></html>');
-    for (const file of ['app.css','local-race.css','control-settings.css','race-lobby.css']) await page.addStyleTag({path:path.resolve(__dirname,'..',file)});
+    for (const file of ['app.css','local-race.css','race-lobby.css','control-settings.css','ui-theme.css','race-overlays.css']) await page.addStyleTag({path:path.resolve(__dirname,'..',file)});
     for (const file of ['control-settings.js','race-lobby.js','local-race.js','menu-navigation.js']) await page.addScriptTag({path:path.resolve(__dirname,'..',file)});
     await page.evaluate(() => {
       window.messages = [];
