@@ -235,6 +235,42 @@ touch-control support, production bot AI, a performance budget pass or an ARM
 server capacity measurement.
 # Local Split-Screen
 
+Reproducible browser lifecycle check after starting the static preview:
+
+```sh
+node scripts/qa/local-web.cjs
+GNOM_LOCAL_SAMPLE_SECONDS=10 node scripts/qa/local-web.cjs
+GNOM_LOCAL_QUALITY=low GNOM_LOCAL_SAMPLE_SECONDS=10 GNOM_LOCAL_OUT=/tmp/gnom-local-low node scripts/qa/local-web.cjs
+```
+
+The first command exercises all five layouts with virtual controllers, camera
+geometry, canvas pixels, keyboard movement, pause/resume, controller loss/return
+and exit. It does not play three laps. `GNOM_LOCAL_URL` accepts only localhost;
+`GNOM_LOCAL_OUT` selects the external artifact directory. The second command
+also samples four-player browser animation callbacks. Keep its window visible
+and focused; do not run another browser test at the same time.
+
+Callback interval percentiles are preliminary browser pacing observations, not
+GPU render times, engine FPS, a worst-case track benchmark or a performance pass.
+The report records its sample window and simulation tick progress. No performance
+threshold is accepted yet. A passing virtual-pad test is not hardware validation.
+`GNOM_LOCAL_QUALITY` selects `standard` (default) or `low`; every layout verifies
+the applied Godot profile. `GNOM_LOCAL_HEADLESS=1` is available for CI smoke checks,
+but its measurements must not be compared to a headed run as equivalent hardware evidence.
+
+Remaining physical-controller and user checks (task 3.25 stays open):
+
+1. Record OS/browser, controller models, wired/Bluetooth connection and player count.
+2. Assign one keyboard plus distinct pads, then an all-pad setup; verify each
+   participant's steering, pedals, drift, look-back and two item buttons independently.
+3. Unplug an assigned pad while accelerating. Verify every car/timer stops, the
+   player remains present and Resume is blocked. Reconnect or explicitly reassign;
+   verify neutral input before new presses and that the other players keep their seats.
+4. Finish a local race; each person confirms readiness once. Verify one new
+   countdown, cleared effects/crystals, preserved device/style selections and no rewards.
+5. Record handling feedback for all four styles and any unreadable HUD or collisions.
+   User playtest approval (3.10) is separate from automated correctness.
+
 Build with `node scripts/export-web.mjs`, then start
 `node scripts/local-web.mjs --detach`. The reported localhost URL serves static
 assets only, with no account API, PostgreSQL or race worker. The network prototype
