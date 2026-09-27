@@ -5,7 +5,7 @@ const root = fileURLToPath(new URL('./', import.meta.url));
 console.log('GNOM backend: building runtime and integration tests');
 await build({
   absWorkingDir: root,
-  entryPoints: { local: 'src/local.ts', server: 'src/server.ts', 'auth.test': 'test/auth.test.ts', 'local-lifecycle.test': 'test/local-lifecycle.test.ts', 'race-compatibility.test': 'test/race-compatibility.test.ts' },
+  entryPoints: { local: 'src/local.ts', server: 'src/server.ts', 'auth.test': 'test/auth.test.ts', 'local-lifecycle.test': 'test/local-lifecycle.test.ts', 'race-compatibility.test': 'test/race-compatibility.test.ts', 'progression.test': 'test/progression.test.ts' },
   outdir: 'dist', outExtension: { '.js': '.mjs' },
   bundle: true, platform: 'node', target: 'node24', format: 'esm',
   external: ['embedded-postgres', 'pg-native'],
