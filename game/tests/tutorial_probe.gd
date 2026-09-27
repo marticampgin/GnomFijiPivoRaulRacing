@@ -21,6 +21,7 @@ func _run() -> void:
 	lesson.configure(track)
 	_check(not lesson.start_local([{"device": -1}, {"device": 0}], [0]), "tutorial rejects multiple seats")
 	_check(lesson.start_local([{"device": -1}], []), "tutorial starts without backend")
+	lesson.inputs.configure_profile(0, {"keyboard": "both", "gamepad": "standard", "deadzone": 0.2, "steering": 1.0})
 	_check(lesson._players.size() == 1 and not lesson._players["local:0"].is_bot, "single human without bots")
 	_check(lesson.presentation().tutorial.step == "drive", "first real driving lesson")
 	await _frame({})

@@ -68,6 +68,7 @@ func _run() -> void:
 	await process_frame
 	_check(client._pending.all(func(command: Dictionary) -> bool: return int(command["sequence"]) > 1), "acknowledged commands removed before replay")
 	_check(client._pending.any(func(command: Dictionary) -> bool: return int(command["sequence"]) == 2), "unacknowledged command retained and replayed")
+	_check(client._input_ack == 1, "snapshot acknowledgement advances flow control")
 	client.set_process(false)
 	client._last_server_ms = Time.get_ticks_msec() - 7000
 	client.waiting_packet = {"type": "snapshot", "track_event": {"phase": "idle", "remaining": 0.0, "active": [false, false], "trigger_tick": 0}, "items_world": {"pickups": [], "projectiles": [], "events": [], "shards": []}, "tick": 15, "countdown": 0.0, "players": [{"id": "probe", "slot": 0, "ack": client._sequence, "epoch": 0, "style_id": "handling", "driving": {"start_boost_remaining": 0.0, "slipstream_charge": 0.0, "slipstream_boost_remaining": 0.0, "slipstream_target": ""}, "combat": {"health": 100.0, "max_health": 100.0, "slots": ["", ""], "effects": {}, "destroyed_remaining": 0.0, "invulnerable_remaining": 0.0, "item_ack": 0, "shards": 0}, "state": state}]}
@@ -92,6 +93,7 @@ func _run() -> void:
 	_check(client._queued_snapshot.is_empty(), "stale snapshot ignored after application")
 	client._queue_snapshot({"type": "snapshot", "track_event": {"phase": "idle", "remaining": 0.0, "active": [false, false], "trigger_tick": 0}, "items_world": {"pickups": [], "projectiles": [], "events": [], "shards": []}, "tick": 18, "players": []})
 	client._leave("ready")
+	_check(client._input_ack == 0 and client._sequence == 0, "leave resets flow control together with sequence")
 	_check(client._queued_snapshot.is_empty(), "leave clears pending snapshot")
 	Input.action_press("look_back")
 	client._on_host_message([JSON.stringify({"type": "focus", "visible": false})])

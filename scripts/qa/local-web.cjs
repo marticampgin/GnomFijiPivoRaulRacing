@@ -176,9 +176,9 @@ async function measureBrowserCadence(page) {
       count, { timeout: 15000 });
       assert.equal(await page.evaluate(() => GnomHost.state.graphics?.quality), quality,
         'Godot graphics quality differs from requested quality');
-      await page.keyboard.down('w');
+      await page.keyboard.down('Space');
       await page.waitForFunction(() => GnomHost.state.seats[0].speed > 15);
-      await page.keyboard.up('w');
+      await page.keyboard.up('Space');
       const sectorColors = await checkSectors(page, count, layout);
       await page.screenshot({ path: path.join(output, `${count}-${layout}.png`) });
       if (count === 4 && sampleSeconds > 0) {
@@ -190,6 +190,8 @@ async function measureBrowserCadence(page) {
       await resume(page);
       const recoveryEpoch = await page.evaluate(() => GnomHost.state.seats[0].epoch);
       await page.locator('.local-pause-button').click();
+      const settings = page.locator('#local-pause > details');
+      if (!await settings.evaluate(node => node.open)) await settings.locator(':scope > summary').click();
       await page.locator('#local-pause').getByRole('button', { name: 'На трассу', exact: true }).first().click();
       await page.waitForFunction(epoch => !GnomHost.state.paused
         && GnomHost.state.seats[0].epoch > epoch, recoveryEpoch);

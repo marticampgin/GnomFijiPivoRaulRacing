@@ -8,6 +8,7 @@ const PHYSICS_DT: float = 1.0 / 60.0
 const INPUT_TIMEOUT_MS: int = 250
 const RECONNECT_MS: int = 30000
 const INTERPOLATION_DELAY_MS: int = 100
+const MAX_UNACKED_INPUTS: int = 24
 
 var _worker: bool = false
 var _kart_script: Script
@@ -23,6 +24,7 @@ var _socket: WebSocketPeer
 var _ticket: String = ""
 var _player_id: String = ""
 var _sequence: int = 0
+var _input_ack: int = 0
 var _pending: Array[Dictionary] = []
 var _queued_snapshot: Dictionary = {}
 var _local: CharacterBody3D
@@ -119,6 +121,11 @@ func _physics_process(delta: float) -> void:
 		if _joined:
 			if Time.get_ticks_msec() - _last_server_ms > 3000 or _pending.size() >= 120:
 				_leave("connection_lost")
+				return
+			# Bound in-flight inputs below the server's 30-command queue, even after a batched delivery.
+			# Item edges are sampled above; prediction must not invent unsent driving steps.
+			if _sequence - _input_ack >= MAX_UNACKED_INPUTS:
+				_update_camera(delta)
 				return
 			_sequence += 1
 			command["type"] = "input"
@@ -560,6 +567,7 @@ func _poll_client() -> void:
 					return
 				_player_id = str(parsed.get("player_id", ""))
 				_sequence = int(parsed.get("ack", 0))
+				_input_ack = _sequence
 				_item_sequence = int(parsed.get("item_ack", 0))
 				_joined = true
 				_status = "connected"
@@ -637,6 +645,7 @@ func _apply_snapshot(packet: Dictionary) -> void:
 			_item_sequence = maxi(_item_sequence, int(_client_combat["item_ack"]))
 			var before: Vector3 = _local.global_position
 			var ack: int = int(entry.get("ack", 0))
+			_input_ack = maxi(_input_ack, mini(ack, _sequence))
 			_pending = _pending.filter(func(command: Dictionary) -> bool: return int(command["sequence"]) > ack)
 			_local.restore_state(state)
 			var epoch_changed: bool = int(_hud.get("epoch", -1)) != int(entry.get("epoch", 0))
@@ -795,6 +804,7 @@ func _leave(status: String) -> void:
 	_queued_snapshot.clear()
 	_player_id = ""
 	_sequence = 0
+	_input_ack = 0
 	_item_sequence = 0
 	_client_combat.clear()
 	if is_instance_valid(_item_visuals):

@@ -20,6 +20,8 @@ func _initialize() -> void:
 	_check(not seats.assign(2, -2, [2, 7, 9]), "invalid device rejected")
 	_check(not seats.assign(-1, 7, [2, 7, 9]) and not seats.assign(4, 7, [2, 7, 9]), "invalid seats rejected")
 	_check(seats.assign(2, 7, [2, 7, 9]) and seats.assign(3, 9, [2, 7, 9]), "four seats assigned")
+	for seat: int in 4:
+		seats.configure_profile(seat, {"keyboard": "both", "gamepad": "standard", "deadzone": 0.2, "steering": 1.0})
 	var raw: Dictionary = {-1: _keys(), 2: _pad(), 7: _pad(), 9: _pad()}
 	seats.sample_all(raw)
 	raw[-1] = _keys({KEY_W: true, KEY_Q: true, KEY_C: true})

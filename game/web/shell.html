@@ -33,7 +33,7 @@
           <label><input type="radio" name="driving-style" value="drift"><span>Дрифт</span></label>
         </div>
       </fieldset>
-      <button id="local-button" class="primary" disabled><span>ЛОКАЛЬНАЯ ГОНКА</span><img src="/assets/icons/arrow-up-right.svg" alt=""></button>
+      <button id="local-button" class="primary" data-menu-default disabled><span>ЛОКАЛЬНАЯ ГОНКА</span><img src="/assets/icons/arrow-up-right.svg" alt=""></button>
       <button id="join-button" class="text-button" disabled>Сетевой полигон</button>
       <div id="load-state" class="load-state" role="status"><span id="load-label">Загрузка игры</span><progress id="load-progress" max="100" value="0"></progress></div>
       <p id="hub-error" class="error" role="alert" hidden></p>
@@ -77,7 +77,7 @@
     <div class="dialog-heading"><h2 id="menu-title">Гонка продолжается</h2><button class="icon-button close-dialog" aria-label="Закрыть"><img src="/assets/icons/x.svg" alt=""></button></div>
     <p class="active-style">Сборка: <span id="active-style">Управляемость</span></p>
     <p id="next-style" class="active-style" hidden>Следующий заезд: <span id="next-style-name"></span></p>
-    <button id="resume-button" class="primary">ПРОДОЛЖИТЬ</button>
+    <button id="resume-button" class="primary" data-menu-default>ПРОДОЛЖИТЬ</button>
     <button id="recover-button" class="secondary-button"><img src="/assets/icons/rotate-ccw.svg" alt="">Вернуть машину</button>
     <fieldset class="graphics-settings">
       <legend>Графика</legend>
@@ -95,6 +95,7 @@
   <script src="/track-map.js"></script>
   <script src="/control-settings.js"></script>
   <script src="/local-race.js"></script>
+  <script src="/menu-navigation.js"></script>
   <script src="/app.js"></script>
   <script src="$GODOT_URL"></script>
   <script>window.GnomHost.boot($GODOT_CONFIG);</script>

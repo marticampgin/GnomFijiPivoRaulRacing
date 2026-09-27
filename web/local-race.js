@@ -71,9 +71,10 @@
     const reducedLabel=element('label','local-reduced-effects'),reduced=element('input');reduced.type='checkbox';reduced.id='local-reduced-effects';
     reduced.addEventListener('change',()=>onGraphics?.({quality:qualityInputs.find(input=>input.checked)?.value || 'standard',reducedEffects:reduced.checked}));
     reducedLabel.append(reduced,element('span','','Снизить интенсивность эффектов'));graphics.append(reducedLabel);
-    const resume = button('Продолжить',()=>send({type:'local_resume'}),'arrow-up-right'); resume.id = 'local-resume';
+    const resume = button('Продолжить',()=>send({type:'local_resume'}),'arrow-up-right'); resume.id = 'local-resume'; resume.setAttribute('data-menu-default','');
     const pauseActions = element('div','local-actions'); pauseActions.append(button('Выйти',()=>{ hide(); onExit?.(); },'x'),resume);
-    pause.append(pauseTitle,pauseRows,graphics,pauseError,pauseActions); document.body.append(pause);
+    const pauseSettings=element('details','local-controls'),pauseSettingsTitle=element('summary','','Игроки и настройки');pauseSettings.append(pauseSettingsTitle,pauseRows,graphics);
+    pause.append(pauseTitle,pauseSettings,pauseError,pauseActions); document.body.append(pause);
     pause.addEventListener('cancel',event=>{event.preventDefault(); if(!resume.disabled)send({type:'local_resume'});});
     const pauseButton = button('',()=>send({type:'local_pause'}),'pause'); pauseButton.title='Пауза'; pauseButton.setAttribute('aria-label','Пауза'); pauseButton.className='local-pause-button'; layer.append(pauseButton);
     const lesson=element('section','local-lesson');lesson.hidden=true;
@@ -128,6 +129,7 @@
     function renderPause() {
       if(!state)return;
       const disconnected=state.disconnected || [];
+      if(disconnected.length)pauseSettings.open=true;
       pauseTitle.textContent=disconnected.length?'Контроллер отключён':'Пауза'; resume.disabled=disconnected.length>0;
       pauseRows.replaceChildren(...state.seats.map((seat,index)=> {
         const row=element('div','local-setup-row');row.style.setProperty('--seat',colors[index]);
@@ -146,7 +148,7 @@
     function update(next) {
       if(next.error) { setupError.textContent=next.error;pauseError.textContent=next.error;start.disabled=false;return; }
       if(!Array.isArray(next.seats)||!next.seats.length)return;
-      state=next;start.disabled=false;if(setup.open)setup.close();layer.hidden=false;
+      state=next;layer.dataset.phase=next.phase;start.disabled=false;if(setup.open)setup.close();layer.hidden=false;
       const tutorial=next.tutorial||{};lesson.hidden=!tutorial.step;layer.classList.toggle('tutorial-active',!lesson.hidden);
       const trackEvent=next.trackEvent||{},trackPhase=trackEvent.phase;
       trackStatus.hidden=Boolean(tutorial.step)||!['warning','active'].includes(trackPhase);
@@ -158,7 +160,7 @@
         lessonCount.textContent=`ОБУЧЕНИЕ ${Math.min(tutorial.stage+1,tutorial.total)} / ${tutorial.total}`;lessonTitle.textContent=tutorial.complete?'Готово к гонке':titles[tutorial.step]||'';
         lessonProgress.value=clamp(tutorial.progress,0,1);lessonProgress.hidden=Boolean(tutorial.complete);lessonKeys.hidden=Boolean(tutorial.complete);
         const first=next.seats[0],profile=first.controls||savedProfiles[0],keyboard=first.device===-1,arrows=profile.keyboard==='arrows';
-        const bindings=keyboard?{drive:[arrows?'↑':'W'],brake:[arrows?'↓':'S'],reverse:[arrows?'↓':'S'],drift:[arrows?'↑':'W',arrows?'← / →':'A / D','Space'],items:['Q','E']}:{drive:['RT'],brake:['LT'],reverse:['LT'],drift:['RT','LS',profile.gamepad==='alternate'?'X':'A'],items:['LB','RB']};
+        const bindings=keyboard?(profile.keyboard==='arcade'?{drive:['Space'],brake:['C'],reverse:['C'],drift:['Space','A / D','Shift'],items:['Q','T']}:{drive:[arrows?'↑':'W'],brake:[arrows?'↓':'S'],reverse:[arrows?'↓':'S'],drift:[arrows?'↑':'W',arrows?'← / →':'A / D','Space'],items:['Q','E']}):(profile.gamepad==='arcade'?{drive:['A'],brake:['B'],reverse:['B'],drift:['A','LS','RT'],items:['LB','Y']}:{drive:['RT'],brake:['LT'],reverse:['LT'],drift:['RT','LS',profile.gamepad==='alternate'?'X':'A'],items:['LB','RB']});
         lessonKeys.replaceChildren(...(bindings[tutorial.step]||[]).map(key=>element('kbd','',key)));
       }
       const signature=`${next.seats.length}:${next.layout}`;
@@ -168,14 +170,15 @@
         if(next.seats.length===3) {const panel=element('section','local-overview'),map=element('canvas'),list=element('ol');map.width=260;map.height=260;panel.append(element('h3','','ЗАМОК И ВОДОПАДЫ'),map,list);grid.append(panel);overview={map,list};}
       }
       next.seats.forEach((seat,index)=> {
-        const p=panes[index];p.identity.textContent=`P${index+1} / ${(styles[seat.styleId] || styles.drift).toUpperCase()}`;
+        const p=panes[index];p.ready.dataset.menuDevice=seat.device;p.identity.textContent=`P${index+1} / ${(styles[seat.styleId] || styles.drift).toUpperCase()}`;
         p.blur.style.backdropFilter=`blur(${clamp(seat.blurIntensity,0,1)*(next.graphics?.reducedEffects?.6:3)}px)`;
         p.lapValue.textContent=`${seat.lap || 1} / ${seat.laps || 3}`;p.clock.textContent=time(seat.elapsed);p.rankValue.textContent=seat.rank || '-';p.total.textContent=`/ ${next.players?.length || 10}`;
         p.healthValue.textContent=Math.ceil(clamp(seat.health,0,seat.maxHealth || 100));p.healthBar.max=seat.maxHealth || 100;p.healthBar.value=clamp(seat.health,0,p.healthBar.max);p.healthBar.classList.toggle('critical',p.healthBar.value/p.healthBar.max<.35);
         p.speedValue.textContent=Math.round(Number(seat.speed)||0);p.reverse.hidden=!seat.reverse;
         p.crystalValue.textContent=clamp(seat.shards,0,seat.shardCap||20);p.crystals.title=`Осколки: ${p.crystalValue.textContent} / ${seat.shardCap||20}`;
         p.driftBars.forEach((bar,level)=>bar.value=clamp(seat.driftSegments?.[level],0,1));p.driftLabel.textContent=`ДРИФТ ${['','I','II','III'][clamp(seat.driftLevel,0,3)]}`;
-        p.slots.forEach(({node,img,key,empty},slot)=> { const item=seat.items?.[slot];const valid=Object.hasOwn(items,item);img.hidden=!valid;empty.hidden=valid;if(valid && img.dataset.item!==item){img.src=`/assets/items/${item}.png`;img.dataset.item=item;}key.textContent=seat.device===-1?['Q','E'][slot]:['LB','RB'][slot];node.disabled=!valid||!seat.canUseItems||next.paused;node.title=valid?items[item]:'Пусто';node.setAttribute('aria-label',`P${index+1}, предмет ${slot+1}: ${valid?items[item]:'пусто'}`); });
+        const profile=seat.controls||savedProfiles[index];
+        p.slots.forEach(({node,img,key,empty},slot)=> { const item=seat.items?.[slot];const valid=Object.hasOwn(items,item);img.hidden=!valid;empty.hidden=valid;if(valid && img.dataset.item!==item){img.src=`/assets/items/${item}.png`;img.dataset.item=item;}key.textContent=seat.device===-1?(profile.keyboard==='arcade'?['Q','T']:['Q','E'])[slot]:(profile.gamepad==='arcade'?['LB','Y']:['LB','RB'])[slot];node.disabled=!valid||!seat.canUseItems||next.paused;node.title=valid?items[item]:'Пусто';node.setAttribute('aria-label',`P${index+1}, предмет ${slot+1}: ${valid?items[item]:'пусто'}`); });
         const labels={...items,crystal_shield:'Щит',weapon_guard:'Защита от удара',burn:'Горение',invulnerable:'Защита',recovery:'Восстановление'};
         p.warning.hidden=!Object.hasOwn(warnings,seat.attackWarning);p.warning.textContent=p.warning.hidden?'':`! ${warnings[seat.attackWarning]}`;
         const effects={...seat.effects};if(seat.invulnerableRemaining>0)effects.invulnerable=seat.invulnerableRemaining;if(seat.destroyedRemaining>0)effects.recovery=seat.destroyedRemaining;
@@ -202,7 +205,7 @@
     function hide() {layer.hidden=true;setup.close();pause.close();state=null;}
     function showSetup() {start.disabled=false;setupError.textContent='';renderSetup();setup.showModal();}
     function destroy() {layer.remove();setup.remove();pause.remove();}
-    return {showSetup,update,updateDevices,hide,destroy,showError:message=>update({error:String(message)})};
+    return {showSetup,update,updateDevices,hide,destroy,menuScope:()=>!layer.hidden&&state?.phase==='results'?layer:null,showError:message=>update({error:String(message)})};
   }
   root.GnomLocalUI=Object.freeze({create,validateSeats,formatTime:time});
 })(globalThis);

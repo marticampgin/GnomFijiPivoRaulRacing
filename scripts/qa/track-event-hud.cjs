@@ -24,7 +24,7 @@ track.minimap.shortcuts = [[track.minimap.polyline[0], track.minimap.polyline[Ma
       return route.fulfill({ status: 404, body: '' });
     });
     await page.goto('http://fixture/');
-    for (const file of ['track-map.js', 'control-settings.js', 'local-race.js', 'app.js']) await page.addScriptTag({ path: path.join(root, 'web', file) });
+    for (const file of ['track-map.js', 'control-settings.js', 'local-race.js', 'menu-navigation.js', 'app.js']) await page.addScriptTag({ path: path.join(root, 'web', file) });
     await page.evaluate(() => { GnomHost.register(() => {}); window.localFixture = GnomLocalUI.create({ send() {} }); });
     const seat = { id: 1, device: -1, styleId: 'drift', health: 100, lap: 3, rank: 1, speed: 50, effects: {}, attackWarning: 'rear' };
     const sizes = [[1600, 900], [844, 390], [390, 844]];

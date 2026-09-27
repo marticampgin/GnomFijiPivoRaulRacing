@@ -92,7 +92,7 @@ async function heroSmoke(page, report) {
   await racing();
   const before = await page.evaluate(() => window.GnomHost.state.forward);
   try {
-    await page.keyboard.down('w');
+    await page.keyboard.down('Space');
     await page.waitForFunction(() => window.GnomHost.state.speed > 15, undefined, { timeout: 10000 });
     await page.keyboard.down('d');
     await page.waitForFunction(initial => {
@@ -103,16 +103,16 @@ async function heroSmoke(page, report) {
     await screenshot('hero-steering');
   } finally {
     await page.keyboard.up('d');
-    await page.keyboard.up('w');
+    await page.keyboard.up('Space');
   }
   await recover(page);
   await screenshot('hero-rear');
   try {
-    await page.keyboard.down('c');
+    await page.keyboard.down('f');
     await page.waitForTimeout(500);
     await screenshot('hero-front');
   } finally {
-    await page.keyboard.up('c');
+    await page.keyboard.up('f');
   }
   const unchanged = await contract(page);
   await page.locator('#menu-button').click();
@@ -149,20 +149,20 @@ async function driftAndBoost(page) {
   const steer = (x - nearest[0]) * -fz + (z - nearest[1]) * fx > 0 ? 'a' : 'd';
   const samples = [];
   try {
-    await page.keyboard.down('w');
-    await page.waitForFunction(() => window.GnomHost.state.speed > 39, undefined, { timeout: 10000 });
     await page.keyboard.down('Space');
+    await page.waitForFunction(() => window.GnomHost.state.speed > 39, undefined, { timeout: 10000 });
+    await page.keyboard.down('Shift');
     await page.keyboard.down(steer);
     const started = Date.now();
     while (Date.now() - started < 950) {
-      if (Date.now() - started > 250) await page.keyboard.up('w');
+      if (Date.now() - started > 250) await page.keyboard.up('Space');
       const sample = await page.evaluate(() => ({ drift: window.GnomHost.state.drift, boost: window.GnomHost.state.boost, speed: window.GnomHost.state.speed }));
       samples.push(sample);
       if (sample.drift >= 0.25) break;
       await page.waitForTimeout(45);
     }
     assert.ok(samples.some(sample => sample.drift >= 0.25), `Keyboard drift never reached the boost threshold: ${JSON.stringify(samples)}`);
-    await page.keyboard.up('Space');
+    await page.keyboard.up('Shift');
     await page.keyboard.up(steer);
     await page.waitForFunction(() => window.GnomHost.state.boost > 0, undefined, { timeout: 2000 });
     const boost = await page.evaluate(() => ({ boost: window.GnomHost.state.boost, drift: window.GnomHost.state.drift, playerId: window.GnomHost.state.playerId, speed: window.GnomHost.state.speed }));
@@ -171,7 +171,7 @@ async function driftAndBoost(page) {
     await recover(page);
     return { samples, boost, steeringKey: steer, recovered: true };
   } finally {
-    for (const key of ['w', 'a', 'd', 'Space']) await page.keyboard.up(key).catch(() => {});
+    for (const key of ['Space', 'a', 'd', 'Shift']) await page.keyboard.up(key).catch(() => {});
   }
 }
 
@@ -179,7 +179,7 @@ async function freezeAndResume(page) {
   await recover(page);
   const cdp = await page.context().newCDPSession(page);
   try {
-    await page.keyboard.down('w');
+    await page.keyboard.down('Space');
     await page.waitForFunction(() => window.GnomHost.state.speed > 12, undefined, { timeout: 10000 });
     const before = await page.evaluate(() => ({ playerId: window.GnomHost.state.playerId, status: window.GnomHost.state.status, serverTick: window.GnomHost.state.serverTick, speed: window.GnomHost.state.speed }));
     await cdp.send('Page.setWebLifecycleState', { state: 'frozen' });
@@ -193,13 +193,13 @@ async function freezeAndResume(page) {
     assert.equal(settled.status, 'racing');
     assert.ok(settled.serverTick > resumed.serverTick, 'Fresh server snapshots did not continue after resume');
     assert.ok(settled.speed <= before.speed + 8 && settled.speed <= resumed.speed + 8, `Acceleration remained latched after freeze: ${JSON.stringify({ before, resumed, settled })}`);
-    await page.keyboard.up('w');
+    await page.keyboard.up('Space');
     await page.screenshot({ path: `${out}/freeze-resume.png` });
     await recover(page);
     return { frozenMilliseconds: 7000, before, resumed, settled, recovered: true };
   } finally {
     await cdp.send('Page.setWebLifecycleState', { state: 'active' }).catch(() => {});
-    await page.keyboard.up('w').catch(() => {});
+    await page.keyboard.up('Space').catch(() => {});
     await cdp.detach().catch(() => {});
   }
 }
@@ -303,9 +303,9 @@ async function menuAccessibility(page, width, height) {
     const canvas = page.locator('#canvas');
     const before = await pixels(await canvas.screenshot({ path: `${out}/desktop-start.png` }));
     assert.ok(before.colors > 30, `Blank canvas: ${before.colors} colors`);
-    await page.keyboard.down('w');
+    await page.keyboard.down('Space');
     await page.waitForFunction(() => window.GnomHost.state.speed > 10, undefined, { timeout: 10000 });
-    await page.waitForTimeout(1500); await page.keyboard.up('w');
+    await page.waitForTimeout(1500); await page.keyboard.up('Space');
     const moved = await page.evaluate(() => window.GnomHost.state);
     const after = await pixels(await canvas.screenshot({ path: `${out}/desktop-moving.png` }));
     const changed = before.data.reduce((n, value, i) => n + (Math.abs(value - after.data[i]) > 10 ? 1 : 0), 0) / before.data.length;
@@ -331,9 +331,9 @@ async function menuAccessibility(page, width, height) {
     assert.equal(await p2.evaluate(() => window.GnomHost.state.spectating), false);
     report.checks.botFilledGrid = grid;
     await page.screenshot({ path: `${out}/desktop-two-profiles.png` });
-    await page.keyboard.down('c'); await page.waitForTimeout(500);
+    await page.keyboard.down('f'); await page.waitForTimeout(500);
     await page.screenshot({ path: `${out}/desktop-front.png` });
-    await page.keyboard.up('c'); await page.waitForTimeout(500);
+    await page.keyboard.up('f'); await page.waitForTimeout(500);
     await page.screenshot({ path: `${out}/desktop-chase-restored.png` });
     report.checks.lookBackPressedAndReleased = true;
     await p2.locator('#menu-button').click(); await p2.locator('#exit-button').click();

@@ -8,7 +8,8 @@ var failures: int = 0
 
 func _initialize() -> void:
 	var standard: Dictionary = Driver.default_profile()
-	_check(standard == {"keyboard": "both", "gamepad": "standard", "deadzone": 0.2, "steering": 1.0}, "defaults preserve existing mapping")
+	var legacy: Dictionary = {"keyboard": "both", "gamepad": "standard", "deadzone": 0.2, "steering": 1.0}
+	_check(standard == {"keyboard": "arcade", "gamepad": "arcade", "deadzone": 0.2, "steering": 1.0}, "defaults select approved arcade mapping")
 	_check(Driver.validate_profile(standard) == standard, "default validated")
 	for invalid: Variant in [null, [], "profile", {}, {"keyboard": "both"}]:
 		_check(Driver.validate_profile(invalid).is_empty(), "invalid shape rejected")
@@ -29,8 +30,9 @@ func _initialize() -> void:
 		{"keyboard": "arrows", "gamepad": "standard", "deadzone": 0.35, "steering": 1.5}]:
 		_check(Driver.validate_profile(value) == value, "inclusive bounds accepted")
 	var keyboard = Driver.new()
+	keyboard.configure_profile(legacy)
 	keyboard.sample_local(_keys())
-	_check(keyboard.sample_local(_keys({KEY_UP: true})).throttle == 1.0, "default arrow throttle")
+	_check(keyboard.sample_local(_keys({KEY_UP: true})).throttle == 1.0, "legacy arrow throttle")
 	var custom: Dictionary = {"keyboard": "wasd", "gamepad": "alternate", "deadzone": 0.1, "steering": 0.5}
 	_check(keyboard.configure_profile(custom), "keyboard configured")
 	custom.steering = 1.5
@@ -51,6 +53,7 @@ func _initialize() -> void:
 	var seats = Seats.new()
 	seats.assign(0, 2, [2, 3, 4])
 	seats.assign(1, 3, [2, 3, 4])
+	seats.configure_profile(1, legacy)
 	_check(not seats.configure_profile(2, standard), "unassigned seat rejected")
 	_check(seats.configure_profile(0, custom), "seat profile configured")
 	var raw: Dictionary = {2: _pad(), 3: _pad()}
@@ -67,7 +70,7 @@ func _initialize() -> void:
 	var profiles: Dictionary = seats.profiles()
 	profiles[0].deadzone = 0.35
 	profiles.clear()
-	_check(seats.profiles()[0] == custom and seats.profiles()[1] == standard, "profile snapshots cannot mutate registry")
+	_check(seats.profiles()[0] == custom and seats.profiles()[1] == legacy, "profile snapshots cannot mutate registry")
 	_check(not seats.configure_profile(0, {}) and seats.profiles()[0] == custom, "invalid seat profile is transactional")
 	_check(not seats.assign(0, 3, [2, 3, 4]) and seats.profiles()[0] == custom and seats.assignments()[0] == 2, "failed reassignment preserves profile and device")
 	_check(seats.assign(0, 4, [4]) and seats.profiles()[0] == custom, "reassignment preserves profile")

@@ -4,14 +4,14 @@
   let nextId = 0;
 
   function defaultProfile() {
-    return {keyboard:'both', gamepad:'standard', deadzone:0.2, steering:1};
+    return {keyboard:'arcade', gamepad:'arcade', deadzone:0.2, steering:1};
   }
 
   function normalize(value) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
     if (Object.keys(value).length !== keys.length || !keys.every(key => Object.hasOwn(value, key))) return null;
-    if (!['both', 'wasd', 'arrows'].includes(value.keyboard)) return null;
-    if (!['standard', 'alternate'].includes(value.gamepad)) return null;
+    if (!['arcade', 'both', 'wasd', 'arrows'].includes(value.keyboard)) return null;
+    if (!['arcade', 'standard', 'alternate'].includes(value.gamepad)) return null;
     if (!Number.isFinite(value.deadzone) || value.deadzone < 0.05 || value.deadzone > 0.35) return null;
     if (!Number.isFinite(value.steering) || value.steering < 0.5 || value.steering > 1.5) return null;
     return {keyboard:value.keyboard, gamepad:value.gamepad, deadzone:value.deadzone, steering:value.steering};
@@ -48,6 +48,7 @@
       const candidate = normalize({...current, [key]:value});
       if (!candidate) return update(current);
       current = candidate;
+      showBindings();
       onChange?.({...current});
     }
 
@@ -86,8 +87,16 @@
       });
     }
 
-    select('keyboard', 'Клавиатура', [['both', 'WASD + стрелки'], ['wasd', 'WASD'], ['arrows', 'Стрелки']]);
-    select('gamepad', 'Геймпад', [['standard', 'A / Y'], ['alternate', 'X / B']]);
+    select('keyboard', 'Клавиатура', [['arcade', 'Аркада · Space / C'], ['both', 'WASD + стрелки'], ['wasd', 'WASD'], ['arrows', 'Стрелки']]);
+    select('gamepad', 'Геймпад', [['arcade', 'Аркада · A / B'], ['standard', 'Курки · дрифт A'], ['alternate', 'Курки · дрифт X']]);
+    const bindings=element('dl','control-bindings');node.append(bindings);
+    function showBindings() {
+      const keyboard=current.keyboard==='arcade'?[['Газ / тормоз','Space / C'],['Поворот','A / D'],['Дрифт','Shift / E'],['Предметы','Q / T'],['Вид назад','F'],['Пауза','Tab / Esc']]
+        :[['Газ / тормоз',current.keyboard==='arrows'?'↑ / ↓':'W / S'],['Поворот',current.keyboard==='arrows'?'← / →':'A / D'],['Дрифт','Space'],['Предметы','Q / E'],['Вид назад','C'],['Пауза','Esc']];
+      const gamepad=current.gamepad==='arcade'?['A / B','LS','RT / RB','LB (LT) / Y','X','Menu']
+        :['RT / LT','LS',current.gamepad==='alternate'?'X':'A','LB / RB',current.gamepad==='alternate'?'B':'Y','Menu'];
+      bindings.replaceChildren(...keyboard.flatMap(([label,key],i)=>[element('dt','',label),element('dd','',`${key} · ${gamepad[i]}`)]));
+    }
     range('deadzone', 'Мёртвая зона', 0.05, 0.35, 0.01, value => `${Math.round(value * 100)}%`);
     range('steering', 'Чувствительность', 0.5, 1.5, 0.05, value => `${value.toFixed(2)}×`);
 
@@ -109,6 +118,7 @@
       const next = normalize(profile);
       if (!next) return false;
       current = next;
+      showBindings();
       for (const key of keys) {
         const field = fields[key];
         field.input.value = String(current[key]);

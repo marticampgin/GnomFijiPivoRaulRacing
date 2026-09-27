@@ -18,6 +18,25 @@
     onResume() { ui.canvas.focus(); },
     onGraphics(value) { graphics = value; saveGraphics(); },
   });
+  window.GnomMenuNavigation.create({
+    allowMenu:() => !localMode,
+    scope() {
+      const dialogs = Array.from(document.querySelectorAll('dialog[open]'));
+      if (dialogs.length) return dialogs.at(-1);
+      if (!ui.hub.hidden) return ui.hub;
+      if (localMode) return localUI.menuScope();
+      if (!$('disconnect').hidden) return $('disconnect');
+      return null;
+    },
+    onMenu() {
+      // Local pause is already edge-triggered by Godot for each assigned device.
+      if (inRace && !localMode) openDialog(ui['menu-dialog']);
+    },
+    onBack(container) {
+      if (container.id === 'result-dialog' || container.id === 'disconnect' || container.dataset.phase === 'results') { leave(); return true; }
+      return false;
+    },
+  });
   const itemLabels = {fanta:'Fanta', mermaid_rum:'Mermaid Rum', ice_rum:'Ice Rum', stroh80:'Stroh 80', lays_crab:'Lay’s Crab', bfg10k:'BFG 10K', crystal_shield:'Кристальный щит', seeker:'Кристальная ракета', rear_trap:'Рунная ловушка'};
   function renderItems(state) {
     for (let slot = 0; slot < 2; slot++) {
@@ -27,7 +46,7 @@
       else icon.removeAttribute('src');
       icon.hidden = !label; button.querySelector('.empty-slot').hidden = !!label;
       button.disabled = !label || !state.canUseItems;
-      button.title = label ? `${label} · ${slot === 0 ? 'Q' : 'E'}` : `Пустой слот ${slot + 1}`;
+      button.title = label ? `${label} · ${slot === 0 ? 'Q / LB' : 'T / Y'}` : `Пустой слот ${slot + 1}`;
       button.setAttribute('aria-label', button.title);
     }
     const maximum = Math.max(1, Number(state.maxHealth) || 100);
@@ -285,7 +304,8 @@
   window.addEventListener('blur', () => send({type:'focus', visible:false}));
   window.addEventListener('focus', () => send({type:'focus', visible:!document.hidden}));
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && inRace && !localMode && !document.querySelector('dialog[open]')) { event.preventDefault(); openDialog(ui['menu-dialog']); }
+    if (event.key === 'Tab' && inRace && !document.querySelector('dialog[open]')) event.preventDefault();
+    if (['Escape','Tab'].includes(event.key) && inRace && !localMode && !document.querySelector('dialog[open]')) { event.preventDefault(); openDialog(ui['menu-dialog']); }
   });
   function drawMap(players, currentId, descriptor) {
     const canvas = $('minimap'), context = canvas.getContext('2d');
