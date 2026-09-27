@@ -8,8 +8,10 @@ const TICKET_VERSION: int = 3
 const VEHICLE_STATE_VERSION: int = Vehicle.STATE_VERSION
 const TRACK_SCHEMA_VERSION: int = 1
 const MATCH_ID: String = "prototype-1"
-const LOADOUT_HASH: String = "prototype-v7"
-const NEUTRAL: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false}
+const LOADOUT_HASH: String = "prototype-v8"
+const NEUTRAL: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 0.0, "drift": false}
+# Simulation-only parking command; never serialized as a player input packet.
+const BLOCKED: Dictionary = {"steering": 0.0, "throttle": 0.0, "brake": 1.0, "drift": false, "drive_blocked": true}
 
 
 static func validate_input(data: Dictionary) -> Dictionary:

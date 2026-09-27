@@ -26,7 +26,7 @@ func _step(app: TestApp) -> void:
 func _run() -> void:
 	var app := TestApp.new()
 	root.add_child(app)
-	app._on_local_message({"type": "local_start", "seats": [{"device": -1, "style_id": "speed"}], "layout": "side-by-side"})
+	app._on_local_message({"type": "local_start", "seats": [{"device": -1, "style_id": "speed"}], "layout": "side-by-side", "botDifficulty": "hard"})
 	await _step(app)
 	var session: Node3D = app._local_race
 	_check(is_instance_valid(session) and app._socket == null, "local bridge creates authority without a socket")
@@ -35,11 +35,18 @@ func _run() -> void:
 	_check(hud.seats.size() == 1 and hud.players.size() == 10, "bridge publishes complete local grid")
 	_check(hud.seats[0].styleId == "speed" and hud.seats[0].device == -1, "seat style and device survive the bridge")
 	_check(hud.trackDescriptor.track_id == "castle-waterfalls", "local HUD uses authored route")
+	_check(hud.botDifficulty == "hard", "chosen bot difficulty reaches authority and HUD")
+	app._on_local_message({"type": "local_start", "seats": [{"device": -1}], "botDifficulty": "cheat"})
+	_check(app._local_race == session, "invalid difficulty preserves active race")
 	app._on_local_message({"type": "local_start", "seats": [{"device": -1}, {"device": -1}]})
 	_check(app._local_race == session, "invalid start preserves active local session")
 	session._phase = "racing"
 	session._countdown = 0
 	var player: Dictionary = session._players["local:0"]
+	player.vehicle.velocity = player.vehicle.global_basis.z * 2.0
+	_check(app._local_hud_state().seats[0].reverse, "reverse indicator follows actual signed motion")
+	player.vehicle.velocity = -player.vehicle.global_basis.z * 2.0
+	_check(not app._local_hud_state().seats[0].reverse, "forward motion clears R")
 	player.combat.slots = ["fanta", "mermaid_rum"]
 	player.combat.health = 30.0
 	app._on_local_message({"type": "local_use_item", "seat": 0, "slot": 1})
@@ -60,6 +67,7 @@ func _run() -> void:
 	app._on_local_message({"type": "local_ready", "seat": 0})
 	await _step(app)
 	_check(session._race_id == race_id + 1 and session._phase == "countdown", "local result button starts one rematch")
+	_check(app._local_hud_state().botDifficulty == "hard", "rematch keeps chosen difficulty")
 	_check(app._local_hud_state().seats[0].items == ["", ""], "rematch clears projected inventory")
 	app._on_local_message({"type": "local_leave"})
 	_check(not is_instance_valid(app._local_race) and not is_instance_valid(app._local_view), "leave removes local authority and views")

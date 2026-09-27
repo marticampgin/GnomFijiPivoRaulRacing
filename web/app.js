@@ -324,6 +324,7 @@
     }
     $('participant-count').textContent = String(state.players.length).padStart(2,'0');
     $('speed').textContent = Math.round(state.speed).toString();
+    $('reverse').hidden = !state.reverse;
     $('lap').textContent = `${state.lap} / 3`;
     $('time').textContent = formatTime(state.elapsed);
     $('ping').textContent = `${state.ping} мс`;

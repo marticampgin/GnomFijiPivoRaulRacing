@@ -296,7 +296,7 @@ func _join_server(peer_id: int, ticket: String) -> void:
 	player["queue"].clear()
 	player["item_queue"].clear()
 	player["combat"]["item_ack"] = player["item_accepted"]
-	player["input"] = Protocol.NEUTRAL.duplicate()
+	player["input"] = Protocol.BLOCKED.duplicate()
 	player["accepted"] = player["ack"]
 	player["last_input_at"] = Time.get_ticks_msec()
 	_peer_players[peer_id] = id
@@ -317,7 +317,7 @@ func _on_disconnect(peer_id: int) -> void:
 		player["queue"].clear()
 		player["item_queue"].clear()
 		player["combat"]["item_ack"] = player["item_accepted"]
-		player["input"] = Protocol.NEUTRAL.duplicate()
+		player["input"] = Protocol.BLOCKED.duplicate()
 
 
 func _remove_one_bot() -> void:
@@ -457,7 +457,7 @@ func _step_local(command: Dictionary, delta: float) -> void:
 		_local.velocity = Vector3.ZERO
 		_local.speed_mps = 0.0
 	else:
-		_local.step(command if _can_drive() else Protocol.NEUTRAL, delta)
+		_local.step(command if _can_drive() and _focused and _input_enabled else Protocol.BLOCKED, delta)
 	# Only duration-based movement is predicted. Health, inventory and revival stay authoritative.
 	var effects: Dictionary = _client_combat.get("effects", {})
 	for effect: String in effects.keys():
@@ -824,6 +824,7 @@ func _publish_hud() -> void:
 		"worldPosition": [location.x, location.y, location.z],
 		"forward": [forward.x, forward.y, forward.z],
 		"position": _hud.get("position", 1), "speed": 0.0 if _local == null else _local.speed_mps * 3.6,
+		"reverse": _local != null and _local.velocity.dot(-_local.global_basis.z) < -0.1,
 		"drift": 0.0 if _local == null else _local.drift_charge, "boost": 0.0 if _local == null else _local.boost_remaining,
 		"lap": _hud.get("lap", 1), "finished": _hud.get("finished", false), "elapsed": _hud.get("elapsed", 0.0),
 		"countdown": _client_countdown, "ping": _ping, "correction": _correction, "serverTick": _tick,
@@ -861,6 +862,7 @@ func _local_hud_state() -> Dictionary:
 		var seat: Dictionary = row.duplicate()
 		seat.merge({"device": snapshot.devices[entry.slot], "styleId": entry.style_id,
 			"speed": vehicle.speed_mps * 3.6, "lap": entry.lap, "laps": RACE_LAPS,
+			"reverse": vehicle.velocity.dot(-vehicle.global_basis.z) < -0.1,
 			"health": combat.health, "maxHealth": combat.max_health, "items": combat.slots,
 			"effects": combat.effects, "drift": vehicle.drift_charge, "boost": vehicle.boost_remaining,
 			"epoch": entry.epoch, "lookBack": _local_race.command_for_seat(entry.slot).get("look_back", false),
@@ -869,7 +871,7 @@ func _local_hud_state() -> Dictionary:
 			"destroyedRemaining": combat.destroyed_remaining, "invulnerableRemaining": combat.invulnerable_remaining})
 		seats.append(seat)
 	seats.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.seat) < int(b.seat))
-	return {"seats": seats, "players": players, "paused": snapshot.paused,
+	return {"seats": seats, "players": players, "paused": snapshot.paused, "botDifficulty": snapshot.bot_difficulty,
 		"disconnected": snapshot.disconnected_seats, "pauseReason": snapshot.pause_reason,
 		"countdown": snapshot.countdown, "status": snapshot.phase, "phase": snapshot.phase,
 		"raceId": snapshot.race_id, "tick": snapshot.tick, "trackDescriptor": _track.descriptor()}
@@ -888,7 +890,7 @@ func _on_local_message(data: Dictionary) -> void:
 		add_child(candidate)
 		candidate.configure(_track)
 		candidate.set_focused(_focused)
-		if not candidate.start_local(data["seats"]):
+		if not candidate.start_local(data["seats"], null, str(data.get("botDifficulty", "normal"))):
 			candidate.free()
 			if _bridge != null:
 				_bridge.update(JSON.stringify({"mode": "local_error", "error": "devices_unavailable"}))

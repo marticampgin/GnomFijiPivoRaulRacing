@@ -19,6 +19,7 @@ var _phase: String = "waiting"
 var _race_elapsed: float = 0.0
 var _finish_remaining: float = -1.0
 var _items: RefCounted = Items.new()
+var _bot_difficulty: String = "normal"
 
 
 func _create_vehicle(_slot: int, _visuals: bool) -> CharacterBody3D:
@@ -61,11 +62,8 @@ func _step_session(delta: float) -> void:
 			player["combat"]["item_ack"] = int(use_command["sequence"])
 			if _phase == "racing" and player["connected"] and use_command["epoch"] == player["epoch"]:
 				_items.use(player, int(use_command["slot"]), _players)
-		if player["is_bot"] and _phase == "racing" and (_tick + int(player["slot"]) * 13) % 120 == 0:
-			for item_slot: int in 2:
-				var item: String = player["combat"]["slots"][item_slot]
-				if item in ["mermaid_rum", "ice_rum"] and float(player["combat"]["health"]) > 85.0:
-					continue
+		if player["is_bot"] and _phase == "racing":
+			for item_slot: int in player["driver"].item_slots(player, _players, _tick):
 				_items.use(player, item_slot, _players)
 		if not queue.is_empty():
 			player["input"] = queue.pop_front()
@@ -74,7 +72,7 @@ func _step_session(delta: float) -> void:
 		if player["is_bot"] and _phase == "racing" and not player["finished"]:
 			command = player["driver"].sample(player["vehicle"], player["progress"], delta)
 		if (not player["is_bot"] and not _human_input_available(player)) or _phase != "racing" or player["finished"] or player["spectator"]:
-			command = Protocol.NEUTRAL
+			command = Protocol.BLOCKED
 		player["previous_position"] = player["vehicle"].global_position
 		player["vehicle"].configure(_items.effects_stats(player, Styles.stats_for(player["style_id"])))
 		var destroyed: bool = float(player["combat"]["destroyed_remaining"]) > 0.0
@@ -110,7 +108,7 @@ func _step_session(delta: float) -> void:
 			player["elapsed"] += delta
 			if float(player["combat"]["destroyed_remaining"]) <= 0.0:
 				_update_progress(player)
-		if float(player["combat"]["destroyed_remaining"]) <= 0.0 and (_track.needs_recovery(player["vehicle"].global_position) or not bool(player["progress"]["interval_valid"]) or (player["is_bot"] and player["driver"].needs_recovery())):
+		if float(player["combat"]["destroyed_remaining"]) <= 0.0 and (_track.needs_recovery(player["vehicle"].global_position) or not bool(player["progress"]["interval_valid"])):
 			_recover(player)
 	_remove_expired_waiters()
 	if _human_count() == 0:
@@ -150,10 +148,10 @@ func _new_player(id: String, display_name: String, slot: int, bot: bool, style_i
 	vehicle.reset_at(_track.spawn_transform(slot))
 	var player: Dictionary = {"id": id, "name": display_name, "slot": slot, "vehicle": vehicle,
 		"style_id": style_id, "next_style_id": style_id,
-		"is_bot": bot, "driver": BotDriver.new(_track, slot) if bot else null,
+		"is_bot": bot, "driver": BotDriver.new(_track, slot, _bot_difficulty) if bot else null,
 		"spectator": false, "ready": bot, "dnf": false,
 		"connected": true,
-		"accepted": 0, "ack": 0, "queue": [], "item_queue": [], "item_accepted": 0, "input": Protocol.NEUTRAL.duplicate(),
+		"accepted": 0, "ack": 0, "queue": [], "item_queue": [], "item_accepted": 0, "input": Protocol.BLOCKED.duplicate(),
 		"lap": 1, "progress": _track.initial_progress(), "previous_position": vehicle.global_position,
 		"finished": false, "finish_order": 0, "elapsed": 0.0, "last_recover_at": -1000, "epoch": 0}
 	_items.init_player(player)
@@ -227,7 +225,7 @@ func _recover(player: Dictionary) -> void:
 	player["queue"].clear()
 	player["item_queue"].clear()
 	player["combat"]["item_ack"] = player["item_accepted"]
-	player["input"] = Protocol.NEUTRAL.duplicate()
+	player["input"] = Protocol.BLOCKED.duplicate()
 	player["ack"] = player["accepted"]
 	player["epoch"] += 1
 	if player["is_bot"]:

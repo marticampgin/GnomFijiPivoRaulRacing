@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(resolve(root, 'shared/track-manifest.json'), 'utf8'));
 const { track_id, schema_version, simulation_revision, simulation_hash, art_revision } = manifest;
-const compatibility = { protocol_version: 5, vehicle_state_version: 1, loadout_hash: 'prototype-v7', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
+const compatibility = { protocol_version: 5, vehicle_state_version: 1, loadout_hash: 'prototype-v8', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
 const secret = 'network-probe-only-not-a-deployment-secret-2026';
 const port = Number(process.env.NETWORK_TEST_PORT || 19080);
 const url = `ws://127.0.0.1:${port}`;
@@ -92,6 +92,7 @@ try {
   await rejectTicket(ticket('pre-styles', { protocol_version: 3 }), 'pre-style wire protocol rejected');
   await rejectTicket(ticket('pre-items', { protocol_version: 4 }), 'pre-item wire protocol rejected');
   await rejectTicket(ticket('pre-item-balance', { loadout_hash: 'prototype-v6' }), 'pre-item balance rejected');
+  await rejectTicket(ticket('pre-reverse-balance', { loadout_hash: 'prototype-v7' }), 'pre-reverse balance rejected');
   await rejectTicket(ticket('bad-style', { style_id: 'faster' }), 'unknown signed style rejected');
   await rejectTicket(ticket('missing-style', { style_id: undefined }), 'missing signed style rejected');
   await rejectTicket(ticket('bot:1'), 'reserved bot identity rejected');
@@ -105,6 +106,7 @@ try {
     ['stale hello protocol', { ...compatibility, protocol_version: 1 }],
     ['pre-item hello protocol', { ...compatibility, protocol_version: 4 }],
     ['pre-item hello balance', { ...compatibility, loadout_hash: 'prototype-v6' }],
+    ['pre-reverse hello balance', { ...compatibility, loadout_hash: 'prototype-v7' }],
     ['unsupported hello state schema', { ...compatibility, vehicle_state_version: 999 }],
     ['old hello vehicle simulation', { ...compatibility, loadout_hash: 'prototype-v1' }],
     ['sharp-box hello vehicle simulation', { ...compatibility, loadout_hash: 'prototype-v2' }],

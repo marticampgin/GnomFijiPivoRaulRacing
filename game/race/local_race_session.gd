@@ -15,7 +15,9 @@ func configure(track: Node3D) -> void:
 	_track = track
 
 
-func start_local(seats: Array, available_pads: Variant = null) -> bool:
+func start_local(seats: Array, available_pads: Variant = null, bot_difficulty: String = "normal") -> bool:
+	if bot_difficulty not in BotDriver.DIFFICULTIES:
+		return false
 	if _track == null or not is_inside_tree() or seats.is_empty() or seats.size() > 4:
 		return false
 	var next_inputs: RefCounted = LocalInputs.new()
@@ -34,6 +36,7 @@ func start_local(seats: Array, available_pads: Variant = null) -> bool:
 	_last_commands.clear()
 	_disconnected_seats.clear()
 	inputs = next_inputs
+	_bot_difficulty = bot_difficulty
 	inputs.set_focused(_focused)
 	inputs.set_suspended(not _focused)
 	_tick = 0
@@ -171,7 +174,7 @@ func presentation() -> Dictionary:
 			seats[seat] = entry.duplicate(true)
 			seats[seat]["look_back"] = bool(_last_commands.get(seat, {}).get("look_back", false))
 			seats[seat]["items_world"] = _items.world_state(player.id)
-	return {"tick": _tick, "race_id": _race_id, "phase": _phase, "players": entries, "seats": seats,
+	return {"tick": _tick, "race_id": _race_id, "phase": _phase, "players": entries, "seats": seats, "bot_difficulty": _bot_difficulty,
 		"paused": inputs.is_suspended(), "focused": _focused, "devices": inputs.assignments(),
 		"pause_reason": "focus" if not _focused else ("device" if not _disconnected_seats.is_empty() else ("manual" if inputs.is_suspended() else "")),
 		"disconnected_seats": _disconnected_seats.duplicate(), "available_pads": Input.get_connected_joypads(),

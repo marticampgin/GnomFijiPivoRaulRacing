@@ -2,7 +2,7 @@ class_name RacingVehicle
 extends CharacterBody3D
 
 const STATE_VERSION: int = 1
-const BALANCE_VERSION: String = "vehicle-prototype-v7"
+const BALANCE_VERSION: String = "vehicle-prototype-v8"
 const COLLISION_SIZE: Vector3 = Vector3(2.18, 0.7, 2.696)
 const COLLISION_BEVEL: float = 0.1
 const DEFAULT_STATS: Dictionary = {
@@ -18,6 +18,8 @@ const DRIFT_MIN_STEERING: float = 0.18
 const DRIFT_MIN_SLIP: float = 0.05
 const DRIFT_MAX_SLIP: float = 1.2
 const BOOST_MIN_CHARGE: float = 0.25
+const REVERSE_MAX_SPEED: float = 8.0
+const REVERSE_ACCELERATION: float = 10.0
 
 var stats: Dictionary = DEFAULT_STATS.duplicate()
 var grounded: bool = false
@@ -85,13 +87,21 @@ func step(input: Dictionary, delta: float, gravity_up: Vector3 = Vector3.UP) -> 
 	var throttle: float = _axis(input, "throttle", 0.0, 1.0)
 	var brake: float = _axis(input, "brake", 0.0, 1.0)
 	var drift_pressed: bool = bool(input.get("drift", false))
+	var drive_blocked: bool = bool(input.get("drive_blocked", false))
+	if drive_blocked:
+		steering = 0.0
+		throttle = 0.0
+		brake = 1.0
+		drift_pressed = false
+		is_drifting = false
+		drift_charge = 0.0
 	var vertical_speed: float = velocity.dot(up_direction)
 	var planar: Vector3 = velocity.slide(up_direction)
 	var forward_speed: float = planar.dot(forward)
 	var on_surface: bool = grounded and vertical_speed <= 0.5
 	# Godot's slope-stop correction can pin a powered box collider to a seam.
 	# Retain idle slope holding, but let active driving slide across triangles.
-	floor_stop_on_slope = throttle <= 0.01 and planar.length_squared() < 0.25
+	floor_stop_on_slope = (drive_blocked or (throttle <= 0.01 and brake <= 0.01)) and planar.length_squared() < 0.25
 	boost_remaining = maxf(0.0, boost_remaining - dt)
 
 	if _drift_was_pressed and not drift_pressed:
@@ -120,7 +130,8 @@ func step(input: Dictionary, delta: float, gravity_up: Vector3 = Vector3.UP) -> 
 		turn_rate *= 1.15 + 0.2 * float(stats["drift"])
 	if not on_surface:
 		turn_rate *= 0.22
-	forward = forward.rotated(up_direction, -steering * turn_rate * speed_ratio * dt)
+	var travel_direction: float = -1.0 if forward_speed < -0.1 else 1.0
+	forward = forward.rotated(up_direction, -steering * turn_rate * speed_ratio * travel_direction * dt)
 	right = forward.cross(up_direction).normalized()
 	global_basis = Basis(right, up_direction, -forward).orthonormalized()
 
@@ -129,15 +140,26 @@ func step(input: Dictionary, delta: float, gravity_up: Vector3 = Vector3.UP) -> 
 	if on_surface:
 		var acceleration: float = float(stats["acceleration"]) * throttle
 		var max_speed: float = float(stats["top_speed"])
-		if boost_remaining > 0.0:
+		if boost_remaining > 0.0 and brake <= 0.01 and longitudinal >= 0.0 and not drive_blocked:
 			acceleration += 22.0
 			max_speed *= 1.28
+		# Opposite pedals first stop travel. Reverse begins only on the next tick.
+		if drive_blocked or (brake > 0.01 and (longitudinal > 0.0 or throttle > 0.01)):
+			longitudinal = move_toward(longitudinal, 0.0, (brake * 34.0 + 1.2) * dt)
+		elif brake > 0.01:
+			if longitudinal < -REVERSE_MAX_SPEED:
+				longitudinal = move_toward(longitudinal, -REVERSE_MAX_SPEED, 4.0 * dt)
+			else:
+				longitudinal = maxf(-REVERSE_MAX_SPEED, longitudinal - REVERSE_ACCELERATION * brake * dt)
+		elif longitudinal < 0.0:
+			longitudinal = move_toward(longitudinal, 0.0, (throttle * 34.0 + 1.2) * dt)
 		# Contact momentum and expired boost coast down instead of vanishing at the cap.
-		if longitudinal > max_speed:
+		elif longitudinal > max_speed:
 			longitudinal = move_toward(longitudinal, max_speed, 4.0 * dt)
 		else:
 			longitudinal = minf(max_speed, longitudinal + acceleration * dt)
-		longitudinal = move_toward(longitudinal, 0.0, (brake * 34.0 + 1.2) * dt)
+		if longitudinal >= 0.0 and brake <= 0.01:
+			longitudinal = move_toward(longitudinal, 0.0, 1.2 * dt)
 		var grip: float = 11.0 * float(stats["handling"])
 		if is_drifting:
 			grip = 1.5 + float(stats["drift"]) * 0.5

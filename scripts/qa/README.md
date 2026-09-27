@@ -7,6 +7,24 @@ is `http://127.0.0.1:8788/`.
 
 ## Prerequisites
 
+Short native checks for the v8 driving/items milestone (no full laps):
+
+```sh
+godot --headless --path game --script res://tests/reverse_probe.gd
+godot --headless --path game --script res://tests/reverse_gates_probe.gd
+godot --headless --path game --script res://tests/bot_difficulty_probe.gd
+godot --headless --path game --script res://tests/gifts_probe.gd
+godot --headless --path game --script res://tests/local_app_probe.gd
+```
+
+Local browser flow: choose easy/normal/hard in local setup, start, hold brake
+during countdown (no reverse), drive forward, brake to stop then reverse (R),
+accelerate forward (R clears), pause/resume. Check an independently assigned
+gamepad and a 390x844 HUD as well as desktop. Virtual controllers verify software
+routing, not real hardware compatibility. Shared gift arbitration/2-second respawn
+and full inventory refusal use deterministic native fixtures; do not drive three
+laps to test these rules. Baseline values are in `docs/playtest-balance.md`.
+
 - Node.js with `playwright` and `sharp` resolvable by `require()`.
 - Playwright's Chromium already available and a graphical desktop session.
 - A matching exported game/backend preview with guest login and the two local

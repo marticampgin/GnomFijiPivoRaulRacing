@@ -88,16 +88,19 @@ func _run() -> void:
 	a.combat.slots = ["", ""]
 	items.step(players, 0.01)
 	_check(a.combat.slots[0] != "" and a.combat.slots[1] == "", "pickup fills first free slot")
-	_check(not items.world_state("a").pickups[0].available, "personal snapshot hides cooling pickup")
-	_check(items.world_state("b").pickups[0].available and items.world_state().pickups[0].available, "pickup availability remains per racer")
+	_check(not items.world_state("a").pickups[0].available, "collector snapshot hides cooling pickup")
+	_check(not items.world_state("b").pickups[0].available and not items.world_state().pickups[0].available, "pickup unavailable globally")
 	items.step(players, 0.01)
 	_check(a.combat.slots[1] == "", "same pickup cooldown")
 	b.vehicle.position = Vector3.ZERO
 	items.step(players, 0.01)
-	_check(b.combat.slots[0] != "", "pickup independent per racer")
+	_check(b.combat.slots[0] == "", "another racer cannot collect during global cooldown")
 	a.combat.slots = ["fanta", "ice_rum"]
-	items.step(players, 8.0)
-	_check(items.world_state("a").pickups[0].available, "personal pickup available after eight seconds")
+	items.step(players, 2.0)
+	_check(b.combat.slots[0] != "", "another racer collects after two seconds")
+	b.combat.slots = ["fanta", "ice_rum"]
+	items.step(players, 2.0)
+	_check(items.world_state("a").pickups[0].available, "global pickup available after two seconds")
 	_check(a.combat.slots == ["fanta", "ice_rum"], "cooldown expiry never replaces full slots")
 	items._pickups.clear()
 	b.vehicle.position = Vector3(0, 10, 0)

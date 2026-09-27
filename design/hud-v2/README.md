@@ -50,7 +50,7 @@ No SEGA artwork is embedded in the mockups.
 - Three bot difficulties adjust driving and item-use skill, not hidden speed,
   teleportation or privileged loot.
 - Brake slows to a stop, then holding it drives backward at a limited speed with R
-  displayed. The present game has braking only, not commanded reverse.
+  displayed. Reverse and its live R indicator are now implemented.
 - Weapons remain in slots. Received damage and negative effects apply immediately,
   without occupying a slot. Repair drinks retain their voluntary blur tradeoff.
 - Full inventory does not consume a gift. A collected gift disappears globally for
@@ -95,7 +95,8 @@ repeat; then the new race mechanics and track changes. The user approved reconci
 the parent OpenSpec proposal, design, four specs and tasks, then implementation.
 The local runtime now includes all five gameplay layouts and the accepted hierarchy
 for existing items, health, rank, lap, drift charge and effects. The prior HUD remains
-in the network prototype. New shards, reverse, three drift levels and attack warnings
+in the network prototype. Reverse now has a live R indicator in both HUDs;
+the local setup includes three bot difficulties. New shards, three drift levels and attack warnings
 are pending their mechanics; they are not populated with illustrative mockup values.
 Physical-controller and four-camera performance acceptance remain open.
 

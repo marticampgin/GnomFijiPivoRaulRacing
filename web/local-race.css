@@ -17,6 +17,7 @@
 .local-race progress{display:block;width:100%;height:6px;border:none;border-radius:0;appearance:none;background:#3b4540}.local-race progress::-webkit-progress-bar{background:#3b4540}.local-race progress::-webkit-progress-value{background:#64e3db}.local-race progress.critical::-webkit-progress-value{background:#ff877b}.local-race progress::-moz-progress-bar{background:#64e3db}
 .local-drift{position:absolute;bottom:var(--inset);left:50%;transform:translateX(-50%);width:180px;font-size:14px;display:grid;gap:12px}.local-drift progress::-webkit-progress-value{background:#e5ff58}
 .local-speed{position:absolute;bottom:var(--inset);right:var(--inset);display:flex;align-items:baseline;gap:8px}.local-speed strong{font-size:40px}.local-speed span{font-size:14px}
+.local-reverse{position:absolute;right:0;bottom:100%;color:#ffd36b;font-size:18px;line-height:24px}
 .local-map{position:absolute;right:var(--inset);bottom:98px;width:160px;height:160px}.local-grid:not(.players-1) .local-map{width:118px;height:118px;bottom:88px}
 .local-effects{position:absolute;top:126px;left:var(--inset);display:flex;flex-wrap:wrap;gap:4px;max-width:calc(100% - 2 * var(--inset))}.local-effect{padding:6px 10px;border:1px solid #64e3db;background:#131715;border-radius:4px;font-size:14px}.local-effect.burn{color:#ff877b;border-color:#ff877b}
 .local-countdown{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);font-size:72px;color:#e5ff58}

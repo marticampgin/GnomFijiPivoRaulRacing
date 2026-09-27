@@ -2,7 +2,7 @@ class_name RaceItems
 extends RefCounted
 
 const Catalog = preload("res://items/item_catalog.gd")
-const PICKUP_COOLDOWN: float = 8.0
+const PICKUP_COOLDOWN: float = 2.0
 var _track: Node3D
 var _pickups: Array = []
 var _projectiles: Array = []
@@ -96,8 +96,7 @@ func step(players: Dictionary, delta: float) -> Array:
 			effect.remaining = maxf(0.0, float(effect.remaining) - delta)
 			if effect.remaining == 0.0:
 				state.effects.erase(id)
-		if _active(player):
-			_pickup(player)
+	_collect_pickups(players)
 	_step_projectiles(players, delta)
 	return due
 
@@ -125,12 +124,12 @@ static func blur_intensity(combat: Dictionary) -> float:
 	return strength
 
 
-func world_state(player_id: String = "") -> Dictionary:
+func world_state(_player_id: String = "") -> Dictionary:
 	var pickups: Array = []
 	var projectiles: Array = []
 	var events: Array = []
 	for pickup: Dictionary in _pickups:
-		var available: bool = player_id.is_empty() or float(_cooldowns.get(player_id + ":" + str(pickup.id), 0.0)) <= 0.0
+		var available: bool = float(_cooldowns.get(str(pickup.id), 0.0)) <= 0.0
 		pickups.append({"id": pickup.id, "position": _array(pickup.position), "available": available})
 	for projectile: Dictionary in _projectiles:
 		projectiles.append({"id": projectile.id, "kind": projectile.kind, "position": _array(projectile.position)})
@@ -158,20 +157,66 @@ func _damage_multiplier(player: Dictionary) -> float:
 	return 1.15 if player.get("combat", {}).get("effects", {}).has("lays_crab") else 1.0
 
 
-func _pickup(player: Dictionary) -> void:
-	var slot: int = player.combat.slots.find("")
-	if slot < 0:
-		return
+func _collect_pickups(players: Dictionary) -> void:
+	var recipients: Dictionary = {}
 	for pickup: Dictionary in _pickups:
-		var key: String = str(player.id) + ":" + str(pickup.id)
+		var key: String = str(pickup.id)
 		if float(_cooldowns.get(key, 0.0)) > 0.0:
 			continue
-		if player.vehicle.global_position.distance_to(pickup.position) > 2.0:
+		var candidates: Array[Dictionary] = []
+		for player: Dictionary in players.values():
+			if not _active(player) or recipients.has(player.id) or player.combat.slots.find("") < 0:
+				continue
+			var distance: float = player.vehicle.global_position.distance_squared_to(pickup.position)
+			if distance <= 4.0:
+				candidates.append({"player": player, "distance": distance})
+		if candidates.is_empty():
 			continue
-		player.combat.slots[slot] = Catalog.IDS[_rng.randi_range(0, Catalog.IDS.size() - 1)]
+		# Stable spatial arbitration is independent of dictionary order and racer type.
+		candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			if a.distance != b.distance:
+				return a.distance < b.distance
+			if int(a.player.get("slot", 0)) != int(b.player.get("slot", 0)):
+				return int(a.player.get("slot", 0)) < int(b.player.get("slot", 0))
+			return str(a.player.id) < str(b.player.id))
+		var recipient: Dictionary = candidates[0].player
+		var context: Dictionary = _loot_context(recipient, players)
+		var slot: int = recipient.combat.slots.find("")
+		recipient.combat.slots[slot] = _draw_item(Catalog.loot_weights(context.place, context.racers, context.gap))
 		_cooldowns[key] = PICKUP_COOLDOWN
+		recipients[recipient.id] = true
 		_event("pickup", pickup.position, 1.0)
-		return
+
+
+func _loot_context(recipient: Dictionary, players: Dictionary) -> Dictionary:
+	var distances: Dictionary = {}
+	for player: Dictionary in players.values():
+		if player.get("spectator", false):
+			continue
+		var distance: float = 0.0
+		if is_instance_valid(_track) and _track.has_method("standings_distance") and player.has("progress"):
+			distance = _track.standings_distance(player.progress, player.vehicle.global_position)
+		distances[player.id] = distance if is_finite(distance) else 0.0
+	var own: float = float(distances.get(recipient.id, 0.0))
+	var leader: float = own
+	var place: int = 1
+	for distance: float in distances.values():
+		leader = maxf(leader, distance)
+		if distance > own:
+			place += 1
+	return {"place": place, "racers": distances.size(), "gap": maxf(0.0, leader - own)}
+
+
+func _draw_item(weights: Dictionary) -> String:
+	var total: float = 0.0
+	for id: String in Catalog.IDS:
+		total += float(weights[id])
+	var draw: float = _rng.randf() * total
+	for id: String in Catalog.IDS:
+		draw -= float(weights[id])
+		if draw < 0.0:
+			return id
+	return Catalog.IDS.back()
 
 
 func _step_projectiles(players: Dictionary, delta: float) -> void:

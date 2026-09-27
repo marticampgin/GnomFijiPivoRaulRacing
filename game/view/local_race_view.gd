@@ -159,7 +159,6 @@ func update_view(delta: float, commands_by_seat: Dictionary = {}) -> void:
 	if _race_id != int(_session._race_id):
 		_race_id = int(_session._race_id)
 		_items.clear()
-	# Legacy personal gift cooldowns become global in the item-rule milestone.
 	_items.apply_world(_session._items.world_state())
 	_items._process(maxf(0.0, delta))
 	for view: Dictionary in _views:

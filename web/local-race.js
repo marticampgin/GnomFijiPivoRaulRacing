@@ -27,16 +27,17 @@
     const setupHeading = element('h2','','Локальная гонка');
     const count = select([1,2,3,4].map(n => [n,`${n} ${n===1?'игрок':'игрока'}`]),1,'Количество игроков');
     const layout = select([['side-by-side','Рядом'],['stacked','Друг над другом']],'side-by-side','Разделение экрана');
+    const difficulty = select([['easy','Лёгкие боты'],['normal','Обычные боты'],['hard','Сложные боты']],'normal','Сложность ботов');
     const setupRows = element('div','local-setup-rows'), setupError = element('p','local-error'); setupError.setAttribute('role','alert');
     const start = button('На старт', () => {
       const error = validateSeats(setupSeats,pads); setupError.textContent = error;
       if (error) return;
       start.disabled = true;
-      const payload = {type:'local_start',seats:setupSeats.map(seat => ({...seat})),layout:chosenLayout};
+      const payload = {type:'local_start',seats:setupSeats.map(seat => ({...seat})),layout:chosenLayout,botDifficulty:difficulty.value};
       (onStart || send)(payload);
     },'arrow-up-right'); start.id = 'local-start';
     const setupActions = element('div','local-actions'); setupActions.append(button('Назад',()=>setup.close(),'x'),start);
-    setup.append(setupHeading,count,layout,setupRows,setupError,setupActions); document.body.append(setup);
+    setup.append(setupHeading,count,layout,difficulty,setupRows,setupError,setupActions); document.body.append(setup);
     const pause = element('dialog','local-dialog'); pause.id = 'local-pause';
     const pauseTitle = element('h2','','Пауза'), pauseRows = element('div','local-setup-rows'), pauseError = element('p','local-error'); pauseError.setAttribute('role','alert');
     const graphics = element('fieldset','local-graphics'), qualityOptions = element('div','local-quality-options');
@@ -80,12 +81,12 @@
       const rank = element('div','local-rank'), rankValue=element('strong'), total=element('span'); rank.append(rankValue,total,element('small','','МЕСТО'));
       const health = element('div','local-health'), healthValue=element('strong'), healthBar=element('progress'); healthBar.max=100; healthBar.setAttribute('aria-label',`Прочность P${index+1}`); health.append(element('span','','ПРОЧНОСТЬ'),healthValue,healthBar);
       const drift = element('div','local-drift'), driftLabel=element('span','','ДРИФТ'), driftBar=element('progress'); driftBar.max=1; driftBar.setAttribute('aria-label',`Заряд дрифта P${index+1}`); drift.append(driftLabel,driftBar);
-      const speed = element('div','local-speed'), speedValue=element('strong'); speed.append(speedValue,element('span','','км/ч'));
+      const speed = element('div','local-speed'), speedValue=element('strong'), reverse=element('b','local-reverse','R'); reverse.hidden=true;reverse.setAttribute('aria-label','Задний ход');speed.append(reverse,speedValue,element('span','','км/ч'));
       const effects=element('div','local-effects'), map=element('canvas','local-map'); map.width=160;map.height=160;map.setAttribute('aria-label',`Карта P${index+1}`);
       const countdown=element('div','local-countdown'), finish=element('div','local-finish'), finishTitle=element('strong'),finishTime=element('span');
       const ready=button('Ещё заезд',()=>send({type:'local_ready',seat:index}),'rotate-ccw'); finish.append(finishTitle,finishTime,ready); finish.hidden=true;
       pane.append(blur,identity,inventory,lap,rank,health,drift,speed,effects,map,countdown,finish);
-      return {pane,blur,identity,slots,lapValue,clock,rankValue,total,healthValue,healthBar,driftLabel,driftBar,speedValue,effects,map,countdown,finish,finishTitle,finishTime,ready};
+      return {pane,blur,identity,slots,lapValue,clock,rankValue,total,healthValue,healthBar,driftLabel,driftBar,speedValue,reverse,effects,map,countdown,finish,finishTitle,finishTime,ready};
     }
     function drawMap(canvas, descriptor, players, id) {
       const ctx=canvas.getContext('2d'); if(!ctx)return; ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -128,7 +129,7 @@
         p.blur.style.backdropFilter=`blur(${clamp(seat.blurIntensity,0,1)*(next.graphics?.reducedEffects?.6:3)}px)`;
         p.lapValue.textContent=`${seat.lap || 1} / ${seat.laps || 3}`;p.clock.textContent=time(seat.elapsed);p.rankValue.textContent=seat.rank || '-';p.total.textContent=`/ ${next.players?.length || 10}`;
         p.healthValue.textContent=Math.ceil(clamp(seat.health,0,seat.maxHealth || 100));p.healthBar.max=seat.maxHealth || 100;p.healthBar.value=clamp(seat.health,0,p.healthBar.max);p.healthBar.classList.toggle('critical',p.healthBar.value/p.healthBar.max<.35);
-        p.speedValue.textContent=Math.round(Number(seat.speed)||0);p.driftBar.value=clamp(seat.drift,0,1);p.driftLabel.textContent=seat.boost>0?'УСКОРЕНИЕ':'ДРИФТ';
+        p.speedValue.textContent=Math.round(Number(seat.speed)||0);p.reverse.hidden=!seat.reverse;p.driftBar.value=clamp(seat.drift,0,1);p.driftLabel.textContent=seat.boost>0?'УСКОРЕНИЕ':'ДРИФТ';
         p.slots.forEach(({node,img,key,empty},slot)=> { const item=seat.items?.[slot];const valid=Object.hasOwn(items,item);img.hidden=!valid;empty.hidden=valid;if(valid && img.dataset.item!==item){img.src=`/assets/items/${item}.png`;img.dataset.item=item;}key.textContent=seat.device===-1?['Q','E'][slot]:['LB','RB'][slot];node.disabled=!valid||!seat.canUseItems||next.paused;node.title=valid?items[item]:'Пусто';node.setAttribute('aria-label',`P${index+1}, предмет ${slot+1}: ${valid?items[item]:'пусто'}`); });
         const labels={...items,burn:'Горение',invulnerable:'Защита',recovery:'Восстановление'};
         const effects={...seat.effects};if(seat.invulnerableRemaining>0)effects.invulnerable=seat.invulnerableRemaining;if(seat.destroyedRemaining>0)effects.recovery=seat.destroyedRemaining;
