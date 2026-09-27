@@ -18,6 +18,37 @@ using an existing external dependency runtime, set `NODE_PATH` to its
 
 ## Run Sequentially
 
+### Native Contact Checks
+
+Use the pinned Godot binary as `godot` below. These short probes cover impulse
+response, actual worker ordering, snapshot replay and solid road/parapets:
+
+```sh
+godot --headless --path game --fixed-fps 60 --script res://tests/vehicle_contacts_probe.gd
+godot --headless --path game --fixed-fps 60 --script res://tests/contact_worker_probe.gd
+godot --headless --path game --script res://tests/contact_reconciliation_probe.gd
+godot --headless --path game --script res://tests/contact_presentation_probe.gd
+godot --headless --path game --script res://tests/contact_motion_probe.gd
+godot --headless --path game --fixed-fps 60 --script res://tests/bot_contact_motion_probe.gd
+godot --headless --path game --fixed-fps 60 --script res://tests/environment_contacts_probe.gd
+```
+
+`bot_race_probe.gd` adds ten-car, three-lap contact coverage on the authored road;
+its contact counter counts solver passes, not distinct impacts. It requires zero
+recoveries and exactly one finish per racer. This accelerated headless run does
+not measure live server capacity or browser frame rate.
+
+The contact presentation probe reproduces the former near-racer overlap from
+100 ms delayed rendering, separately from the collision-envelope probe. Nearby
+visual extrapolation is capped at 100 ms; it cannot predict an unseen future
+impact or guarantee zero overlap under arbitrary latency.
+
+The motion probe uses deterministic snapshot/acknowledgment jitter to check
+frame displacement and turn continuity. The bot contact motion probe separates
+server-side pack corrections from presentation jitter in a short simulation.
+
+### Browser Scope
+
 Choose the scope to match the change. Hero-only geometry/material edits use the
 short smoke below, not the full race. Route/physics/progress/network changes
 still require their relevant integration checks and, when affected, a full finish.
@@ -42,7 +73,10 @@ node scripts/qa/art-stage.cjs
 Its default pass requires three laps, the authoritative `finished` flag, the
 result dialog, four route-anchor screenshots and a healthy browser console.
 It also rejects sudden unbraked speed losses near the road centre (more than
-75% in at most 250 ms from above 8 m/s), excluding long pauses and position jumps.
+75% in at most 250 ms from above 8 m/s), excluding long pauses, position jumps
+and samples within four metres of another racer where contact is expected.
+This proximity exclusion is not proof of a collision; pair impulse behaviour is
+covered separately by the native contact and worker probes.
 Route geometry comes from the HUD descriptor; local camera anchors are used only
 when the baked simulation hash matches. No movement packets or teleport commands
 are injected.

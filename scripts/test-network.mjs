@@ -9,7 +9,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const manifest = JSON.parse(readFileSync(resolve(root, 'shared/track-manifest.json'), 'utf8'));
 const { track_id, schema_version, simulation_revision, simulation_hash, art_revision } = manifest;
-const compatibility = { protocol_version: 3, vehicle_state_version: 1, loadout_hash: 'prototype-v3', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
+const compatibility = { protocol_version: 3, vehicle_state_version: 1, loadout_hash: 'prototype-v5', track: { track_id, schema_version, simulation_revision, simulation_hash, art_revision } };
 const secret = 'network-probe-only-not-a-deployment-secret-2026';
 const port = Number(process.env.NETWORK_TEST_PORT || 19080);
 const url = `ws://127.0.0.1:${port}`;
@@ -93,12 +93,16 @@ try {
   await rejectTicket(ticket('wrong-state', { vehicle_state_version: 999 }), 'signed unsupported vehicle state schema rejected');
   await rejectTicket(ticket('old-vehicle', { loadout_hash: 'prototype-v1' }), 'signed old vehicle simulation rejected');
   await rejectTicket(ticket('sharp-box-vehicle', { loadout_hash: 'prototype-v2' }), 'signed sharp-box vehicle simulation rejected');
+  await rejectTicket(ticket('no-contact-vehicle', { loadout_hash: 'prototype-v3' }), 'signed pre-contact vehicle simulation rejected');
+  await rejectTicket(ticket('narrow-contact-vehicle', { loadout_hash: 'prototype-v4' }), 'signed narrow contact envelope rejected');
   await rejectTicket(ticket('wrong-track', { track: { ...compatibility.track, simulation_hash: 'a'.repeat(64) } }), 'signed stale track hash rejected');
   for (const [label, descriptor] of [
     ['stale hello protocol', { ...compatibility, protocol_version: 1 }],
     ['unsupported hello state schema', { ...compatibility, vehicle_state_version: 999 }],
     ['old hello vehicle simulation', { ...compatibility, loadout_hash: 'prototype-v1' }],
     ['sharp-box hello vehicle simulation', { ...compatibility, loadout_hash: 'prototype-v2' }],
+    ['pre-contact hello simulation', { ...compatibility, loadout_hash: 'prototype-v3' }],
+    ['narrow contact envelope', { ...compatibility, loadout_hash: 'prototype-v4' }],
     ['stale hello track', { ...compatibility, track: { ...compatibility.track, simulation_hash: 'a'.repeat(64) } }],
   ]) {
     const peer = await connect(ticket('incompatible-client'), descriptor);
@@ -124,8 +128,12 @@ try {
   const movingBot = ownState(first, bot.id);
   verify(Math.hypot(...movingBot.state.position.map((value, index) => value - bot.state.position[index])) > 3, 'server bot drives under authoritative physics');
   await delay(1300);
-  const stopped = ownState(first, 'driver-a');
-  verify(Math.hypot(stopped.state.velocity[0], stopped.state.velocity[2]) < 0.5, 'stale input brakes authoritative car');
+  // Braking does not cancel legitimate rear impacts from bots passing the idle car.
+  const stopped = await waitFor(() => {
+    const latest = ownState(first, 'driver-a');
+    return Math.hypot(latest.state.velocity[0], latest.state.velocity[2]) < 0.5 ? latest : null;
+  }, 'stale-input braking after contact traffic settles', 10000);
+  verify(true, 'stale input brakes authoritative car after external pushes settle');
   first.socket.close();
   await waitFor(() => first.closed, 'disconnect');
   const resumed = await joined('driver-a');

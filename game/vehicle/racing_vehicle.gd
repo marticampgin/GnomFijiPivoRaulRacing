@@ -2,8 +2,8 @@ class_name RacingVehicle
 extends CharacterBody3D
 
 const STATE_VERSION: int = 1
-const BALANCE_VERSION: String = "vehicle-prototype-v3"
-const COLLISION_SIZE: Vector3 = Vector3(1.25, 0.7, 2.1)
+const BALANCE_VERSION: String = "vehicle-prototype-v5"
+const COLLISION_SIZE: Vector3 = Vector3(2.18, 0.7, 2.696)
 const COLLISION_BEVEL: float = 0.1
 const DEFAULT_STATS: Dictionary = {
 	"top_speed": 34.0,
@@ -132,7 +132,11 @@ func step(input: Dictionary, delta: float, gravity_up: Vector3 = Vector3.UP) -> 
 		if boost_remaining > 0.0:
 			acceleration += 22.0
 			max_speed *= 1.28
-		longitudinal = minf(max_speed, longitudinal + acceleration * dt)
+		# Contact momentum and expired boost coast down instead of vanishing at the cap.
+		if longitudinal > max_speed:
+			longitudinal = move_toward(longitudinal, max_speed, 4.0 * dt)
+		else:
+			longitudinal = minf(max_speed, longitudinal + acceleration * dt)
 		longitudinal = move_toward(longitudinal, 0.0, (brake * 34.0 + 1.2) * dt)
 		var grip: float = 11.0 * float(stats["handling"])
 		if is_drifting:

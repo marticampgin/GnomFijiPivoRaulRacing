@@ -3,6 +3,7 @@ extends SceneTree
 const Track = preload("res://track/authored_track.gd")
 const Vehicle = preload("res://vehicle/racing_vehicle.gd")
 const Driver = preload("res://ai/racing_bot_driver.gd")
+const Contacts = preload("res://vehicle/vehicle_contacts.gd")
 
 
 func _initialize() -> void:
@@ -31,16 +32,27 @@ func _run() -> void:
 		racers.append({"car": car, "driver": Driver.new(track, slot), "progress": track.initial_progress(), "recoveries": 0, "finish_tick": 0, "finish_events": 0})
 	var completed: int = 0
 	var valid_commands: bool = true
+	var contact_count: int = 0
+	var all_bodies: Array = racers.map(func(racer: Dictionary) -> CharacterBody3D: return racer.car)
 	for tick: int in 15000:
 		await physics_frame
+		var active_bodies: Array = []
+		var previous_transforms: Dictionary = {}
 		for racer: Dictionary in racers:
 			if racer.progress.finished:
 				continue
 			var car: CharacterBody3D = racer.car
 			var command: Dictionary = racer.driver.sample(car, racer.progress, 1.0 / 60.0)
 			valid_commands = valid_commands and _valid(command)
-			var previous: Vector3 = car.position
+			active_bodies.append(car)
+			previous_transforms[car.get_instance_id()] = car.global_transform
 			car.step(command, 1.0 / 60.0)
+		contact_count += Contacts.resolve(active_bodies, previous_transforms, all_bodies)
+		for racer: Dictionary in racers:
+			if racer.progress.finished:
+				continue
+			var car: CharacterBody3D = racer.car
+			var previous: Vector3 = previous_transforms[car.get_instance_id()].origin
 			var events: Array = track.advance_progress(racer.progress, previous, car.position)
 			for event: Dictionary in events:
 				if event.type == "finish":
@@ -56,7 +68,7 @@ func _run() -> void:
 		if completed == 10:
 			break
 	var report: Array = []
-	var passed: bool = completed == 10 and valid_commands
+	var passed: bool = completed == 10 and valid_commands and contact_count > 0
 	for slot: int in racers.size():
 		var racer: Dictionary = racers[slot]
 		passed = passed and racer.recoveries == 0 and racer.finish_events == 1 and racer.progress.lap == 3
@@ -72,8 +84,8 @@ func _run() -> void:
 		racer.driver.reset()
 		passed = passed and not racer.driver.needs_recovery()
 		racer.car.queue_free()
-	print("BOT_RACE_PROBE ", JSON.stringify({"passed": passed, "completed": completed, "valid_commands": valid_commands,
-		"racers": report, "note": "Ten unchanged vehicle bodies on real road collision, three complete checkpoint-validated laps; not a server capacity benchmark."}))
+	print("BOT_RACE_PROBE ", JSON.stringify({"passed": passed, "completed": completed, "valid_commands": valid_commands, "solver_pass_contact_resolutions": contact_count,
+		"racers": report, "note": "Ten vehicle bodies with authoritative contacts on real road collision, three checkpoint-validated laps and zero recoveries. Contact resolutions count solver passes, not unique impacts. Not a server capacity benchmark."}))
 	track.queue_free()
 	await process_frame
 	quit(0 if passed else 1)

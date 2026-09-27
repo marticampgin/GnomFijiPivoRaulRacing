@@ -29,6 +29,11 @@ func _character_probes() -> void:
 	var vehicle: CharacterBody3D = _character(Vector3(0.0, 0.8, 0.0))
 	await _steps(vehicle, 90, {})
 	_check(vehicle.grounded, "CharacterBody settles on floor")
+	vehicle.velocity = Vector3.FORWARD * 42.0
+	await _steps(vehicle, 1, {"throttle": 1.0})
+	_check(vehicle.speed_mps > 41.0 and vehicle.speed_mps < 42.0, "external overspeed survives one tick but cannot gain engine energy")
+	await _steps(vehicle, 180, {"throttle": 1.0})
+	_check(vehicle.speed_mps <= float(vehicle.stats["top_speed"]), "external overspeed decays to normal engine cap")
 	await _steps(vehicle, 120, {"throttle": 1.0})
 	_check(vehicle.speed_mps > 20.0, "CharacterBody accelerates")
 	var before: Vector3 = -vehicle.global_basis.z

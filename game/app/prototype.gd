@@ -6,6 +6,7 @@ const Protocol = preload("res://net/prototype_protocol.gd")
 const Transport = preload("res://net/prototype_socket_server.gd")
 const Driver = preload("res://input/driver_input.gd")
 const BotDriver = preload("res://ai/racing_bot_driver.gd")
+const VehicleContacts = preload("res://vehicle/vehicle_contacts.gd")
 const HERO_COLOR: Color = Color("2e9d99")
 const MAX_PLAYERS: int = 10
 const PHYSICS_DT: float = 1.0 / 60.0
@@ -148,7 +149,7 @@ func _create_vehicle(_slot: int, visuals: bool) -> CharacterBody3D:
 	var collider: CollisionShape3D = CollisionShape3D.new()
 	collider.shape = Vehicle.create_collision_shape()
 	vehicle.add_child(collider)
-	# The initial network probe excludes car-to-car collision prediction.
+	# Road motion is predicted locally; pair contacts are resolved once on the server.
 	vehicle.collision_layer = 2
 	vehicle.collision_mask = 1
 	if visuals:
@@ -178,6 +179,8 @@ func _step_server(delta: float) -> void:
 		if _finish_remaining >= 0.0:
 			_finish_remaining = maxf(0.0, _finish_remaining - delta)
 	var now: int = Time.get_ticks_msec()
+	var contact_bodies: Array = []
+	var previous_transforms: Dictionary = {}
 	for id: String in _players.keys():
 		var player: Dictionary = _players[id]
 		if not player["is_bot"] and not player["connected"] and now - int(player["disconnected_at"]) > RECONNECT_MS:
@@ -192,7 +195,15 @@ func _step_server(delta: float) -> void:
 		if (not player["is_bot"] and (not player["connected"] or now - int(player["last_input_at"]) > INPUT_TIMEOUT_MS)) or _phase != "racing" or player["finished"] or player["spectator"]:
 			command = Protocol.NEUTRAL
 		player["previous_position"] = player["vehicle"].global_position
+		if _phase == "racing" and not player["finished"] and not player["spectator"]:
+			contact_bodies.append(player["vehicle"])
+			previous_transforms[player["vehicle"].get_instance_id()] = player["vehicle"].global_transform
 		player["vehicle"].step(command, delta)
+	if contact_bodies.size() > 1:
+		VehicleContacts.resolve(contact_bodies, previous_transforms,
+			_players.values().map(func(player: Dictionary) -> CharacterBody3D: return player["vehicle"]))
+	# Checkpoints observe the final contact-corrected pose, never an unresolved overlap.
+	for player: Dictionary in _players.values():
 		if _phase == "racing" and not player["finished"] and not player["spectator"]:
 			player["elapsed"] += delta
 			_update_progress(player)
@@ -677,11 +688,11 @@ func _apply_snapshot(packet: Dictionary) -> void:
 			_pending = _pending.filter(func(command: Dictionary) -> bool: return int(command["sequence"]) > ack)
 			_local.restore_state(state)
 			var epoch_changed: bool = int(_hud.get("epoch", -1)) != int(entry.get("epoch", 0))
-			if epoch_changed:
+			if epoch_changed or generation_changed:
 				_pending.clear()
 			for command: Dictionary in _pending:
 				_local.step(command if _phase == "racing" and not entry.get("finished", false) and not entry.get("spectator", false) else Protocol.NEUTRAL, PHYSICS_DT)
-			if epoch_changed and _race_camera != null:
+			if (epoch_changed or generation_changed) and _race_camera != null:
 				_race_camera.reset(_local)
 			_correction = before.distance_to(_local.global_position)
 			_hud = entry.duplicate()
@@ -696,9 +707,13 @@ func _apply_snapshot(packet: Dictionary) -> void:
 			var samples: Array = _remotes[id]["samples"]
 			if generation_changed or int(_remotes[id].get("epoch", -1)) != int(entry.get("epoch", 0)):
 				samples.clear()
+				_remotes[id].erase("near_pose")
+				_remotes[id].erase("near_sample_at")
+				_remotes[id].erase("near_lead")
 				_remotes[id]["node"].global_transform = state["transform"]
 			_remotes[id]["epoch"] = int(entry.get("epoch", 0))
-			samples.append({"at": Time.get_ticks_msec(), "transform": state["transform"],
+			samples.append({"at": Time.get_ticks_msec(), "tick": server_tick, "transform": state["transform"],
+				"velocity": state["velocity"],
 				"speed": state["velocity"].slide(state["up_direction"]).length(), "steering": state["steering_amount"],
 				"drifting": state["is_drifting"], "boost": state["boost_remaining"]})
 			while samples.size() > 12:
@@ -714,8 +729,13 @@ func _can_drive() -> bool:
 	return _status == "practice" or (_phase == "racing" and not _hud.get("finished", false) and not _hud.get("spectator", false))
 
 
+func _presentation_time_msec() -> int:
+	return Time.get_ticks_msec()
+
+
 func _interpolate_remotes(delta: float) -> void:
-	var target: int = Time.get_ticks_msec() - INTERPOLATION_DELAY_MS
+	var now: int = _presentation_time_msec()
+	var target: int = now - INTERPOLATION_DELAY_MS
 	for remote: Dictionary in _remotes.values():
 		var samples: Array = remote["samples"]
 		while samples.size() > 2 and int(samples[1]["at"]) <= target:
@@ -726,8 +746,57 @@ func _interpolate_remotes(delta: float) -> void:
 		if samples.size() > 1:
 			var weight: float = clampf(float(target - int(samples[0]["at"])) / maxf(1.0, float(int(samples[1]["at"]) - int(samples[0]["at"]))), 0.0, 1.0)
 			result = result.interpolate_with(samples[1]["transform"], weight)
-		remote["node"].global_transform = result
 		var motion: Dictionary = samples[0]
+		if _local != null:
+			var newest: Dictionary = samples.back()
+			var current: Transform3D = newest["transform"]
+			var distance: float = current.origin.distance_to(_local.global_position)
+			var proximity: float = 1.0 - smoothstep(12.0, 20.0, distance)
+			if proximity > 0.0:
+				# Capture prediction lead once per snapshot; the live pending count has
+				# an acknowledgement sawtooth that must never move remote visuals.
+				var age: float = maxf(0.0, float(now - int(newest["at"])) / 1000.0)
+				var sample_at: int = int(newest["at"])
+				var measured_lead: float = minf(0.1, _pending.size() * PHYSICS_DT)
+				if not remote.has("near_sample_at"):
+					remote["near_lead"] = measured_lead
+				elif int(remote["near_sample_at"]) != sample_at:
+					var interval: float = maxf(0.0, float(sample_at - int(remote["near_sample_at"])) / 1000.0)
+					remote["near_lead"] = lerpf(float(remote["near_lead"]), measured_lead, 1.0 - exp(-interval / 0.3))
+				remote["near_sample_at"] = sample_at
+				var horizon: float = minf(0.1, age + float(remote["near_lead"]))
+				var velocity: Vector3 = newest.get("velocity", Vector3.ZERO)
+				current.origin += velocity * horizon
+				var angular_axis := Vector3.UP
+				var angular_speed: float = 0.0
+				if samples.size() > 1:
+					var older: Dictionary = samples[-2]
+					var seconds: float = float(int(newest.get("tick", 0)) - int(older.get("tick", 0))) * PHYSICS_DT
+					if seconds > 0.0:
+						var rotation_delta: Quaternion = current.basis.get_rotation_quaternion() * Transform3D(older["transform"]).basis.get_rotation_quaternion().inverse()
+						if rotation_delta.w < 0.0:
+							rotation_delta = -rotation_delta
+						if rotation_delta.get_angle() > 0.0001:
+							angular_axis = rotation_delta.get_axis()
+							angular_speed = minf(6.0, rotation_delta.get_angle() / seconds)
+				current.basis = Basis(Quaternion(angular_axis, angular_speed * horizon)) * current.basis
+				if remote.has("near_pose"):
+					var predicted: Transform3D = remote["near_pose"]
+					# Feed forward motion and smooth only correction, avoiding positional
+					# lerp lag. Unknown future impacts still remain server-authoritative.
+					if age < 0.1:
+						predicted.origin += velocity * delta
+						predicted.basis = Basis(Quaternion(angular_axis, angular_speed * delta)) * predicted.basis
+					if predicted.origin.distance_to(current.origin) < 4.0:
+						current = predicted.interpolate_with(current, 1.0 - exp(-delta / 0.06))
+				remote["near_pose"] = current
+				result = result.interpolate_with(current, proximity)
+				motion = newest
+			else:
+				remote.erase("near_pose")
+				remote.erase("near_sample_at")
+				remote.erase("near_lead")
+		remote["node"].global_transform = result
 		remote["node"].update_visual(delta, motion["speed"], motion["steering"], motion["drifting"], minf(1.0, motion["boost"]))
 
 

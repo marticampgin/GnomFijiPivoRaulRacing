@@ -167,7 +167,8 @@ async function main() {
       }
       previousPosition = current.worldPosition;
       const controls = controlsFor(route, current, heading);
-      samples.push({ elapsedMs, position: current.worldPosition, forward: current.forward || null, lap: current.lap, finished: current.finished, speedKph: current.speed, serverTick: current.serverTick, correction: current.correction, fps: current.fps, ...controls });
+      const nearestRacer = Math.min(...current.players.filter(player => player.id !== current.playerId).map(player => Math.hypot(...player.worldPosition.map((value, axis) => value - current.worldPosition[axis]))));
+      samples.push({ elapsedMs, position: current.worldPosition, forward: current.forward || null, lap: current.lap, finished: current.finished, speedKph: current.speed, serverTick: current.serverTick, correction: current.correction, fps: current.fps, nearestRacer, ...controls });
       if (Date.now() - lastLogAt > 5000) {
         console.log(JSON.stringify({ elapsed: Math.round(elapsedMs / 1000), lap: current.lap, speed: Math.round(current.speed), s: Math.round(controls.s), centerError: +controls.centerError.toFixed(2), steering: +controls.steering.toFixed(2) }));
         lastLogAt = Date.now();
@@ -204,6 +205,7 @@ async function main() {
       const travel = Math.hypot(...sample.position.map((value, axis) => value - previous.position[axis]));
       return gap > 0 && gap <= 250 && previous.speedMps > 8 && sample.speedMps < previous.speedMps * 0.25
         && !previous.brake && !sample.brake && previous.centerError < 3.5 && sample.centerError < 3.5
+        && previous.nearestRacer > 4 && sample.nearestRacer > 4
         && travel < 4 && previous.lap === sample.lap
         ? [{ elapsedMs: sample.elapsedMs, s: sample.s, beforeMps: previous.speedMps, afterMps: sample.speedMps }]
         : [];
