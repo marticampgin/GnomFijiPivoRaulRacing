@@ -18,6 +18,21 @@ using an existing external dependency runtime, set `NODE_PATH` to its
 
 ## Run Sequentially
 
+Choose the scope to match the change. Hero-only geometry/material edits use the
+short smoke below, not the full race. Route/physics/progress/network changes
+still require their relevant integration checks and, when affected, a full finish.
+Do not run three laps solely to validate a face, clothing or texture adjustment.
+
+```sh
+GNOM_QA_SCOPE=hero GNOM_QA_URL=http://127.0.0.1:8787/ GNOM_QA_OUT=/tmp/gnom-hero-qa node scripts/qa/art-stage.cjs
+```
+
+This mode checks one dev profile, nonblank/changing canvas, short keyboard
+movement and turning, front/rear screenshots, Low rendering and mobile framing.
+It records elapsed time and console errors, then exits the race. No laps,
+two-client network regression, drift/boost or performance acceptance is claimed.
+The default `GNOM_QA_SCOPE=full` keeps the existing art-stage coverage unchanged.
+
 ```sh
 node scripts/qa/browser-driver.cjs
 node scripts/qa/art-stage.cjs

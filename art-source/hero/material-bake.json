@@ -7,68 +7,68 @@
   "uv": {
     "Body": {
       "corners": 34544,
-      "triangleUvArea": 0.08760848671601071,
-      "sha256": "8dc62b43a764ebdb35a33ca42a8049348325abfeddd1a2abeb498dae24a13e10"
+      "triangleUvArea": 0.08037959836206571,
+      "sha256": "0cc7020c6bb8e6ab6c79ecf4b90a5140cca1372c564fc609580c2b813ad7303f"
     },
     "Crystal": {
       "corners": 98,
-      "triangleUvArea": 0.0012175532039892384,
-      "sha256": "89dc3ff6254f0fdb6381148f645619b9ebfaf21ef4362c91199b682acb905008"
+      "triangleUvArea": 0.001116839965452865,
+      "sha256": "6026c004879dff6f6c9a5fadb7e9a8d2521decf1f88cd507e4ebe0a36436da6d"
     },
     "DriverBody": {
-      "corners": 13240,
-      "triangleUvArea": 0.010974276169329077,
-      "sha256": "a958e1424d9b77f5d576585b98ee35b1bbb49fdca59434992bb9f0fe6cadd5ea"
+      "corners": 17676,
+      "triangleUvArea": 0.013909863331494327,
+      "sha256": "e1c4476d4ef115ce63d4ae02f226ebb991381d04889159e7e5cb69bf037452af"
     },
     "EngineCradle": {
       "corners": 8688,
-      "triangleUvArea": 0.012535307679338345,
-      "sha256": "c4656dfcd173f0bcb71e12d17253ee9e0ff460e8c8d022f1b3a036fde2e29381"
+      "triangleUvArea": 0.011498449722640733,
+      "sha256": "dd921810908ad188c84d2e1a8ea5bbe3c3404c17db9c98b222015f09389f1f57"
     },
     "FrontLeftRoll": {
       "corners": 10104,
-      "triangleUvArea": 0.018626568541959862,
-      "sha256": "0f895becef1d362b86a15c1c9317c7a70308d99a0cfc4c13ace0f0abfb4283e6"
+      "triangleUvArea": 0.017085786803579785,
+      "sha256": "42e29e22632511c182349c514bb3665dff326d591d89f3d59ac09f572cb7cfc9"
     },
     "FrontRightRoll": {
       "corners": 10104,
-      "triangleUvArea": 0.018626562680104302,
-      "sha256": "17fac513a349c0d90c78fd802e8140ef239fb93d6209a0d16982cbd5b7de3a0c"
+      "triangleUvArea": 0.017085786350749553,
+      "sha256": "11179f75bc14457fcc5f4630d5841b34906213b3b04917d16d9f2b1ffdca2e6e"
     },
     "Hat": {
-      "corners": 4116,
-      "triangleUvArea": 0.002809957956577576,
-      "sha256": "8f273318d1a03daea800346c9f33c286c08cc974ec7c7ae01d3ae17bdefe61ef"
+      "corners": 4928,
+      "triangleUvArea": 0.002973697807014661,
+      "sha256": "b9c254ff1f521d75a1093b94bc0fc5597fd223f7e292c69b500527c2de536b2c"
     },
     "Head": {
-      "corners": 39226,
-      "triangleUvArea": 0.009432327386963986,
-      "sha256": "a89218c9f43202dc8df1c5021b4db6f102960a21a8f738f28fb8fe35adf83a12"
+      "corners": 51320,
+      "triangleUvArea": 0.00915062333765261,
+      "sha256": "b13594cdc86bac027748062fbb42575e1868281ce2bb82bf0a97b117fa489d94"
     },
     "LeftHand": {
       "corners": 3892,
-      "triangleUvArea": 0.0004239321629317949,
-      "sha256": "d770efcfb8dddecd43f3de3c665674952b0a8284a06a805d97c1677971b39898"
+      "triangleUvArea": 0.0003888626939306111,
+      "sha256": "dbb558375139918809dacf557bc837a99bb14040ac68abace45046a76462f31c"
     },
     "RearLeftRoll": {
       "corners": 10104,
-      "triangleUvArea": 0.021963969241318868,
-      "sha256": "4fb943cdf24b7d51b30f3d98822ab5e42196df9cb69a5c0fb38c517c25af1f2c"
+      "triangleUvArea": 0.0201471038972494,
+      "sha256": "b7a166969a2c761241ded1790afbfec8050d3ff02d35084389c8323095522d44"
     },
     "RearRightRoll": {
       "corners": 10104,
-      "triangleUvArea": 0.021963967808093985,
-      "sha256": "c19f42cc19f4de73edc7a8ae58a0d74aae5c04982ac1fe484bdd5cae2bcc82b6"
+      "triangleUvArea": 0.020147147113904692,
+      "sha256": "7d2ea100bfdc20c0b1f88179f8f54a8777e045bdcb4e26d09748170681b27591"
     },
     "RightHand": {
       "corners": 3892,
-      "triangleUvArea": 0.00042393218832392776,
-      "sha256": "3b186850ab6657a76cd883a71f24c9aa4c9a9a10fee6f2dad0c772b2fca6f487"
+      "triangleUvArea": 0.0003888640954907152,
+      "sha256": "addc95936fa7e717d5ee661eec17c788fca33c49965924d90fa0a12a48f0862a"
     },
     "SteeringWheel": {
       "corners": 3288,
-      "triangleUvArea": 0.0010367004885774994,
-      "sha256": "2f215bde7f320b6830ce897c1af65c171d3fe9f2866b94423800461b2bb2d509"
+      "triangleUvArea": 0.0009509649119662511,
+      "sha256": "9ebf22f13f673c2ad216659c478c7064e71ac7967f3c913397d484d04c7b64f7"
     }
   },
   "uvOverlapAudit": {
@@ -79,91 +79,63 @@
     "geometryAreaTolerance": 1e-12,
     "analyticControlsPassed": 5,
     "maxRepairPasses": 5,
-    "repairPasses": 3,
-    "polygonRepairOperations": 392,
+    "repairPasses": 1,
+    "polygonRepairOperations": 283,
     "before": {
-      "triangles": 75512,
-      "positiveAreaTrianglesChecked": 75412,
-      "uniqueBroadPhasePairs": 891124,
-      "analyticTriangleIntersections": 168465,
+      "triangles": 84216,
+      "positiveAreaTrianglesChecked": 84212,
+      "uniqueBroadPhasePairs": 930663,
+      "analyticTriangleIntersections": 187866,
       "interObjectOverlapPairs": 0,
-      "sameObjectOverlapPairs": 1528,
-      "summedPairwiseIntersectionArea": 0.0003854484906756214,
-      "maxIntersectionArea": 1.4540268726236319e-06,
+      "sameObjectOverlapPairs": 662,
+      "summedPairwiseIntersectionArea": 0.00010460125405016332,
+      "maxIntersectionArea": 1.3119449507707448e-06,
       "collapsedNonzeroGeometryUvTriangles": 4,
-      "degenerateGeometryTriangles": 96,
+      "degenerateGeometryTriangles": 0,
       "tinyValidUvTrianglesBelowOverlapTolerance": 0,
-      "offendingPolygons": 387
+      "offendingPolygons": 283
     },
     "after": {
-      "triangles": 75512,
-      "positiveAreaTrianglesChecked": 75416,
-      "uniqueBroadPhasePairs": 840553,
-      "analyticTriangleIntersections": 168329,
+      "triangles": 84216,
+      "positiveAreaTrianglesChecked": 84215,
+      "uniqueBroadPhasePairs": 932664,
+      "analyticTriangleIntersections": 187431,
       "interObjectOverlapPairs": 0,
       "sameObjectOverlapPairs": 0,
       "summedPairwiseIntersectionArea": 0.0,
       "maxIntersectionArea": 0.0,
       "collapsedNonzeroGeometryUvTriangles": 0,
-      "degenerateGeometryTriangles": 96,
-      "tinyValidUvTrianglesBelowOverlapTolerance": 0,
+      "degenerateGeometryTriangles": 0,
+      "tinyValidUvTrianglesBelowOverlapTolerance": 1,
       "offendingPolygons": 0
     },
     "history": [
       {
-        "triangles": 75512,
-        "positiveAreaTrianglesChecked": 75412,
-        "uniqueBroadPhasePairs": 891124,
-        "analyticTriangleIntersections": 168465,
+        "triangles": 84216,
+        "positiveAreaTrianglesChecked": 84212,
+        "uniqueBroadPhasePairs": 930663,
+        "analyticTriangleIntersections": 187866,
         "interObjectOverlapPairs": 0,
-        "sameObjectOverlapPairs": 1528,
-        "summedPairwiseIntersectionArea": 0.0003854484906756214,
-        "maxIntersectionArea": 1.4540268726236319e-06,
+        "sameObjectOverlapPairs": 662,
+        "summedPairwiseIntersectionArea": 0.00010460125405016332,
+        "maxIntersectionArea": 1.3119449507707448e-06,
         "collapsedNonzeroGeometryUvTriangles": 4,
-        "degenerateGeometryTriangles": 96,
+        "degenerateGeometryTriangles": 0,
         "tinyValidUvTrianglesBelowOverlapTolerance": 0,
-        "offendingPolygons": 387
+        "offendingPolygons": 283
       },
       {
-        "triangles": 75512,
-        "positiveAreaTrianglesChecked": 75415,
-        "uniqueBroadPhasePairs": 854425,
-        "analyticTriangleIntersections": 166021,
-        "interObjectOverlapPairs": 0,
-        "sameObjectOverlapPairs": 3,
-        "summedPairwiseIntersectionArea": 2.734268367277082e-10,
-        "maxIntersectionArea": 1.3655743202889425e-10,
-        "collapsedNonzeroGeometryUvTriangles": 0,
-        "degenerateGeometryTriangles": 96,
-        "tinyValidUvTrianglesBelowOverlapTolerance": 1,
-        "offendingPolygons": 1
-      },
-      {
-        "triangles": 75512,
-        "positiveAreaTrianglesChecked": 75416,
-        "uniqueBroadPhasePairs": 838694,
-        "analyticTriangleIntersections": 167796,
-        "interObjectOverlapPairs": 0,
-        "sameObjectOverlapPairs": 2,
-        "summedPairwiseIntersectionArea": 5.748548840085219e-11,
-        "maxIntersectionArea": 3.8323669627944845e-11,
-        "collapsedNonzeroGeometryUvTriangles": 0,
-        "degenerateGeometryTriangles": 96,
-        "tinyValidUvTrianglesBelowOverlapTolerance": 0,
-        "offendingPolygons": 4
-      },
-      {
-        "triangles": 75512,
-        "positiveAreaTrianglesChecked": 75416,
-        "uniqueBroadPhasePairs": 840553,
-        "analyticTriangleIntersections": 168329,
+        "triangles": 84216,
+        "positiveAreaTrianglesChecked": 84215,
+        "uniqueBroadPhasePairs": 932664,
+        "analyticTriangleIntersections": 187431,
         "interObjectOverlapPairs": 0,
         "sameObjectOverlapPairs": 0,
         "summedPairwiseIntersectionArea": 0.0,
         "maxIntersectionArea": 0.0,
         "collapsedNonzeroGeometryUvTriangles": 0,
-        "degenerateGeometryTriangles": 96,
-        "tinyValidUvTrianglesBelowOverlapTolerance": 0,
+        "degenerateGeometryTriangles": 0,
+        "tinyValidUvTrianglesBelowOverlapTolerance": 1,
         "offendingPolygons": 0
       }
     ],
@@ -181,11 +153,11 @@
       "width": 2048,
       "height": 2048,
       "colorSpace": "sRGB",
-      "bytes": 2800125,
-      "sha256": "1391d76a0cda2af18b756e55667c665d0d68a80709156862ea20eb7ec81f8c12",
+      "bytes": 2808064,
+      "sha256": "ec96592d1edf287c5813854c7485b0733495b0cef8554391fa29d4952957debc",
       "pixelChecks": {
         "sampledPixels": 65536,
-        "nonblackSamples": 29650,
+        "nonblackSamples": 32125,
         "rgbMin": 0.0,
         "rgbMax": 1.0,
         "meshRegionHits": {
@@ -211,11 +183,11 @@
       "width": 2048,
       "height": 2048,
       "colorSpace": "Non-Color",
-      "bytes": 3125707,
-      "sha256": "414c9fc4f092b874cb907712a2a6911f5451135be58d9c683b042bf9bb841053",
+      "bytes": 3106737,
+      "sha256": "72c42856a80702ab6a8961022160fe4e5510128c113c956e90f4d45711e11fda",
       "pixelChecks": {
         "sampledPixels": 65536,
-        "nonblackSamples": 29650,
+        "nonblackSamples": 32125,
         "rgbMin": 0.0,
         "rgbMax": 1.0,
         "meshRegionHits": {}
@@ -227,11 +199,11 @@
       "width": 2048,
       "height": 2048,
       "colorSpace": "sRGB",
-      "bytes": 63967,
-      "sha256": "85fa0bff3a7c7efc458ce97d73d2b8322e8f5d34a071323798e001395f280cd5",
+      "bytes": 64646,
+      "sha256": "7be6ec34d3a3d57dc42a8a7e711332df24223241d060d1ab6ac232a1e32a3bd7",
       "pixelChecks": {
         "sampledPixels": 65536,
-        "nonblackSamples": 274,
+        "nonblackSamples": 235,
         "rgbMin": 0.0,
         "rgbMax": 0.7450980544090271,
         "meshRegionHits": {}
@@ -642,8 +614,8 @@
   },
   "meshCount": 13,
   "runtimeMaterialSurfaces": 13,
-  "geometryAndPivotSha256Before": "bc7c1110a35458b88190a4773bedb7bf4a1f61df63878471d93591f103922e45",
-  "geometryAndPivotSha256After": "bc7c1110a35458b88190a4773bedb7bf4a1f61df63878471d93591f103922e45",
+  "geometryAndPivotSha256Before": "7b61e3155b29e54bd480540858bdde11477ed10683dfa80a66c6720bb9ff3d10",
+  "geometryAndPivotSha256After": "7b61e3155b29e54bd480540858bdde11477ed10683dfa80a66c6720bb9ff3d10",
   "geometryAndPivotsPreserved": true,
   "bake": {
     "engine": "Cycles CPU",

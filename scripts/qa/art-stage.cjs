@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const out = process.env.GNOM_QA_OUT || '/tmp/gnom-art-stage-qa';
 const url = process.env.GNOM_QA_URL || 'http://127.0.0.1:8788/';
 const profileFirst = Number(process.env.GNOM_QA_PROFILE_FIRST ?? 1);
+const scope = process.env.GNOM_QA_SCOPE || 'full';
 
 async function pixels(buffer) {
   const { data, info } = await sharp(buffer).resize(160, 90).removeAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -36,6 +37,68 @@ async function recover(page) {
   await page.locator('#recover-button').click();
   await page.waitForFunction(() => window.GnomHost.state.speed < 2);
   await page.waitForTimeout(500);
+}
+
+async function heroSmoke(page, report) {
+  const identity = await page.evaluate(() => ({ playerId: window.GnomHost.state.playerId, serverTick: window.GnomHost.state.serverTick }));
+  assert.ok(identity.playerId, 'Hero smoke requires a joined player');
+  const racing = async () => {
+    await page.waitForFunction(expected => window.GnomHost.state.status === 'racing' && window.GnomHost.state.playerId === expected, identity.playerId, { timeout: 2000 });
+    assert.equal(await page.locator('#disconnect').isVisible(), false, 'Hero is disconnected');
+  };
+  const screenshot = async name => {
+    await racing();
+    await page.screenshot({ path: `${out}/${name}.png` });
+  };
+  await racing();
+  const before = await page.evaluate(() => window.GnomHost.state.forward);
+  try {
+    await page.keyboard.down('w');
+    await page.waitForFunction(() => window.GnomHost.state.speed > 15, undefined, { timeout: 10000 });
+    await page.keyboard.down('d');
+    await page.waitForFunction(initial => {
+      const forward = window.GnomHost.state.forward;
+      return Math.hypot(forward[0] - initial[0], forward[2] - initial[2]) > 0.06;
+    }, before, { timeout: 3000 });
+    report.checks.steering = await page.evaluate(() => ({ speed: window.GnomHost.state.speed, forward: window.GnomHost.state.forward }));
+    await screenshot('hero-steering');
+  } finally {
+    await page.keyboard.up('d');
+    await page.keyboard.up('w');
+  }
+  await recover(page);
+  await screenshot('hero-rear');
+  try {
+    await page.keyboard.down('c');
+    await page.waitForTimeout(500);
+    await screenshot('hero-front');
+  } finally {
+    await page.keyboard.up('c');
+  }
+  const unchanged = await contract(page);
+  await page.locator('#menu-button').click();
+  report.checks.low = await graphics(page, 'low', true);
+  assert.deepEqual(await contract(page), unchanged);
+  await page.locator('#resume-button').click();
+  await page.waitForTimeout(400);
+  await screenshot('hero-low');
+  await page.locator('#menu-button').click();
+  await graphics(page, 'standard', false);
+  await page.locator('#resume-button').click();
+  report.checks.viewports = [];
+  for (const [width, height] of [[390, 844], [844, 390]]) {
+    await page.setViewportSize({ width, height });
+    await page.waitForTimeout(400);
+    const canvas = await pixels(await page.locator('#canvas').screenshot());
+    assert.ok(canvas.colors > 30, `Blank hero view at ${width}x${height}`);
+    await screenshot(`hero-${width}x${height}`);
+    report.checks.viewports.push({ width, height, canvasColors: canvas.colors });
+  }
+  const serverTick = await page.evaluate(() => window.GnomHost.state.serverTick);
+  assert.ok(serverTick > identity.serverTick, 'Hero smoke stopped receiving server snapshots');
+  report.checks.joinedHero = { playerId: identity.playerId, startTick: identity.serverTick, endTick: serverTick };
+  await page.locator('#menu-button').click();
+  await page.locator('#exit-button').click();
 }
 
 async function driftAndBoost(page) {
@@ -148,12 +211,19 @@ async function menuAccessibility(page, width, height) {
   const parsedUrl = new URL(url);
   assert.ok(parsedUrl.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(parsedUrl.hostname), 'Only a local preview URL is allowed');
   assert.ok(profileFirst === 0 || profileFirst === 1, 'GNOM_QA_PROFILE_FIRST must be 0 or 1');
+  assert.ok(['full', 'hero'].includes(scope), 'GNOM_QA_SCOPE must be full or hero');
   await fs.mkdir(out, { recursive: true });
   const browser = await chromium.launch({ headless: false });
   const errors = [], contexts = [], functionalFailures = [];
   let activePage;
   const report = { url, capturedAt: new Date().toISOString(), browser: browser.version(), browserRouting: 'Browser plugin not available; regular Playwright', profileOrder: [profileFirst, 1 - profileFirst],
     scenario: 'Authored-route art study/blockout, not accepted final production art. Two dev profiles, keyboard movement/drift/boost, recovery/look-back, CDP freeze/resume, graphics preferences, persistence, responsive HUD/menu and incompatible-version rejection. Full-lap acceptance runs in a separate keyboard-driver report; no mobile-controls or performance/capacity claim.', checks: {} };
+  const started = Date.now();
+  report.scope = scope;
+  if (scope === 'hero') {
+    report.profileOrder = [profileFirst];
+    report.scenario = 'Focused hero geometry/material smoke: one profile, short keyboard movement/turn, front/rear views, Low and mobile framing. No laps, finish, drift, reconnect or performance acceptance.';
+  }
   const ready = async page => page.waitForFunction(() => !document.querySelector('#join-button').disabled, undefined, { timeout: 90000 });
   const open = async profile => {
     const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, reducedMotion: 'no-preference' }); contexts.push(context);
@@ -195,6 +265,16 @@ async function menuAccessibility(page, width, height) {
     await page.waitForTimeout(1000);
     report.checks.recover = await page.evaluate(() => ({ speed: window.GnomHost.state.speed, lap: window.GnomHost.state.lap }));
     assert.ok(report.checks.recover.speed < 2);
+    if (scope === 'hero') {
+      await heroSmoke(page, report);
+      assert.equal(await page.locator('vite-error-overlay, nextjs-portal, #webpack-dev-server-client-overlay').count(), 0);
+      report.checks.noFrameworkOverlay = true;
+      assert.deepEqual(errors, []);
+      report.errors = errors;
+      report.passed = true;
+      console.log(JSON.stringify({ output: out, scope, passed: true, elapsedSeconds: (Date.now() - started) / 1000 }));
+      return;
+    }
     const p2 = await open(1 - profileFirst); await join(p2);
     await page.bringToFront();
     await page.waitForFunction(() => window.GnomHost.state.players.filter(p => p.connected).length === 2);
@@ -304,6 +384,7 @@ async function menuAccessibility(page, width, height) {
     if (activePage) await activePage.screenshot({ path: `${out}/failure.png` }).catch(() => {});
     console.error(error); process.exitCode = 1;
   } finally {
+    report.elapsedSeconds = (Date.now() - started) / 1000;
     report.functionalFailures = functionalFailures;
     await fs.writeFile(`${out}/result.json`, JSON.stringify(report, null, 2));
     await browser.close();

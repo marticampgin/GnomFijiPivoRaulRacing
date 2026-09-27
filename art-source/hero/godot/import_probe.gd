@@ -2,6 +2,7 @@ extends SceneTree
 
 const ATLAS_SIZE: int = 2048
 const UV_TOLERANCE: float = 0.0001
+const GEOMETRY_AREA_TOLERANCE: float = 0.000000000001
 
 var _checks := 0
 var _failures: Array[String] = []
@@ -60,6 +61,9 @@ func _run() -> void:
 	var triangles := 0
 	var materials: Dictionary = {}
 	var mesh_bounds: Dictionary = {}
+	var geometry_meshes: Dictionary = {}
+	var degenerate_triangles: int = 0
+	var nonfinite_triangles: int = 0
 	var uv_surfaces: Array[Dictionary] = []
 	for node: Node in _nodes.values():
 		_expect(not (node is Camera3D or node is Light3D or node is CollisionObject3D), "%s excludes studio/physics nodes" % node.name)
@@ -69,6 +73,10 @@ func _run() -> void:
 		meshes.append(mesh_node)
 		var bound := _mesh_bounds(mesh_node)
 		mesh_bounds[node.name] = _bounds_json(bound)
+		var geometry := _check_mesh_geometry(mesh_node)
+		geometry_meshes[node.name] = geometry
+		degenerate_triangles += int(geometry.degenerateTriangles)
+		nonfinite_triangles += int(geometry.nonfiniteTriangles)
 		for index in mesh_node.mesh.get_surface_count():
 			surfaces += 1
 			var arrays := mesh_node.mesh.surface_get_arrays(index)
@@ -135,6 +143,8 @@ func _run() -> void:
 		"checks": _checks, "failures": _failures, "meshCount": meshes.size(), "surfaces": surfaces,
 		"triangles": triangles, "materials": material_names, "bounds": _bounds_json(overall),
 		"meshBounds": mesh_bounds, "nodeNames": _nodes.keys(),
+		"geometry": {"coordinateSpace": "world", "areaToleranceSquareMeters": GEOMETRY_AREA_TOLERANCE,
+			"degenerateTriangles": degenerate_triangles, "nonfiniteTriangles": nonfinite_triangles, "meshes": geometry_meshes},
 		"uv": {"channel": "UV1 / TEXCOORD_0", "boundsTolerance": UV_TOLERANCE, "surfaces": uv_surfaces},
 		"pbr": pbr,
 		"notCovered": ["final aesthetic approval", "UV island overlap, padding and texel-density quality", "GPU mipmap sampling when running headless", "normal map", "skeletal rig", "browser renderer and color-space appearance", "10-racer frame budget"],
@@ -147,6 +157,37 @@ func _run() -> void:
 	print("HERO_BLOCKOUT_PROBE " + serialized)
 	scene.free()
 	quit(0 if _failures.is_empty() else 1)
+
+
+func _check_mesh_geometry(node: MeshInstance3D) -> Dictionary:
+	var triangles: int = 0
+	var degenerate: int = 0
+	var nonfinite: int = 0
+	var minimum_area: float = INF
+	var examples: Array[Dictionary] = []
+	for surface: int in node.mesh.get_surface_count():
+		var arrays: Array = node.mesh.surface_get_arrays(surface)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+		var count: int = indices.size() if not indices.is_empty() else vertices.size()
+		for offset: int in range(0, count - 2, 3):
+			var a: Vector3 = node.global_transform * vertices[indices[offset] if not indices.is_empty() else offset]
+			var b: Vector3 = node.global_transform * vertices[indices[offset + 1] if not indices.is_empty() else offset + 1]
+			var c: Vector3 = node.global_transform * vertices[indices[offset + 2] if not indices.is_empty() else offset + 2]
+			var area: float = (b - a).cross(c - a).length() * 0.5
+			triangles += 1
+			if not is_finite(area):
+				nonfinite += 1
+			else:
+				minimum_area = minf(minimum_area, area)
+				if area <= GEOMETRY_AREA_TOLERANCE:
+					degenerate += 1
+					if examples.size() < 12:
+						examples.append({"surface": surface, "triangle": offset / 3, "worldAreaSquareMeters": area})
+	_expect(triangles > 0 and degenerate == 0 and nonfinite == 0,
+		"%s world-space triangles are finite and have area above 1e-12 m2 (%d degenerate, %d nonfinite)" % [node.name, degenerate, nonfinite])
+	return {"triangles": triangles, "degenerateTriangles": degenerate, "nonfiniteTriangles": nonfinite,
+		"minimumTriangleAreaSquareMeters": minimum_area if is_finite(minimum_area) else null, "degenerateExamples": examples}
 
 
 func _check_uvs(node_name: String, surface: int, arrays: Array) -> Dictionary:

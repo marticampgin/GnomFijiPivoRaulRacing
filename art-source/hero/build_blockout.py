@@ -111,6 +111,56 @@ def ring(name, center, right, up, radius, thickness, material, steps=40):
     return tube(name, points, thickness, material, 8)
 
 
+def sculpted_lock(name, controls, widths, depths, material, facing=(0, 1, 0), sides=10, phase=0.0):
+    controls = [Vector(point) for point in controls]
+    points, cross_sections = [], []
+    for index in range(len(controls) - 1):
+        p0, p1 = controls[max(0, index - 1)], controls[index]
+        p2, p3 = controls[index + 1], controls[min(len(controls) - 1, index + 2)]
+        for step in range(4):
+            t = step / 4
+            points.append(.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t))
+            cross_sections.append((widths[index] * (1 - t) + widths[index + 1] * t, depths[index] * (1 - t) + depths[index + 1] * t))
+    points.append(controls[-1])
+    cross_sections.append((widths[-1], depths[-1]))
+    rows, previous_front = [], Vector(facing).normalized()
+    for index, point in enumerate(points):
+        tangent = (points[min(index + 1, len(points) - 1)] - points[max(0, index - 1)]).normalized()
+        front = Vector(facing) - tangent * Vector(facing).dot(tangent)
+        if front.length_squared < .01:
+            front = previous_front - tangent * previous_front.dot(tangent)
+        front.normalize()
+        if front.dot(previous_front) < 0:
+            front = -front
+        across = tangent.cross(front).normalized()
+        previous_front = front
+        width, depth = cross_sections[index]
+        progress = index / (len(points) - 1)
+        rows.append([point + across * (math.cos(angle) * width * (1 + .07 * math.cos(angle * 3 + phase) * math.sin(PI * progress))) + front * (math.sin(angle) * depth) for angle in (2 * PI * side / sides for side in range(sides))])
+    return loft(name, rows, material)
+
+
+def vest_layer(rows):
+    count = 32
+    vertices = []
+    for inset in (0.0, .008):
+        for z, width, depth, cy, opening in rows:
+            for index in range(count):
+                angle = PI / 2 + opening + (2 * PI - 2 * opening) * index / (count - 1)
+                vertices.append(((width - inset) * math.cos(angle), cy + (depth - inset) * math.sin(angle), z))
+    outer_count = len(rows) * count
+    faces = []
+    for row in range(len(rows) - 1):
+        for index in range(count - 1):
+            a = row * count + index
+            faces.extend([(a, a + 1, a + count + 1, a + count), (a + outer_count + count, a + outer_count + count + 1, a + outer_count + 1, a + outer_count)])
+    boundary = list(range(count)) + [row * count + count - 1 for row in range(1, len(rows))] + list(reversed(range((len(rows) - 1) * count, len(rows) * count - 1))) + [row * count for row in reversed(range(1, len(rows) - 1))]
+    for index, a in enumerate(boundary):
+        b = boundary[(index + 1) % len(boundary)]
+        faces.append((a, b, b + outer_count, a + outer_count))
+    return mesh('Fitted open leather waistcoat', vertices, faces, 'Leather')
+
+
 def ellipsoid(name, center, scale, material, segments=24, rings=16):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=segments, ring_count=rings, radius=1, location=center)
     obj = bpy.context.object
@@ -225,12 +275,12 @@ def make_body(root):
             parts.append(tube('Lamp guard', [(lamp[0] + offset, 1.143, lamp[2] - half), (lamp[0] + offset, 1.153, lamp[2]), (lamp[0] + offset, 1.143, lamp[2] + half)], .006, 'Brass', 6))
         parts.append(box('Split bumper', (side * .38, 1.29, .34), (.37, .15, .14), 'TealEnamel', .05))
         parts.append(box('Bumper cap', (side * .535, 1.292, .34), (.055, .16, .15), 'Brass', .02))
-    parts.append(box('Grille dark opening', (0, 1.203, .47), (.45, .035, .27), 'Rubber', .085))
+    parts.append(box('Grille dark opening', (0, 1.203, .47), (.45, .035, .27), 'Rubber', .015))
     for x in (-.17, -.085, 0, .085, .17):
         parts.append(box('Grille slat', (x, 1.23, .47), (.018, .025, .24), 'Brass', .008))
     parts.append(tube('Front crossbar', [(-.52, 1.24, .29), (0, 1.29, .265), (.52, 1.24, .29)], .025, 'DarkSteel'))
     for index in range(3):
-        parts.append(box('Hood louvre', (0, .60 + index * .10, .825 - index * .035), (.24, .027, .014), 'DarkSteel', .009))
+        parts.append(box('Hood louvre', (0, .60 + index * .10, .825 - index * .035), (.24, .027, .014), 'DarkSteel', .006))
     badge = [(0, 1.202, .79), (-.075, 1.217, .705), (0, 1.236, .63), (.075, 1.217, .705), (0, 1.25, .709)]
     parts.append(mesh('Simple brass badge', badge, [(0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4)], 'BrassLight', False))
     parts.append(ellipsoid('Seat cushion', (0, -.16, .62), (.31, .34, .095), 'Leather'))
@@ -285,35 +335,52 @@ def make_driver(root):
         rows.append([(x_radius * math.cos(i * 2 * PI / 24), cy + y_radius * math.sin(i * 2 * PI / 24), z) for i in range(24)])
     body.append(loft('Coat torso', rows, 'BlueCloth'))
     body.append(tube('Coat front seam', [(0, .077, .73), (0, .085, .92), (0, .055, 1.12)], .011, 'BlueDark'))
+    vest_rows = [(.79, .265, .175, -.09, .20), (.99, .289, .180, -.09, .33), (1.16, .249, .160, -.11, .66), (1.218, .182, .137, -.103, .84)]
+    body.append(vest_layer(vest_rows))
+    for side in (-1, 1):
+        edge = [(side * width * math.sin(opening), cy + depth * math.cos(opening) + .002, z) for z, width, depth, cy, opening in vest_rows]
+        body.append(tube('Waistcoat rolled edge', edge, .008, 'LeatherLight', 6))
+        body.append(sculpted_lock('Turned coat collar', [(side * .08, -.07, 1.248), (side * .136, .012, 1.219), (side * .155, .066, 1.164), (side * .113, .092, 1.115)], [.027, .043, .032, .004], [.010, .017, .011, .002], 'BlueDark', sides=8))
+    body.append(tube('Back waistcoat seam', [(0, -.259, .82), (.006, -.274, .98), (0, -.264, 1.148)], .0045, 'LeatherLight', 6))
     for z in (.82, .94, 1.06):
         body.append(ellipsoid('Coat button', (0, .099, z), (.015, .008, .015), 'Brass', 10, 6))
     for side in (-1, 1):
-        body.append(tube('Bent sleeve', [(side * .18, -.07, 1.14), (side * .28, .02, 1.085), (side * .30, .17, .965), (side * .205, .36, .97)], [.093, .09, .078, .059], 'BlueCloth', 16))
-        body.append(tube('Sleeve seam', [(side * .244, -.006, 1.15), (side * .345, .10, 1.028), (side * .255, .31, 1.0)], .009, 'BlueDark', 6))
+        body.append(sculpted_lock('Gathered bent sleeve', [(side * .18, -.07, 1.14), (side * .265, .016, 1.08), (side * .301, .146, .982), (side * .263, .256, .962), (side * .205, .36, .97)], [.091, .105, .087, .076, .059], [.082, .088, .074, .061, .052], 'BlueCloth', facing=(0, 0, 1), sides=14, phase=side * .4))
+        body.append(tube('Sleeve seam', [(side * .244, -.006, 1.15), (side * .378, .10, 1.028), (side * .286, .29, 1.0)], .005, 'BlueDark', 6))
+        for offset, lift in ((-.036, .026), (.009, .002), (.052, -.019)):
+            body.append(sculpted_lock('Compressed elbow fold', [(side * .251, .133 + offset, 1.044 + lift), (side * .309, .164 + offset, 1.052 + lift), (side * .353, .149 + offset, 1.015 + lift)], [.003, .014, .002], [.002, .008, .0015], 'BlueCloth', facing=(0, 0, 1), sides=8, phase=offset * 20))
         body.append(tube('Leather cuff', [(side * .225, .316, .97), (side * .208, .353, .97)], .064, 'Leather', 16))
         body.append(tube('Cuff piping', [(side * .23, .311, .97), (side * .226, .320, .97)], .067, 'LeatherLight', 16))
         body.append(ellipsoid('Cuff stud', (side * .263, .33, 1.004), (.008, .008, .008), 'Brass', 8, 6))
         body.append(ellipsoid('Bent trouser thigh', (side * .15, .08, .70), (.14, .27, .105), 'BlueDark'))
         body.append(ellipsoid('Boot', (side * .17, .38, .50), (.12, .18, .08), 'Leather'))
-        body.append(tube('Leather shoulder strap', [(side * .13, -.20, 1.17), (side * .155, .005, 1.15), (side * .20, .064, .87)], .025, 'Leather', 8))
+        body.append(sculpted_lock('Broad shoulder reinforcement', [(side * .142, -.222, 1.164), (side * .173, -.109, 1.198), (side * .173, .014, 1.143), (side * .202, .070, .882)], [.023, .030, .025, .023], [.008, .012, .010, .007], 'LeatherLight', facing=(0, 0, 1), sides=8))
         body.append(tube('Strap buckle', [(side * .164, .069, .943), (side * .209, .076, .946), (side * .201, .083, .994), (side * .16, .075, .99), (side * .164, .069, .943)], .006, 'Brass', 6))
         for z in (.89, .915, 1.04, 1.065):
             body.append(ellipsoid('Strap stitch', (side * (.20 - (z - .87) * .16), .086 - (z - .87) * .17, z), (.007, .0035, .0025), 'LeatherLight', 8, 4))
     batch(body, 'DriverBody', lean, (0, -.08, .71))
     head_pivot = empty('HeadMotion', (0, -.075, 1.43), lean)
     face = []
-    face.append(ellipsoid('Head sculpt mass', (0, -.07, 1.427), (.203, .175, .228), 'Skin', 32, 24))
-    face.append(ellipsoid('Jaw mass', (0, .02, 1.29), (.156, .13, .125), 'Skin'))
+    face.append(ellipsoid('Head sculpt mass', (0, -.074, 1.432), (.202, .176, .221), 'Skin', 32, 24))
+    face.append(ellipsoid('Jaw mass', (-.004, .015, 1.298), (.16, .128, .12), 'Skin'))
     for side in (-1, 1):
-        face.append(ellipsoid('Cheekbone', (side * .13, .063, 1.387), (.069, .044, .048), 'SkinWarm'))
-        face.append(ellipsoid('Eye socket', (side * .083, .091, 1.479), (.062, .022, .046), 'SkinShadow'))
-        face.append(ellipsoid('Eye white', (side * .083, .112, 1.483), (.041, .014, .027), 'EyeWhite'))
-        face.append(ellipsoid('Iris', (side * .079, .126, 1.482), (.017, .007, .018), 'Iris', 18, 12))
-        face.append(ellipsoid('Pupil', (side * .078, .133, 1.482), (.008, .003, .011), 'Rubber', 12, 8))
-        face.append(ellipsoid('Eye light', (side * .072, .136, 1.489), (.003, .002, .003), 'EyeWhite', 8, 6))
+        eye_lift = .003 if side < 0 else -.002
+        cheek = ellipsoid('Weathered cheek volume', (side * .127, .064, 1.403), (.068, .046, .065), 'SkinWarm', 24, 16)
+        cheek.rotation_euler.y = side * .22
+        face.append(cheek)
+        face.append(ellipsoid('Recessed eye socket', (side * .084, .098, 1.480 + eye_lift), (.061, .020, .038), 'SkinShadow', 20, 12))
+        face.append(ellipsoid('Eye white', (side * .084, .118, 1.482 + eye_lift), (.039, .013, .023), 'EyeWhite', 20, 12))
+        face.append(ellipsoid('Iris', (side * .079, .131, 1.480 + eye_lift), (.016, .006, .017), 'Iris', 18, 12))
+        face.append(ellipsoid('Pupil', (side * .078, .137, 1.480 + eye_lift), (.007, .003, .010), 'Rubber', 12, 8))
+        face.append(ellipsoid('Eye light', (side * .073, .140, 1.487 + eye_lift), (.003, .002, .003), 'EyeWhite', 8, 6))
         eye_x = side * .083
-        face.append(tube('Upper eyelid sculpt', [(eye_x - .044, .11, 1.478), (eye_x - .026, .124, 1.500), (eye_x + .011, .126, 1.503), (eye_x + .045, .109, 1.479)], [.009, .013, .013, .009], 'Skin', 8))
-        face.append(tube('Lower eyelid sculpt', [(eye_x - .044, .11, 1.478), (eye_x, .126, 1.46), (eye_x + .044, .11, 1.478)], [.008, .01, .008], 'SkinWarm', 8))
+        face.append(sculpted_lock('Heavy upper eyelid', [(eye_x - .041, .112, 1.480 + eye_lift), (eye_x - .022, .129, 1.497 + eye_lift), (eye_x + .014, .130, 1.499 + eye_lift), (eye_x + .042, .112, 1.480 + eye_lift)], [.007, .014, .013, .006], [.005, .009, .008, .004], 'Skin', sides=8))
+        face.append(tube('Lower eyelid rim', [(eye_x - .040, .113, 1.479 + eye_lift), (eye_x, .132, 1.462 + eye_lift), (eye_x + .040, .113, 1.479 + eye_lift)], [.006, .008, .006], 'SkinWarm', 8))
+        face.append(ellipsoid('Aged lower lid pad', (eye_x, .112, 1.449 + eye_lift), (.046, .019, .019), 'Skin', 20, 10))
+        face.append(tube('Lower lid crease', [(eye_x - .031, .119, 1.449 + eye_lift), (eye_x + .002, .129, 1.441 + eye_lift), (eye_x + .035, .112, 1.451 + eye_lift)], [.0015, .0025, .001], 'SkinShadow', 6))
+        face.append(sculpted_lock('Brow ridge', [(side * .026, .103, 1.519), (side * .077, .113, 1.526 + eye_lift), (side * .14, .085, 1.526 + eye_lift)], [.014, .023, .009], [.010, .017, .006], 'Skin', sides=8))
+        for offset in (0.0, .010):
+            face.append(tube('Outer eye age crease', [(side * .122, .116, 1.472 - offset), (side * .151, .095, 1.477 - offset), (side * .164, .075, 1.470 - offset)], [.0015, .0025, .001], 'SkinShadow', 6))
         ear_outline = [(side * .166, -.068, 1.52), (side * .26, -.022, 1.535), (side * .357, -.07, 1.59), (side * .297, -.068, 1.428), (side * .215, -.04, 1.408)]
         ear_center = Vector((side * .238, .022, 1.487))
         outer = [Vector(p) for p in ear_outline]
@@ -324,27 +391,58 @@ def make_driver(root):
         mod = ear.modifiers.new('Ear sculpt smoothing', 'SUBSURF'); mod.levels = 2
         bpy.ops.object.modifier_apply(modifier=mod.name)
         face.append(ear)
-        face.append(tube('Ear inner fold', [(side * .205, .005, 1.49), (side * .266, -.002, 1.51), (side * .308, -.035, 1.554)], [.018, .021, .006], 'SkinWarm', 8))
-        face.append(tube('Swept eyebrow', [(side * .022, .103, 1.548), (side * .065, .137, 1.542), (side * .127, .128, 1.554), (side * .166, .070, 1.54)], [.024, .033, .027, .007], 'Hair', 10))
-        face.append(tube('Moustache wing', [(side * .012, .183, 1.398), (side * .071, .209, 1.388), (side * .133, .189, 1.369), (side * .186, .143, 1.388)], [.028, .049, .036, .003], 'Hair', 12))
-    face.append(ellipsoid('Nose bridge', (0, .111, 1.48), (.046, .055, .085), 'Skin'))
-    face.append(ellipsoid('Prominent nose', (0, .179, 1.438), (.065, .08, .055), 'SkinWarm', 28, 18))
-    face.append(tube('Mouth under moustache', [(-.051, .163, 1.343), (0, .183, 1.338), (.051, .163, 1.343)], .012, 'SkinShadow', 8))
+        face.append(ellipsoid('Ear concha hollow', (side * .238, .006, 1.480), (.027, .010, .039), 'SkinShadow', 16, 10))
+        face.append(sculpted_lock('Ear inner helix', [(side * .207, .013, 1.461), (side * .237, .025, 1.501), (side * .282, -.006, 1.528), (side * .307, -.035, 1.551)], [.010, .014, .012, .003], [.007, .010, .008, .002], 'SkinWarm', sides=8))
+        face.append(ellipsoid('Ear tragus', (side * .207, .013, 1.477), (.014, .012, .024), 'Skin', 14, 10))
+        for index in range(3):
+            z = 1.534 + eye_lift + index * .008
+            face.append(sculpted_lock('Layered expressive eyebrow', [(side * (.019 + index * .005), .119 - index * .004, z), (side * (.067 + index * .008), .142 - index * .003, z + .006), (side * (.127 + index * .010), .116 - index * .007, z + .017), (side * (.174 + index * .005), .070, z - .005)], [.010, .019 - index * .002, .014, .0015], [.007, .011, .008, .0015], 'Hair' if index != 1 else 'HairShadow', sides=8, phase=index * .7))
+        for index in range(3):
+            face.append(sculpted_lock('Swept overlapping moustache', [(side * (.012 + index * .006), .190 - index * .006, 1.404 - index * .012), (side * (.061 + index * .004), .220 - index * .006, 1.396 - index * .013), (side * (.128 + index * .009), .193 - index * .004, 1.374 - index * .008), (side * (.181 + index * .004), .144, 1.402 - index * .010 + side * .005)], [.015, .028 - index * .003, .020, .0015], [.012, .024 - index * .004, .013, .0015], 'Hair', sides=10, phase=index + side))
+        face.append(ellipsoid('Nose wing', (side * .044 - .003, .175, 1.416), (.028, .035, .024), 'SkinWarm', 20, 12))
+        face.append(ellipsoid('Recessed nostril', (side * .044 - .003, .193, 1.399), (.012, .012, .008), 'SkinShadow', 14, 8))
+        face.append(tube('Cheek smile fold', [(side * .068, .156, 1.405), (side * .096, .135, 1.374), (side * .112, .111, 1.361)], [.0025, .0035, .0015], 'SkinShadow', 6))
+    face.append(ellipsoid('Nose bridge', (-.003, .114, 1.477), (.043, .049, .080), 'Skin'))
+    face.append(ellipsoid('Weathered nose tip', (-.004, .180, 1.441), (.063, .074, .052), 'SkinWarm', 28, 18))
+    face.append(tube('Set mouth under moustache', [(-.057, .164, 1.343), (-.003, .188, 1.341), (.054, .160, 1.351)], .009, 'SkinShadow', 8))
+    for z, width in ((1.57, .061), (1.587, .045)):
+        face.append(tube('Forehead expression crease', [(-width, .049, z), (-.004, .069, z + .002), (width, .049, z - .002)], [.0015, .0025, .0015], 'SkinShadow', 6))
     beard_rings = []
     for z, width, cy, depth in [(1.39, .15, .085, .086), (1.31, .183, .103, .103), (1.22, .149, .124, .103), (1.12, .091, .158, .061), (1.047, .012, .176, .013)]:
         beard_rings.append([(width * math.cos(i * 2 * PI / 24), cy + depth * math.sin(i * 2 * PI / 24), z) for i in range(24)])
     face.append(loft('Continuous beard sculpt', beard_rings, 'HairShadow'))
-    for index in range(-4, 5):
-        x = index * .036
-        face.append(tube('Swept beard lock', [(x, .163 - abs(index) * .006, 1.347), (x * 1.06, .214 - abs(index) * .009, 1.272), (x * .73, .226 - abs(index) * .01, 1.176 + abs(index) * .014), (x * .40, .19, 1.06 + abs(index) * .031)], [.029, .029, .021, .0015], 'Hair', 10))
-    for index in range(13):
-        angle = PI * .05 + PI * .9 * index / 12
-        x = math.cos(angle) * .198
-        y = -.075 - math.sin(angle) * .177
-        face.append(tube('Back hair sculpt lock', [(x, y, 1.58), (x * 1.06, y - .014, 1.49), (x * 1.03, y - .02, 1.37), (x * .92, y + .025, 1.325 + .03 * math.sin(index))], [.030, .033, .026, .002], 'Hair', 9))
+    beard_locks = [(-.145, -.096, 1.166, .029), (-.105, -.042, 1.105, .038), (-.056, -.008, 1.072, .039), (-.012, .022, 1.052, .033), (.037, .055, 1.094, .041), (.083, .127, 1.158, .034), (.131, .149, 1.207, .026)]
+    for index, (start_x, tip_x, tip_z, width) in enumerate(beard_locks):
+        drift = .015 * math.sin(index * 1.9)
+        face.append(sculpted_lock('Asymmetric flowing beard lock', [(start_x, .154 + .018 * math.cos(index), 1.348 - .008 * (index % 2)), (start_x + drift, .219 - abs(start_x) * .14, 1.285), (tip_x - drift * .3, .236 - abs(tip_x) * .16, tip_z + .047), (tip_x, .187 + .009 * math.sin(index), tip_z)], [width * .67, width, width * .67, .0015], [.010, .023, .015, .0015], 'Hair', sides=10, phase=index * .8))
+    for side in (-1, 1):
+        for index in range(3):
+            face.append(sculpted_lock('Overlapping cheek whisker', [(side * (.142 + index * .009), .092 - index * .012, 1.393 + index * .018), (side * (.175 + index * .006), .141 - index * .007, 1.336), (side * (.133 + index * .006), .188, 1.264 + index * .011), (side * (.102 + index * .011), .177, 1.253 + index * .019 + side * .007)], [.016, .029 - index * .003, .021, .002], [.008, .018, .011, .0015], 'Hair' if index != 1 else 'HairShadow', sides=9, phase=side + index))
+        face.append(sculpted_lock('Loose temple wisp', [(side * .177, -.025, 1.558), (side * .205, -.012, 1.477), (side * .229, -.029, 1.402), (side * .207, .002, 1.372)], [.018, .025, .018, .0015], [.010, .016, .009, .0015], 'Hair', facing=(side, 0, 0), sides=9))
+    for index in range(11):
+        angle = PI * .035 + PI * .93 * index / 10 + .032 * math.sin(index * 2.1)
+        radius_x, radius_y = .194, .174
+        x, y = math.cos(angle) * radius_x, -.075 - math.sin(angle) * radius_y
+        sweep = .065 * math.sin(index * 1.7 + .4)
+        tip_angle = angle + sweep
+        tip_z = 1.330 + .032 * math.sin(index * 1.9) + .012 * math.cos(index * .7)
+        width = .033 + .008 * (.5 + .5 * math.sin(index * 1.3))
+        face.append(sculpted_lock('Lower swept nape lock', [(x, y, 1.588), (x * 1.05, y - .008, 1.488), (math.cos(tip_angle) * .205, -.081 - math.sin(tip_angle) * .193, tip_z + .048), (math.cos(tip_angle + .045) * .195, -.063 - math.sin(tip_angle + .045) * .158, tip_z)], [width * .72, width, width * .67, .0015], [.010, .023, .015, .0015], 'Hair', facing=(math.cos(angle), -math.sin(angle), 0), sides=10, phase=index))
+    for index in range(8):
+        angle = PI * .09 + PI * .82 * index / 7
+        x, y = math.cos(angle) * .196, -.075 - math.sin(angle) * .18
+        tip_angle = angle + .075 * math.cos(index * 1.7)
+        face.append(sculpted_lock('Upper overlapping nape lock', [(x, y, 1.602), (math.cos(angle + .025) * .216, -.080 - math.sin(angle + .025) * .201, 1.512), (math.cos(tip_angle) * .224, -.078 - math.sin(tip_angle) * .204, 1.421 + .025 * math.sin(index * 1.6))], [.022, .034, .0015], [.010, .017, .0015], 'Hair' if index % 3 else 'HairShadow', facing=(math.cos(angle), -math.sin(angle), 0), sides=9, phase=index * .9))
     batch(face, 'Head', head_pivot, (0, -.075, 1.43))
     hat_rings = []
-    rows = [(1.60, 0, -.072, .206, .174), (1.64, 0, -.075, .21, .18), (1.69, .005, -.085, .186, .165), (1.78, .022, -.11, .15, .14), (1.88, .053, -.14, .12, .106), (1.965, .10, -.18, .082, .073), (2.02, .166, -.22, .060, .046), (2.007, .237, -.253, .048, .037), (1.953, .302, -.269, .029, .025), (1.928, .346, -.254, .004, .004)]
+    profile = [(1.60, 0, -.072, .206, .174), (1.64, 0, -.075, .21, .18), (1.69, .005, -.085, .186, .165), (1.78, .022, -.11, .15, .14), (1.88, .053, -.14, .12, .106), (1.965, .10, -.18, .082, .073), (2.02, .166, -.22, .060, .046), (2.007, .237, -.253, .048, .037), (1.953, .302, -.269, .029, .025), (1.928, .346, -.254, .004, .004)]
+    rows = []
+    for index in range(len(profile) - 1):
+        a, b = profile[index], profile[index + 1]
+        for step in range(3):
+            t = step / 3
+            rows.append(tuple(a[value] * (1 - t) + b[value] * t for value in range(5)))
+    rows.append(profile[-1])
     for row_index, (z, cx, cy, rx, ry) in enumerate(rows):
         before = rows[max(0, row_index - 1)]
         after = rows[min(len(rows) - 1, row_index + 1)]
@@ -354,15 +452,21 @@ def make_driver(root):
         ring_points = []
         for i in range(32):
             a = i * 2 * PI / 32
-            fold = .028 * math.sin(row_index * 2.5 + a * 2) * math.sin(PI * row_index / (len(rows) - 1))
-            wrinkle = 1.0 + .045 * math.sin(a * 5 + row_index * .75) + fold / max(rx, .05)
-            ring_points.append(Vector((cx, cy, z)) + right * (math.cos(a) * rx * wrinkle) + across * (math.sin(a) * ry * wrinkle) + tangent * (.004 * math.cos(a * 3 + row_index)))
+            progress = row_index / (len(rows) - 1)
+            fold = .010 * math.sin(progress * 10 * PI + .9 * math.sin(a * 2)) * math.sin(PI * progress) * (1 - progress * .45)
+            wrinkle = 1.0 + .022 * math.sin(a * 5 + progress * 4) + fold / max(rx, .05)
+            ring_points.append(Vector((cx, cy, z)) + right * (math.cos(a) * rx * wrinkle) + across * (math.sin(a) * ry * wrinkle) + tangent * (.0025 * math.cos(a * 3 + progress * 5)))
         hat_rings.append(ring_points)
     hat_parts = [loft('Bent cloth crown', hat_rings, 'RedCloth')]
-    hat_parts.append(tube('Hat rolled hem', [(math.cos(i * 2 * PI / 48) * .208, -.074 + math.sin(i * 2 * PI / 48) * .178, 1.628 + .006 * math.sin(i * 4 * PI / 48)) for i in range(49)], .018, 'RedDark'))
+    hem_rows = [[(rx * math.cos(i * 2 * PI / 32), -.074 + ry * math.sin(i * 2 * PI / 32), z + .004 * math.sin(i * 4 * PI / 32)) for i in range(32)] for z, rx, ry in ((1.606, .205, .173), (1.614, .216, .184), (1.642, .213, .181), (1.65, .204, .173))]
+    hat_parts.append(loft('Turned cloth hat band', hem_rows, 'RedDark'))
     for index in range(32):
         a = 2 * PI * index / 32
-        hat_parts.append(tube('Hat hem stitch', [(.225 * math.cos(a - .013), -.074 + .195 * math.sin(a - .013), 1.626), (.225 * math.cos(a + .013), -.074 + .195 * math.sin(a + .013), 1.634)], .0025, 'RedCloth', 5))
+        stitch = []
+        for angle, z in ((a - .013, 1.626), (a + .013, 1.634)):
+            t = (z - 1.614) / (1.642 - 1.614)
+            stitch.append(((.216 - .003 * t) * math.cos(angle), -.074 + (.184 - .003 * t) * math.sin(angle), z + .004 * math.sin(angle * 2)))
+        hat_parts.append(tube('Hat hem stitch', stitch, .0025, 'RedCloth', 5))
     batch(hat_parts, 'Hat', head_pivot, (0, -.075, 1.43))
     return lean
 

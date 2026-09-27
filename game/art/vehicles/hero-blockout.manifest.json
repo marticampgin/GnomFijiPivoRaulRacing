@@ -3,35 +3,35 @@
   "asset": "hero-blockout",
   "recordedOn": "2026-09-27",
   "change": "build-presentation-faithful-racing-slice",
-  "stage": "mvp-uv-pbr-material-pass",
+  "stage": "mvp-character-sculpt-pass",
   "reviewStatus": "model-sheet-approved-mvp; rendered-model-awaiting-approval",
   "modelSheetApproved": true,
   "finalModelApproved": false,
   "source": {
     "path": "art-source/hero/hero-blockout.blend",
-    "sha256": "a0ab71c6c779de24d1115b8e12ef0450467f0f21f575a6225f2d837ab580da08",
-    "bytes": 7384052,
+    "sha256": "16af08c471bed46cb60351e06ec4ccf4c833207e2fda32dbaa45f0f6506934ca",
+    "bytes": 7573909,
     "compressed": true,
     "includesReviewStudio": true,
     "builder": "art-source/hero/build_blockout.py",
-    "builderSha256": "ebc63674cd96a7badcd5092fd95d353f08c21278697ed3c3e02620d3ddccb12c",
+    "builderSha256": "cde3f3c591c976c774b322b88f65f15bc0b6f61e72ce4a0a655a57396ccf368a",
     "reproduction": "art-source/hero/README.md",
     "materialBuilder": "art-source/hero/hero_materials.py",
     "materialBuilderSha256": "7a4122c59bb05d93d0f439ee5a9693d9b75b261881d1e70a66fb40485fab1d16",
     "materialBakeReport": "art-source/hero/material-bake.json",
-    "materialBakeReportSha256": "dd9ab6902cb85d02679f81d349e89ab3d245d3ae74ee5cb92c2c8a96150da329",
+    "materialBakeReportSha256": "3b3a6dbc58c5be9ba443e793e618ee61d1c5b9aa487999545a046c95544fa675",
     "uvHelper": "art-source/hero/hero_uv.py",
     "uvHelperSha256": "588c4fceec62c6a92a94ad5bf7317cc61995ef80eeb37e672af4f2e0b8e41953"
   },
   "runtime": {
     "path": "game/art/vehicles/hero-blockout.glb",
-    "sha256": "612bbda7c69521987ca79037d1a6eff9a20c5ff7d45593746168bcf7b815f484",
-    "bytes": 8633216,
+    "sha256": "4b22546eb6d6a805aedafe7e59df4425066722ef7fe02db1e10c698bf2238e59",
+    "bytes": 8917392,
     "selfContained": true,
     "meshCount": 13,
     "materialCount": 1,
     "materialSurfaceCount": 13,
-    "triangles": 75512,
+    "triangles": 84216,
     "textures": 3,
     "uvUnwrapComplete": true,
     "skeletalRigComplete": false,
@@ -39,7 +39,7 @@
     "lodsComplete": false,
     "physicsNodes": 0,
     "studioExported": false,
-    "sourcePlusRuntimeBytes": 16017268,
+    "sourcePlusRuntimeBytes": 16491301,
     "sourcePlusRuntimeLimitBytes": 33554432,
     "sourcePlusRuntimeLimitPurpose": "Repository accident guard, not an agreed performance budget. Increased from untextured prototype 10 MiB for packed 2048 atlases; user deferred numeric budgets.",
     "textureAtlasSize": 2048,
@@ -113,12 +113,12 @@
     ],
     "aabbMax": [
       1.08999991416931,
-      2.09221220016479,
+      2.08409643173218,
       1.32400000095367
     ],
     "widthHeightLength": [
       2.17999982833862,
-      2.09221220016479,
+      2.08409643173218,
       2.69600009918213
     ],
     "existingColliderAdapterOffset": [
@@ -214,8 +214,8 @@
   "verification": {
     "standaloneGodotProbe": "art-source/hero/godot/import_probe.gd",
     "report": "art-source/hero/import-check.json",
-    "reportSha256": "1c9e78f921c3d93eea904581d27649dd299582ee40637af4d5f9875fe9efabe6",
-    "checksPassed": 265,
+    "reportSha256": "42d7a6677bb3d9f1392ed433a82a323c39f36f083112ecb22716fdc0b99749ad",
+    "checksPassed": 278,
     "checksFailed": 0,
     "sameMeshReviewViewsInspected": [
       "front",
@@ -223,26 +223,33 @@
       "side",
       "three-quarter"
     ],
-    "temporaryRenderDirectory": "/private/tmp/gnom-hero-material-final-renders",
+    "temporaryRenderDirectory": "/private/tmp/gnom-hero-sculpt-art5-final",
     "rendersCommitted": false,
     "renderSha256": {
-      "FrontCamera.png": "87a186f2168350a4ac824ad74fee1551cb9eed73448285793200b5cd189f564d",
-      "RearCamera.png": "2c55e84466fe051c4c6e5c66098cf4751577e57d782716951752559e37e02597",
-      "SideCamera.png": "7c299583d7b83e3a2f015d02d2bb61d889784217e35c3eca33b87989075ecd24",
-      "ThreeQuarterCamera.png": "29602bd0d354807fc74bd49217a6a0b9cab483d29a2bccb2cf0f7a18bd724bc5"
+      "FrontCamera.png": "20255490014671b15aac4618405f6a85be7c207d1c7503113a3d51a5d82b709e",
+      "RearCamera.png": "cb33484613c7c6833d4aad82e9048340f60a3069d81905e1c66a9554fd9e98be",
+      "SideCamera.png": "57a489e5895ee33fb32aebcd0651add48882d1dc64cb311768cdeec19f2d5a74",
+      "ThreeQuarterCamera.png": "2d9129dae5b628dc51bfb63dea7baa73de477023fa56ae750a3501cac04870a0"
     },
     "browserIntegration": "Versioned release-Web QA is recorded separately in docs/delivery.md; this import probe does not establish browser or final visual acceptance.",
     "tenVisibleKartPerformance": "unmeasured by this asset probe",
     "uvOverlapAudit": {
       "report": "art-source/hero/material-bake.json",
-      "repairPasses": 3,
-      "positiveAreaTrianglesChecked": 75416,
+      "repairPasses": 1,
+      "positiveAreaTrianglesChecked": 84215,
       "interObjectOverlapPairs": 0,
       "sameObjectOverlapPairs": 0,
       "collapsedNonzeroGeometryUvTriangles": 0,
-      "existingDegenerateGeometryTriangles": 96,
+      "existingDegenerateGeometryTriangles": 0,
       "areaTolerance": 1e-12,
-      "geometryAndPivotsPreserved": true
+      "geometryAndPivotsPreserved": true,
+      "tinyValidUvTrianglesBelowOverlapTolerance": 1
+    },
+    "geometryAudit": {
+      "areaToleranceSquareMeters": 1e-12,
+      "degenerateTriangles": 0,
+      "nonfiniteTriangles": 0,
+      "previousBodyDegeneratesFixed": 96
     }
   },
   "remainingGates": [

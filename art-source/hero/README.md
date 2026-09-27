@@ -1,4 +1,4 @@
-# Hero/Kart MVP Material Pass
+# Hero/Kart MVP Character Pass
 
 This is an editable, geometry-authored **MVP work in progress**, not a final
 character or skeletal rig. The model sheet was approved as the MVP direction on
@@ -32,8 +32,9 @@ self-contained scene; see [Godot's image-handling modes](https://docs.godotengin
 The UV pass checks positive-area triangle intersections across and within all
 meshes, isolates only faulty polygons, repacks, and refuses an unresolved bake
 after five repair passes. It does not modify vertex positions or topology.
-Existing zero-area geometry is counted separately, not presented as repaired;
-final topology cleanup belongs to the still-open geometry stage. The audit does
+Zero-area geometry is counted separately; the Godot import probe rejects it.
+The character pass fixes the 96 former Body degenerates at their source: grille
+and louvre bevels now remain below half the thin box depth. The UV audit does
 not replace artistic seam/texel-density review or browser mip-filtering checks.
 
 ## Provenance
@@ -117,8 +118,20 @@ hat and sculpted beard silhouette, four correctly oriented tires, a compact
 crystal below the shoulders, and two low rear nozzles. These are actual shared
 mesh views, not separately generated concept images.
 
-Remaining art work includes facial/hair refinement, final topology and material tuning,
+The next character pass adds recessed eyes, heavier lids, cheek/nose/ear details,
+unequal overlapping beard and nape locks, a leather waistcoat, turned collar,
+shaped sleeves and a cloth hat band. Flattened swept cross-sections replace the
+old identical round hair tubes. The outer silhouette, wheel/hand pivots and
+gameplay collider are retained; this is not a finished sculpt or deforming rig.
+
+Remaining art work includes further facial/hair refinement, final topology and material tuning,
 finished deformations, optimized LODs and user approval. The stylized blockout
 is simpler than the accepted illustrative art. Material surfaces and triangles
 must be profiled in a ten-visible-kart browser fixture; a successful import is
 not evidence of meeting that performance budget.
+
+For changes limited to this asset, use the standalone import probe, the game's
+`tests/authored_kart_probe.gd` after editor import, and
+`GNOM_QA_SCOPE=hero node scripts/qa/art-stage.cjs` against the rebuilt Web preview.
+This short browser check does not replace full-lap/network acceptance when
+route, physics or network behavior changes.
